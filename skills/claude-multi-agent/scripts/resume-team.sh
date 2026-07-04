@@ -19,6 +19,7 @@ fi
 SESSION_ID=$(cat "$SESSION_FILE")
 
 export CLAUDE_CODE_SUBAGENT_MODEL="${CLAUDE_CODE_SUBAGENT_MODEL:-sonnet}"
+export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS="${CLAUDE_CODE_DISABLE_BACKGROUND_TASKS:-1}"
 
 ARGS=(
   -p "$FEEDBACK"
@@ -26,11 +27,22 @@ ARGS=(
   --fallback-model "sonnet,haiku"
   --permission-mode "${PERMISSION_MODE:-acceptEdits}"
   --resume "$SESSION_ID"
-  --output-format json
+  --output-format stream-json
+  --verbose
+  --append-system-prompt "Subagents you spawn in this session run in the foreground: the Agent tool call itself blocks until the subagent returns a result. Do not poll, sleep, or use Monitor to wait for a subagent to finish — there is nothing to wait for beyond the tool call already returning."
 )
 [[ -n "${MAX_TURNS:-}" ]] && ARGS+=(--max-turns "$MAX_TURNS")
 [[ -n "${MAX_BUDGET_USD:-}" ]] && ARGS+=(--max-budget-usd "$MAX_BUDGET_USD")
 
-claude "${ARGS[@]}" | tee "$STATE_DIR/last-result.json"
+LOG_FILE="$STATE_DIR/stream.jsonl"
+: > "$LOG_FILE"
+
+claude "${ARGS[@]}" | tee "$LOG_FILE" | jq -c 'select(.type == "result")' > "$STATE_DIR/last-result.json"
+
+if [[ ! -s "$STATE_DIR/last-result.json" ]]; then
+  echo "error: no final result event captured — the run may have errored or been interrupted." >&2
+  echo "       check $LOG_FILE for the full turn-by-turn transcript before assuming it hung." >&2
+  exit 1
+fi
 
 jq -r '.session_id' "$STATE_DIR/last-result.json" > "$SESSION_FILE"

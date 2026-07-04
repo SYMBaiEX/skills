@@ -3,7 +3,8 @@
   "model": "opus",
   "fallbackModel": ["sonnet", "haiku"],
   "env": {
-    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
+    "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"
   },
   "permissions": {
     "defaultMode": "acceptEdits"

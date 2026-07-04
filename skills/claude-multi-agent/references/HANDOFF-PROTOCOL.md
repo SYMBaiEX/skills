@@ -4,19 +4,58 @@ The exact state this skill's scripts read and write, so you can build your own w
 a CI pipeline, another Claude Code instance, anything with a shell) instead of using the bundled
 `scripts/*.sh` verbatim.
 
+## A failure mode this protocol used to have, and how it's fixed now
+
+Earlier versions of this skill let subagents run in the background (Claude Code's default since
+v2.1.198). That produced a real bug in practice: the orchestrator spawned the `engineer` subagent
+asynchronously, ended its own turn while the subagent was still running, and the `Stop` hook fired
+right then — writing a `done-<session_id>.json` marker that only meant *the top-level turn ended*,
+not that the engineer subagent had finished. Meanwhile `claude -p --output-format json` prints
+nothing until the very end, so from the calling agent's side the run looked hung for a long
+stretch, got interrupted, and killed the still-working subagent mid-task — landing a partial edit.
+
+Two changes fix this:
+
+1. **Subagents now run in the foreground by default.** `run-team.sh`, `resume-team.sh`, and
+   `launch-team-bg.sh` all set `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` (also baked into
+   `assets/settings.json`), and the four bundled agents set `background: false` in their own
+   frontmatter as a second layer. This means the Agent tool call spawning a subagent *is* the join
+   — it blocks until the subagent returns, so there's nothing to poll and no window where the
+   top-level turn can end while a subagent is still working. The scripts also append a system
+   prompt telling the orchestrator this explicitly, so it doesn't try to build its own wait loop
+   with `sleep` (which Claude Code blocks as a bare polling pattern anyway) or the `Monitor` tool
+   (which isn't meant for this and needs its schema loaded before it's callable in the first
+   place).
+2. **`run-team.sh` and `resume-team.sh` now use `--output-format stream-json --verbose`** instead
+   of plain `json`, teeing the full turn-by-turn stream to `.claude-team/stream.jsonl` so the
+   calling agent has a liveness signal (`tail -f` it) instead of guessing "hung vs. still working"
+   from total silence. The final `result`-type event in that stream is filtered out with `jq` into
+   `last-result.json`, so the downstream contract below is unchanged.
+
+With subagents forced to the foreground, `Stop` firing really does mean everything the orchestrator
+spawned has finished — the failure mode above specifically required a background subagent still
+in flight when `Stop` fired, and that state can no longer happen through this skill's scripts. If
+you override `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` back to unset/`0` yourself, this guarantee no
+longer holds and you're back to the original race.
+
 ## State directory: `.claude-team/`
 
 Created in the current working directory (the target repo) on first run.
 
 | File | Written by | Contents |
 |---|---|---|
-| `.claude-team/last-result.json` | `run-team.sh`, `resume-team.sh` | The full `--output-format json` payload from the most recent synchronous call: `result` (text), `session_id`, `total_cost_usd`, `is_error`, `num_turns`, plus per-model cost breakdown. |
+| `.claude-team/last-result.json` | `run-team.sh`, `resume-team.sh` | The final `type: "result"` event filtered out of the `--output-format stream-json` stream: `result` (text), `session_id`, `total_cost_usd`, `is_error`, `num_turns`, plus per-model cost breakdown. Same fields as plain `--output-format json` would give you — just sourced from the stream instead of a single blocking payload. |
+| `.claude-team/stream.jsonl` | `run-team.sh`, `resume-team.sh` | The full turn-by-turn `stream-json` transcript, written as the run progresses (not just at the end). This is the liveness signal — `tail -f` it to see the orchestrator and its subagents actually working, instead of the old plain-`json` silence that made a slow run indistinguishable from a hung one. |
 | `.claude-team/last-session-id` | `run-team.sh`, `resume-team.sh` | Just the session id string, so the next `resume-team.sh` call knows what to `--resume`. |
-| `.claude-team/done-<session_id>.json` | `on-stop-notify.sh` hook | `{"session_id": "...", "status": "done"}`. Written the moment the orchestrator's `Stop` event fires — this is what a walk-away poller should watch for instead of scraping `claude logs`. |
+| `.claude-team/done-<session_id>.json` | `on-stop-notify.sh` hook | `{"session_id": "...", "status": "done"}`. Written the moment the orchestrator's `Stop` event fires. With subagents forced to the foreground (see above), this reliably means the whole run — orchestrator and every subagent it spawned — is finished, not just that the top-level turn ended. |
 
 None of this is Claude Code's own state (that lives under `~/.claude/`) — it's a plain,
 grep/jq-able contract this skill defines on top, so the calling agent doesn't need to understand
 Claude Code's internal transcript format at all.
+
+If `run-team.sh`/`resume-team.sh` exit with `error: no final result event captured`, the run
+errored or was interrupted before producing a result — check `stream.jsonl` for what was happening
+right before it stopped rather than assuming the process just hung.
 
 ## The loop, end to end
 

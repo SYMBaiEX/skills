@@ -21,7 +21,7 @@ orchestrator seat (needs Opus's reasoning) or the worker seat (needs Sonnet's co
 
 ## The core mechanism
 
-Two levers control who does what, and both ship pre-wired in this skill:
+Three levers control who does what and how reliably, and all three ship pre-wired in this skill:
 
 1. **The orchestrator is the main session**, launched with `--model opus`. It's the thing making
    decisions, writing the plan, and deciding what to delegate vs. do itself.
@@ -30,8 +30,14 @@ Two levers control who does what, and both ship pre-wired in this skill:
    order — it overrides `model: inherit` on built-in subagents (Explore, Plan, general-purpose)
    *and* any custom subagent, so you don't have to hunt down every agent file to keep costs sane.
    The bundled custom agents in `assets/agents/` also set `model: sonnet` explicitly, belt-and-suspenders.
+3. **Every subagent runs in the foreground**, via `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` (Claude
+   Code's default since v2.1.198 is background). This makes the Agent tool call itself the join —
+   it blocks until the subagent returns, so the orchestrator can't end its turn while one is still
+   working, and there's nothing for it to poll or sleep-wait on. See
+   [references/HANDOFF-PROTOCOL.md](references/HANDOFF-PROTOCOL.md#a-failure-mode-this-protocol-used-to-have-and-how-its-fixed-now)
+   for the real bug this fixes.
 
-Everything below is just plumbing around those two facts.
+Everything below is just plumbing around those three facts.
 
 ## Quickstart
 
@@ -60,11 +66,13 @@ the target repo's working directory, because Claude Code session lookups are sco
 
 ### 1. Synchronous — you're driving the loop yourself
 
-`scripts/run-team.sh "<task>"` calls `claude -p` and blocks until the orchestrator finishes,
-printing `--output-format json` (fields include `result`, `session_id`, `total_cost_usd`,
-`is_error`, `num_turns`). It writes that JSON to `.claude-team/last-result.json` and the session
-id to `.claude-team/last-session-id`. Use this when the calling agent is scripted and fine
-waiting synchronously for each round.
+`scripts/run-team.sh "<task>"` calls `claude -p --output-format stream-json --verbose` and blocks
+until the orchestrator finishes. The full turn-by-turn stream is teed to `.claude-team/stream.jsonl`
+(`tail -f` it for a liveness signal — don't assume a slow run is a hung one) while the final
+`result` event (same fields as plain `--output-format json`: `result`, `session_id`,
+`total_cost_usd`, `is_error`, `num_turns`) is filtered into `.claude-team/last-result.json`, and
+the session id into `.claude-team/last-session-id`. Use this when the calling agent is scripted
+and fine waiting synchronously for each round.
 
 ### 2. Walk away — true fire-and-forget
 
@@ -79,7 +87,8 @@ running. Come back later with:
 
 The `Stop` hook (see [Hooks](#hooks)) also drops a `.claude-team/done-<session_id>.json` marker
 file the moment the orchestrator finishes, so a polling loop doesn't have to parse `claude logs`
-output to know when it's safe to check results.
+output to know when it's safe to check results. Because subagents run in the foreground (see
+above), that marker reliably means the whole run — not just the top-level turn — is done.
 
 ### 3. Iterative follow-up — Codex as the user
 
@@ -92,6 +101,22 @@ just standing in for the human.
 
 Session resume is scoped to the directory it was started in — always run these scripts from the
 same working directory (or the worktree, if you used `-w`) as the original invocation.
+
+## Working directly in a dirty repo
+
+`--worktree` isolation (the default) makes a fresh checkout — it does **not** carry over your
+current uncommitted changes, since a new worktree branches from the last commit, not your working
+tree's dirty state. If the task genuinely needs to operate on a repo that has uncommitted changes
+present, set `IN_PLACE=1` to skip `--worktree` entirely and run directly against the current
+checkout:
+
+```bash
+IN_PLACE=1 bash scripts/run-team.sh "Finish the half-done refactor in the working tree"
+```
+
+This trades away the disposable-branch safety net described in
+[references/SAFETY.md](references/SAFETY.md) — commit or stash first if you want a rollback point,
+since changes now land directly on whatever you're checked out to.
 
 ## Model configuration
 

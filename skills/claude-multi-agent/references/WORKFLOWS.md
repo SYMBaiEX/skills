@@ -81,6 +81,14 @@ that aren't covered by this skill's permission-mode defaults:
   them before handing off anything migration- or audit-shaped, especially in walk-away mode where
   no one is watching the token counter.
 
+This skill's `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` default (see
+[HANDOFF-PROTOCOL.md](HANDOFF-PROTOCOL.md#a-failure-mode-this-protocol-used-to-have-and-how-its-fixed-now))
+does not affect workflows — that env var scopes to ad hoc subagent/background-Bash-task
+backgrounding specifically. Workflows have their own separate toggle
+(`disableWorkflows`/`CLAUDE_CODE_DISABLE_WORKFLOWS`) and Anthropic's own docs already have `claude
+-p` properly wait for a workflow to finish before returning its result, unlike the subagent race
+this skill's other default fixes.
+
 ## Requirements
 
 Dynamic workflows need Claude Code v2.1.154 or later, and are available on all paid plans, direct

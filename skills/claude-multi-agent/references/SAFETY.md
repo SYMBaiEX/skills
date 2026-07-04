@@ -27,6 +27,17 @@ git worktree at `<repo>/.claude/worktrees/<name>` rather than your actual checko
 wrong-headed change lands in a disposable branch you can inspect, diff, or delete — it never
 touches your working tree directly.
 
+### `IN_PLACE=1` opts out of this
+
+A worktree is a *separate* checkout — it does not carry over uncommitted changes from your current
+working tree, only committed history. If a task genuinely needs to see and build on dirty,
+uncommitted state, `--worktree` isn't just inconvenient, it's silently wrong: the orchestrator
+would be working against a clean copy that's missing exactly the changes you wanted it to build
+on. `IN_PLACE=1` (see [SKILL.md](../SKILL.md#working-directly-in-a-dirty-repo)) skips `--worktree`
+so the session runs directly against the real checkout instead. You lose the disposable-branch
+safety net entirely when you do this — commit or `git stash` first if you want something to roll
+back to, since there's no separate branch to discard if the run goes wrong.
+
 Before merging anything a walk-away run produced:
 
 1. Read the diff on the worktree branch yourself (or have a reviewer subagent/human do it) — don't

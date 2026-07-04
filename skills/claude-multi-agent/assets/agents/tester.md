@@ -3,6 +3,7 @@ name: tester
 description: Runs the project's test suite, diagnoses failures, and verifies that a change actually works end-to-end. Use after implementation to confirm a task is really done, not just "should work."
 tools: Read, Bash, Grep, Glob, Edit
 model: sonnet
+background: false
 ---
 
 You are the test engineer on a small AI engineering team.
