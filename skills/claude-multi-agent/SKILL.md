@@ -149,8 +149,26 @@ or delete what the target repo doesn't need. Keep every one of them on `model: s
 an agent that genuinely needs Opus-level reasoning for its own subtask, that's a signal the
 orchestrator should be doing that piece itself rather than delegating it.
 
+## Subagents vs. dynamic workflows
+
+Everything above is the classic subagent mechanism: the Opus orchestrator decides, turn by turn,
+what to delegate. That's the right default for a single scoped task. Claude Code separately has
+[dynamic workflows](https://code.claude.com/docs/en/workflows) — a JS script Claude writes and a
+runtime executes in the background, holding the orchestration itself instead of Claude's turn-by-
+turn context, scaling to hundreds of agents per run. This skill does **not** turn workflows on by
+default, but the orchestrator can reach for one on its own if the task calls for it — a
+codebase-wide audit, a large multi-file migration, or research that needs cross-checking. Trigger
+it by phrasing the task as a workflow request (e.g. `"use a workflow to migrate every component
+under src/ from styled-components to Tailwind, each in its own isolated copy"`) — it's plain prompt
+text, so it works the same in headless `-p`/`--bg` mode as interactively. See
+[references/WORKFLOWS.md](references/WORKFLOWS.md) for when to reach for one, how to route a
+workflow's own agents onto Sonnet, and the safety implications that differ from the rest of this
+skill (workflow subagents always run in `acceptEdits`, and headless launches never prompt for
+approval).
+
 ## Reference material
 
 - [references/CLI-CHEATSHEET.md](references/CLI-CHEATSHEET.md) — every `claude` CLI flag this skill touches, condensed
 - [references/HANDOFF-PROTOCOL.md](references/HANDOFF-PROTOCOL.md) — the exact state files and loop the scripts implement, for building your own wrapper instead of using the bundled ones
 - [references/SAFETY.md](references/SAFETY.md) — permission modes, worktree isolation, budget/turn caps, and what `bypassPermissions` does and doesn't skip
+- [references/WORKFLOWS.md](references/WORKFLOWS.md) — when the orchestrator should reach for a dynamic workflow instead of plain subagents, how to route a workflow's agents onto Sonnet, and workflow-specific safety notes

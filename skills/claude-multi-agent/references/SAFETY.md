@@ -52,6 +52,23 @@ as the host. For that class of task:
   tool call — MCP servers or Bash commands it's allowed to run are an exfiltration path if
   `bypassPermissions` is on.
 
+## If the orchestrator writes a dynamic workflow
+
+Everything above assumes plain subagents. If the task prompt nudges the orchestrator into writing
+a [dynamic workflow](https://code.claude.com/docs/en/workflows) instead (see
+[WORKFLOWS.md](WORKFLOWS.md)), the envelope changes in ways this skill's `PERMISSION_MODE` doesn't
+control:
+
+- Workflow-spawned subagents always run in `acceptEdits`, regardless of whatever `PERMISSION_MODE`
+  the orchestrator session itself is running under. A `bypassPermissions` walk-away session doesn't
+  make a workflow's agents any less restricted — they get `acceptEdits` specifically either way.
+- In headless `-p`/`--bg` mode, the interactive "here's the planned phases, run it?" approval step
+  never appears — the workflow just starts. The runtime's own cap (16 concurrent / 1,000 total
+  agents per run) is the real backstop here, not a permission prompt.
+- Cost scales with agent count, not with how big the task looked when you wrote the prompt. Set
+  `MAX_BUDGET_USD` before handing off anything migration- or audit-shaped, especially in walk-away
+  mode where nothing is watching the token counter.
+
 ## Never use Fable here
 
 Don't set `model: fable` on the orchestrator or any subagent, and don't include `fable` in a
