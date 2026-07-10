@@ -49,9 +49,10 @@ Do not stop after research when the objective includes building. Do not stop aft
 
 Inspect the live agent tree and tool schema before choosing a topology. Count the orchestrator as a concurrency slot. Use later waves rather than oversubscribing the runtime.
 
-- Use Terra as an implementation profile for concrete, bounded changes.
-- Use Luna as an investigation and independent-verification profile.
-- Treat these as behavioral profiles unless real model routing is exposed and confirmed.
+- Use confirmed `sol_engineer` / `gpt-5.6` routing for ambiguous architecture, hard implementation, and integration.
+- Use confirmed `terra_explorer` and `terra_worker` / `gpt-5.6-terra` routing for read-heavy research and bounded routine implementation.
+- Use confirmed `luna_verifier` / `gpt-5.6-luna` routing for high-volume mechanical verification and residual scans.
+- Treat these as behavioral profiles unless custom agent configuration or the spawn API confirms real model routing.
 - Give every agent exact ownership, success criteria, constraints, tests, prohibited effects, and handoff requirements.
 - Keep one writer per file or tightly coupled subsystem.
 - Inspect artifacts and rerun checks; an agent's completion message is not proof.
@@ -63,6 +64,8 @@ Choose the next action by leverage: unblock critical dependencies, close user-fa
 Pause for the user only when a missing decision would materially change the result or continuing requires new authority. Treat missing credentials or external state as a reported verification boundary, not permission to fabricate success.
 
 Use the runtime's native blocked status only under its stated threshold and semantics. Difficulty, uncertainty, slow progress, or a nearly exhausted budget are not blockers by themselves.
+
+Do not install a generic `Stop` hook to force persistence. Such hooks can create unbounded continuation loops and cannot determine whether new user authority is required. Prefer native goal state or the explicit goal ledger above.
 
 ## Complete the goal
 

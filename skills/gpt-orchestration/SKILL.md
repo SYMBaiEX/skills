@@ -1,10 +1,10 @@
 ---
 name: gpt-orchestration
-description: Coordinate hierarchical coding-agent fleets for repository-wide audits, implementation sprints, migrations, and complex work that benefits from parallel specialists. Use when a user asks for subagents, a fleet, parallel delegation, Terra or Luna roles, broad codebase completion, or independent implementation and verification passes. Enforce bounded ownership, concurrency-aware waves, dirty-worktree safety, runtime-honest model handling, and evidence-based integration.
+description: Coordinate hierarchical coding-agent fleets for repository-wide audits, implementation sprints, migrations, and complex work that benefits from parallel specialists. Use when a user asks for subagents, a fleet, parallel delegation, GPT-5.6 Sol, Terra, or Luna routing, broad codebase completion, or independent implementation and verification passes. Enforce bounded ownership, concurrency-aware waves, dirty-worktree safety, runtime-honest model handling, and evidence-based integration.
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # GPT Orchestration
@@ -15,11 +15,11 @@ Treat findings as inputs to action, not the end product. When the user authorize
 
 ## Establish runtime truth
 
-1. Inspect the available collaboration tool schemas and current agent tree before promising a topology.
-2. Check whether `spawn_agent` or another exposed runtime control accepts an explicit model identifier.
-3. If model selection is exposed, use only identifiers confirmed by the runtime or current official documentation.
-4. If model selection is not exposed, state once that per-agent model routing is unavailable and use Terra and Luna as behavioral role profiles only. Never claim that an agent runs a model that was not explicitly selected and confirmed.
-5. Treat the orchestrator as one occupied concurrency slot. Compute each wave from the currently exposed capacity and active-agent count.
+1. Inspect the available collaboration tool schemas, custom agent types, and current agent tree before promising a topology.
+2. Check for confirmed Codex custom agents that bind a type to a model, or an explicit model field on the spawn API. A custom agent type is real routing only when its configuration or current runtime confirms the model.
+3. Prefer `gpt-5.6` (Sol) for ambiguous integration and hard engineering, `gpt-5.6-terra` for exploration and bounded implementation, and `gpt-5.6-luna` for high-volume mechanical verification.
+4. Use only identifiers confirmed by the runtime or current official documentation. If routing is unavailable, state that once and use Sol, Terra, and Luna as behavioral profiles only. Never claim a model selection that was not confirmed.
+5. Treat the orchestrator as one occupied concurrency slot. Compute each wave from the currently exposed capacity and active-agent count. Keep spawn depth at one unless deeper delegation is necessary and explicitly bounded.
 
 ## Preserve repository state
 
@@ -41,12 +41,13 @@ For a repository-wide completion pass, prefer this first wave:
 
 | Profile | Mode | Responsibility |
 | --- | --- | --- |
-| Terra | Read-only; bounded writes only when authorized | Trace architecture, SDK usage, dependency drift, and removable custom or deprecated code |
-| Luna | Read-only | Find incomplete product paths, TODOs, stubs, mocks, placeholder UX, silent fallbacks, and missing tests |
-| Luna | Read-only | Review correctness, security, accessibility, build or release readiness, and verification coverage |
-| Orchestrator | Integrator | Inventory the repo, resolve overlaps, assign remediation waves, run cross-cutting checks, and own the final verdict |
+| Sol / `sol_engineer` | Bounded writes when authorized | Resolve ambiguous architecture, hard implementation, integration, and root-cause debugging |
+| Terra / `terra_explorer` | Read-only | Trace architecture, SDK usage, dependencies, documentation, and incomplete product paths |
+| Terra / `terra_worker` | Bounded writes | Implement isolated, well-specified findings with focused tests |
+| Luna / `luna_verifier` | Verification | Run test matrices, diff hygiene, residual scans, and acceptance evidence |
+| Orchestrator | Integrator | Resolve overlaps, own cross-cutting judgment, and decide final acceptance |
 
-Treat `Terra` as an implementation-focused profile: concrete edits, minimal abstractions, local tests, and exact handoff notes. Treat `Luna` as an investigation and verification profile: trace behavior end to end, challenge completion claims, and cite evidence. These names do not imply model selection unless the runtime confirms it.
+When Codex custom profiles are present, route by their exact agent types. Otherwise treat the names as behavioral profiles. Keep final semantic acceptance and authority decisions with the orchestrator even when Luna performs mechanical verification.
 
 ## Write task contracts
 

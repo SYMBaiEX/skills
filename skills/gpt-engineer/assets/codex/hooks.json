@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "SubagentStart": [
+      {
+        "matcher": "^(sol_engineer|terra_explorer|terra_worker|luna_verifier)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/gpt_engineer_subagent_context.py\"",
+            "timeout": 10,
+            "statusMessage": "Loading GPT Engineer context"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/gpt_engineer_guard.py\"",
+            "timeout": 10,
+            "statusMessage": "Checking destructive command guard"
+          }
+        ]
+      }
+    ]
+  }
+}

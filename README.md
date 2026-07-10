@@ -5,6 +5,8 @@ work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
 
 ## Skills
 
+- [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: model-routed
+  research, implementation, integration, verification, goal persistence, and optional Codex bootstrap.
 - [`skills/claude-multi-agent/`](skills/claude-multi-agent/) — delegate real engineering work to
   Claude Code CLI as an autonomous multi-agent team: an Opus 4.8 orchestrator delegating to
   Sonnet 5 subagents, driven headlessly via `claude -p` / `claude --bg`. Built for hand-off from
@@ -27,6 +29,7 @@ a folder with a `SKILL.md` (metadata + instructions) plus optional `scripts/`, `
 
 ```bash
 npx skills add SYMBaiEX/skills                         # interactive: pick agent + skill
+npx skills add SYMBaiEX/skills --skill gpt-engineer -y
 npx skills add SYMBaiEX/skills --skill claude-multi-agent -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration-build -y

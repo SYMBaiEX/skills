@@ -39,7 +39,7 @@ Order confirmed work by dependency and blast radius:
 5. cleanup, documentation, and generated artifacts;
 6. independent verification and residual-gap scan.
 
-Use the runtime's available concurrency, counting the orchestrator as a slot. Give one writer ownership of each file or tightly coupled subsystem. Use implementation-focused Terra profiles for bounded writes and Luna profiles for independent review when explicit model routing is unavailable. Never claim a model was selected unless the runtime confirms it.
+Use the runtime's available concurrency, counting the orchestrator as a slot. Give one writer ownership of each file or tightly coupled subsystem. When confirmed Codex custom agents are present, use `sol_engineer` (`gpt-5.6`) for hard integration, `terra_worker` (`gpt-5.6-terra`) for bounded implementation, `terra_explorer` for read-heavy gaps, and `luna_verifier` (`gpt-5.6-luna`) for high-volume mechanical checks. Otherwise use those as behavioral profiles and never claim model routing the runtime did not confirm.
 
 Every writer contract must include exact paths, success criteria, prohibited side effects, required tests, baseline constraints, and expected handoff evidence. Keep overlapping work read-only.
 

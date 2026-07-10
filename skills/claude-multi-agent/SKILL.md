@@ -2,7 +2,6 @@
 name: claude-multi-agent
 description: Hand off real engineering work to Claude Code CLI as an autonomous, staffed multi-agent team - an Opus 4.8 orchestrator that plans, delegates to Sonnet 5 subagents (engineer, reviewer, tester, planner), and reports back. Use when another agent (e.g. OpenAI Codex acting as the product owner/user) needs Claude Code to act as the engineering team on a task and run headlessly via `claude -p` / `claude --bg`, including "give it a task and walk away" autonomous runs, iterative design follow-up loops, CI automation, or setting up `.claude/agents`, hooks, and permission modes for headless multi-agent Claude Code work.
 license: MIT
-compatibility: Requires the `claude` CLI (Claude Code) installed, authenticated, and on PATH, plus `git` and `jq`. Meant to be invoked by another shell-capable agent (OpenAI Codex, another Claude Code instance, a CI runner, or any orchestrator with Bash access).
 metadata:
   author: SYMBaiEX
   version: "1.0"
@@ -10,6 +9,8 @@ allowed-tools: Bash(claude:*) Bash(git:*) Bash(jq:*) Read Write
 ---
 
 # Claude Multi-Agent
+
+Requires the `claude` CLI installed, authenticated, and on `PATH`, plus `git` and `jq`. Invoke it from a shell-capable agent such as Codex, another Claude Code instance, or CI.
 
 Turn Claude Code into an autonomous engineering team that another agent can delegate to. The
 calling agent (Codex, another orchestrator, CI) plays **product owner / user**. Claude Code plays
