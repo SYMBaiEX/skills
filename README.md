@@ -13,6 +13,10 @@ work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
 - [`skills/gpt-orchestration/`](skills/gpt-orchestration/) — coordinate native agent fleets for
   repository-wide audits and implementation work with explicit ownership, safe concurrency,
   runtime-honest model handling, and independent verification.
+- [`skills/gpt-orchestration-build/`](skills/gpt-orchestration-build/) — take an existing audit,
+  finding list, or implementation plan and build every confirmed item through verified waves.
+- [`skills/gpt-orchestration-auto/`](skills/gpt-orchestration-auto/) — run a persistent `/goal`-style
+  research, implementation, verification, and gap-closing loop until the outcome is complete.
 
 ## Install a skill
 
@@ -25,6 +29,8 @@ a folder with a `SKILL.md` (metadata + instructions) plus optional `scripts/`, `
 npx skills add SYMBaiEX/skills                         # interactive: pick agent + skill
 npx skills add SYMBaiEX/skills --skill claude-multi-agent -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration -y
+npx skills add SYMBaiEX/skills --skill gpt-orchestration-build -y
+npx skills add SYMBaiEX/skills --skill gpt-orchestration-auto -y
 ```
 
 Or just copy the skill folder into your own agent's skill directory (e.g. `.claude/skills/`,

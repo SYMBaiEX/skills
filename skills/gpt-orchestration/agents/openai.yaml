@@ -1,4 +1,4 @@
 interface:
   display_name: "GPT Orchestration"
   short_description: "Coordinate safe, evidence-driven agent fleets"
-  default_prompt: "Use $gpt-orchestration to coordinate a safe multi-agent audit and implementation pass."
+  default_prompt: "Use $gpt-orchestration to research this codebase, build every confirmed in-scope finding, and verify the integrated result."

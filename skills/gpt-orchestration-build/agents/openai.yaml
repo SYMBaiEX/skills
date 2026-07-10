@@ -1,0 +1,4 @@
+interface:
+  display_name: "GPT Orchestration Build"
+  short_description: "Build every confirmed orchestration finding"
+  default_prompt: "Use $gpt-orchestration-build to turn these findings into verified implementation waves."

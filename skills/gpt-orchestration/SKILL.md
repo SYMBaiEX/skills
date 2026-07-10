@@ -4,12 +4,14 @@ description: Coordinate hierarchical coding-agent fleets for repository-wide aud
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # GPT Orchestration
 
 Coordinate specialists while retaining responsibility for integration and the final result. Use native collaboration tools; do not build an orchestration framework inside the target repository unless the user explicitly requests one.
+
+Treat findings as inputs to action, not the end product. When the user authorizes implementation, carry every confirmed in-scope finding through disposition, build, integration, and verification. Do not stop after producing an audit report.
 
 ## Establish runtime truth
 
@@ -70,6 +72,8 @@ Use prompts that are independently actionable. Do not ask multiple writers to fi
 5. **Integrate:** Review each diff immediately. Check that the agent stayed in scope and preserved baseline changes before starting the next dependent wave.
 6. **Verify independently:** Give Luna-profile reviewers raw artifacts and acceptance criteria, not the intended conclusion. Use a fresh reviewer where capacity permits.
 7. **Close:** Run repository-wide gates, inspect the final diff against the baseline, and report completed work plus any genuinely unresolved items.
+
+Maintain a finding ledger across the waves. Give each finding an identifier, evidence, severity, affected paths, dependencies, owner, planned verification, and one final disposition: implemented, already satisfied, invalid, duplicate, blocked, or explicitly deferred. Never silently drop a finding between research and build.
 
 Do not spawn more workers than the runtime supports. Use later waves or reuse an idle agent when specialist continuity is useful.
 
