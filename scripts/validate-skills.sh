@@ -9,6 +9,9 @@ python3 "$ROOT/scripts/check-skills.py"
 python3 "$ROOT/skills/gpt-engineer/scripts/test_bootstrap.py"
 python3 "$ROOT/skills/gpt-engineer/scripts/test_bootstrap_codex.py"
 python3 "$ROOT/skills/gpt-engineer/scripts/test_run_codex_agent.py"
+python3 "$ROOT/skills/gpt-engineer-spark/scripts/test_bootstrap.py"
+python3 "$ROOT/skills/gpt-engineer-spark/scripts/test_run_spark_agent.py"
+python3 "$ROOT/skills/gpt-engineer-spark/scripts/test_run_spark_fleet.py"
 
 for skill in "$ROOT"/skills/*; do
   if [[ -f "$skill/SKILL.md" ]]; then

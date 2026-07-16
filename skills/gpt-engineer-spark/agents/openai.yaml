@@ -1,0 +1,4 @@
+interface:
+  display_name: "GPT Engineer Spark"
+  short_description: "Build quickly with a routed Spark agent fleet"
+  default_prompt: "Use $gpt-engineer-spark to lead this engineering task with a fleet of fast Spark agents."

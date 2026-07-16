@@ -7,6 +7,8 @@ work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
 
 - [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: provider-routed
   research, implementation, integration, verification, goal persistence, and Codex/Claude bootstrap.
+- [`skills/gpt-engineer-spark/`](skills/gpt-engineer-spark/) — keep a capable lead in control while
+  a model-pinned GPT-5.3-Codex-Spark fleet handles bounded parallel exploration, candidate edits, and checks.
 - [`skills/claude-multi-agent/`](skills/claude-multi-agent/) — delegate real engineering work to
   Claude Code CLI as an autonomous multi-agent team: an Opus 4.8 orchestrator delegating to
   Sonnet 5 subagents, driven headlessly via `claude -p` / `claude --bg`. Built for hand-off from
@@ -30,6 +32,7 @@ a folder with a `SKILL.md` (metadata + instructions) plus optional `scripts/`, `
 ```bash
 npx skills add SYMBaiEX/skills                         # interactive: pick agent + skill
 npx skills add SYMBaiEX/skills --skill gpt-engineer -y
+npx skills add SYMBaiEX/skills --skill gpt-engineer-spark -y
 npx skills add SYMBaiEX/skills --skill claude-multi-agent -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration-build -y
@@ -49,6 +52,18 @@ python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --check --global
 The profile bootstrap is deliberately separate from skills.sh: it refuses conflicting files and does
 not edit provider configuration. For project-local profiles and conservative Codex hooks, replace
 `--global` with `/path/to/repository`.
+
+Install and register the Codex-only Spark fleet separately:
+
+```bash
+npx skills add https://github.com/SYMBaiEX/skills \
+  --skill gpt-engineer-spark --agent codex --global --yes
+python3 ~/.agents/skills/gpt-engineer-spark/scripts/bootstrap.py --global
+python3 ~/.agents/skills/gpt-engineer-spark/scripts/bootstrap.py --check --global
+```
+
+Spark fallback writers use isolated candidate copies and return reviewable change bundles. The capable
+main agent integrates those bundles and owns the final repository checks.
 
 Or just copy the skill folder into your own agent's skill directory (e.g. `.claude/skills/`,
 `.codex/skills/`, or wherever your agent looks for skills — see the `skills` CLI's supported-agent
