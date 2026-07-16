@@ -5,8 +5,8 @@ work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
 
 ## Skills
 
-- [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: model-routed
-  research, implementation, integration, verification, goal persistence, and optional Codex bootstrap.
+- [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: provider-routed
+  research, implementation, integration, verification, goal persistence, and Codex/Claude bootstrap.
 - [`skills/claude-multi-agent/`](skills/claude-multi-agent/) — delegate real engineering work to
   Claude Code CLI as an autonomous multi-agent team: an Opus 4.8 orchestrator delegating to
   Sonnet 5 subagents, driven headlessly via `claude -p` / `claude --bg`. Built for hand-off from
@@ -35,6 +35,20 @@ npx skills add SYMBaiEX/skills --skill gpt-orchestration -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration-build -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration-auto -y
 ```
+
+For the complete GPT Engineer workflow in Codex and Claude Code, install it globally, register the
+bundled provider-native model profiles, then restart both clients:
+
+```bash
+npx skills add https://github.com/SYMBaiEX/skills \
+  --skill gpt-engineer --agent codex claude-code --global --yes
+python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --global
+python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --check --global
+```
+
+The profile bootstrap is deliberately separate from skills.sh: it refuses conflicting files and does
+not edit provider configuration. For project-local profiles and conservative Codex hooks, replace
+`--global` with `/path/to/repository`.
 
 Or just copy the skill folder into your own agent's skill directory (e.g. `.claude/skills/`,
 `.codex/skills/`, or wherever your agent looks for skills — see the `skills` CLI's supported-agent

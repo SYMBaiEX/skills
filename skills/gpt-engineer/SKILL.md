@@ -1,6 +1,6 @@
 ---
 name: gpt-engineer
-description: "Own a software-engineering outcome end to end with a model-routed GPT-5.6 agent fleet: research the real codebase, turn findings into implementation waves, edit safely, test and inspect the result, and persist through gap-closing cycles until the authorized goal is complete. Use when the user asks for a GPT engineer, autonomous engineer, complete feature or repository build, broad remediation, research plus implementation, multi-agent coding, or a durable /goal-style engineering run. Prefer confirmed Codex Sol, Terra, and Luna custom-agent profiles when available; degrade honestly on runtimes without model routing."
+description: "Own a software-engineering outcome end to end with a provider-routed agent fleet: research the real codebase, turn findings into implementation waves, edit safely, test and inspect the result, and persist through gap-closing cycles until the authorized goal is complete. Use when the user asks for a GPT engineer, autonomous engineer, complete feature or repository build, broad remediation, research plus implementation, multi-agent coding, explicit subagents, different models, or a durable /goal-style engineering run. Prefer confirmed Codex Sol, Terra, and Luna profiles or Claude model-specific profiles; preflight routing and never silently present same-model children as a model-diverse fleet."
 ---
 
 # GPT Engineer
@@ -17,9 +17,19 @@ Read [the Codex and GPT-5.6 routing reference](references/codex-gpt-5.6.md) when
 4. Separate local implementation authority from deployment, push, merge, production, messaging, purchasing, and credential authority.
 5. If the user requests a durable goal and native goal tooling exists, use it according to the runtime contract. Otherwise keep an equivalent goal ledger; never fake goal persistence.
 
-## Detect and route the fleet
+## Make delegation real
 
 Inspect the live collaboration tools, agent types, capacity, and current agent tree before promising a topology.
+
+Spawn subagents when the user explicitly requests a fleet or when a non-trivial task has at least two independent workstreams that materially benefit from delegation. Use at least one explorer before broad implementation and an independent verifier after it. Add bounded workers only when their write scopes do not overlap. Do not force a fleet for a trivial or tightly coupled change.
+
+Run this routing preflight:
+
+1. Confirm that the intended profiles are installed in a directory the selected agent actually loads.
+2. Inspect the active spawn schema for an `agent_type`, `model`, or equivalent selector. Profile files alone do not prove that a child used their model.
+3. Prefer native subagents when the runtime can select the exact profile. Do not use a full-history fork when the runtime rejects model or role overrides with that mode.
+4. When Codex model diversity is required but native selection is unavailable, use `scripts/run_codex_agent.py` for explicit model-pinned delegates. Run no more than two read-only delegates concurrently, never overlap a writer with another delegate in the same repository, and inspect every result envelope.
+5. If no model-selectable route exists, use generic subagents only for context isolation and disclose that they inherited the parent model. Never claim model diversity that the runtime did not prove.
 
 When the bundled Codex profiles are installed and selectable, prefer:
 
@@ -32,9 +42,25 @@ When the bundled Codex profiles are installed and selectable, prefer:
 
 Use Sol for the main engineering judgment when the current surface lets the user or runtime select it. Keep high-stakes integration and final acceptance with the orchestrator even when delegated.
 
-If those profiles are not installed, check whether the spawn API exposes a model or custom agent type. Use only confirmed identifiers. If routing is unavailable, use the names as behavioral profiles and say once that actual per-agent model selection could not be confirmed.
+For Claude Code, route to `gpt-engineer-lead` (Opus), `gpt-engineer-explorer` and `gpt-engineer-worker` (Sonnet), and `gpt-engineer-verifier` (Haiku). If `CLAUDE_CODE_SUBAGENT_MODEL` is set, report that it overrides every profile. Claude profiles cannot run GPT models; use the Codex CLI fallback only when cross-provider delegation is explicitly intended and Codex is installed and authenticated.
 
 Count the orchestrator as a concurrency slot. Keep the Codex default one-level hierarchy unless deeper nesting is genuinely necessary. Prefer independent parallel work over recursive fan-out.
+
+### Use the Codex CLI fallback safely
+
+Pass the task through stdin and keep evidence outside the repository:
+
+```bash
+python3 scripts/run_codex_agent.py \
+  --role terra-explorer \
+  --cwd /path/to/repo \
+  --output-dir /tmp/gpt-engineer/architecture \
+  <<'PROMPT'
+Trace the requested execution path. Return evidence only; do not edit.
+PROMPT
+```
+
+Writer roles require `--allow-writes` and at least one repository-relative `--allow-path`. Explicitly review and list any permitted pre-existing dirty path with `--allow-dirty-path`. The runner pins the role's model, disables recursive delegation and network access, uses a repository lock, refuses output inside the worktree, captures JSONL and the final message, and fails closed on incomplete events or scope violations. Never add bypass-permissions flags.
 
 ## Run the engineering loop
 
@@ -72,16 +98,25 @@ Use explorers for noisy discovery, workers for isolated writes, and verifiers fo
 - Use Computer Use or browser tooling for user-facing QA when available and authorized; preserve screenshots or exact reproduction evidence.
 - Inspect smoke, release, migration, and integration scripts before running them. Never let a command silently default to production.
 
-## Configure Codex only when authorized
+## Register profiles only when authorized
 
-The optional bootstrap installs project-local custom agent profiles and conservative hooks:
+skills.sh installs the workflow but cannot register provider-specific agent files. Use the unified bootstrap explicitly after installation.
+
+Install user-level Codex and Claude profiles:
 
 ```bash
-python3 scripts/bootstrap_codex.py /path/to/repo
-python3 scripts/bootstrap_codex.py --check /path/to/repo
+python3 scripts/bootstrap.py --global
+python3 scripts/bootstrap.py --check --global
 ```
 
-Run it only when the user asks to configure the target repository. It merges `.codex/hooks.json`, refuses conflicting files, and does not edit `config.toml`. Hooks are guardrails, not a security boundary; continue applying the workflow's authority checks.
+Install project-level profiles plus conservative Codex hooks:
+
+```bash
+python3 scripts/bootstrap.py /path/to/repo
+python3 scripts/bootstrap.py --check /path/to/repo
+```
+
+Restart the selected agent and start a new task after installation so it rebuilds the agent catalog. The bootstrap refuses conflicting files, never edits provider config, installs no global hooks, and merges only project `.codex/hooks.json`. Hooks are guardrails, not a security boundary.
 
 ## Close like an owner
 

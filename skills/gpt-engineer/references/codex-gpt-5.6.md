@@ -12,11 +12,19 @@ GPT-5.6 supports `none`, `low`, `medium`, `high`, `xhigh`, and `max` in the API.
 
 ## Codex custom agents
 
-Current Codex releases load project agents from `.codex/agents/*.toml`. Required fields are `name`, `description`, and `developer_instructions`; model, reasoning effort, sandbox, MCP servers, and skill config are optional overrides.
+Current Codex releases load user agents from `~/.codex/agents/*.toml` and project agents from `.codex/agents/*.toml`. Required fields are `name`, `description`, and `developer_instructions`; model, reasoning effort, sandbox, MCP servers, and skill config are optional overrides.
 
 Codex defaults to six concurrent agent threads and a maximum spawn depth of one. Keep depth one by default. More nesting increases tokens, latency, local resource use, and the chance of repeated fan-out.
 
 Subagents are enabled in current Codex releases and can be requested directly or by applicable `AGENTS.md` or skill instructions. ChatGPT Work can also run parallel hosted subagent workflows where available.
+
+Agent files are configuration, not proof of selection. Inspect the current spawn tool for an agent-type or model selector. When that selector is unavailable, use the bundled `run_codex_agent.py` wrapper to pin `codex exec --model`; otherwise describe the child as inheriting the parent model.
+
+## Claude Code agents
+
+Claude Code loads user agents from `~/.claude/agents/*.md` and project agents from `.claude/agents/*.md`. The bundled lead, explorer, worker, and verifier profiles use the stable `opus`, `sonnet`, and `haiku` aliases. `CLAUDE_CODE_SUBAGENT_MODEL` overrides every per-agent model; surface that condition rather than claiming diversity.
+
+Claude Code cannot natively run GPT-5.6 profiles. Cross-provider GPT delegation requires an installed, authenticated Codex CLI and the explicit Codex fallback. Do not relabel Claude agents as Sol, Terra, or Luna.
 
 ## Hooks
 
@@ -40,3 +48,5 @@ Do not install a default `Stop` continuation hook. A generic auto-continue hook 
 - Codex subagents: https://learn.chatgpt.com/docs/agent-configuration/subagents
 - Codex hooks: https://learn.chatgpt.com/docs/hooks
 - Codex customization: https://learn.chatgpt.com/docs/customization/overview
+- Claude Code subagents: https://code.claude.com/docs/en/sub-agents
+- Claude Code model configuration: https://code.claude.com/docs/en/model-config

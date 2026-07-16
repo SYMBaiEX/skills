@@ -52,7 +52,8 @@ Inspect the live agent tree and tool schema before choosing a topology. Count th
 - Use confirmed `sol_engineer` / `gpt-5.6` routing for ambiguous architecture, hard implementation, and integration.
 - Use confirmed `terra_explorer` and `terra_worker` / `gpt-5.6-terra` routing for read-heavy research and bounded routine implementation.
 - Use confirmed `luna_verifier` / `gpt-5.6-luna` routing for high-volume mechanical verification and residual scans.
-- Treat these as behavioral profiles unless custom agent configuration or the spawn API confirms real model routing.
+- Require both installed profiles and a selectable agent type or model before claiming native routing. If native selection is unavailable and the sibling `gpt-engineer` skill is installed, use its guarded Codex CLI fallback for model-pinned delegates. Otherwise disclose same-model inheritance.
+- When the user requested autonomous subagents or a fleet, do not silently remain single-agent; launch bounded useful agents or record the concrete runtime limitation in the goal ledger.
 - Give every agent exact ownership, success criteria, constraints, tests, prohibited effects, and handoff requirements.
 - Keep one writer per file or tightly coupled subsystem.
 - Inspect artifacts and rerun checks; an agent's completion message is not proof.

@@ -18,8 +18,9 @@ Treat findings as inputs to action, not the end product. When the user authorize
 1. Inspect the available collaboration tool schemas, custom agent types, and current agent tree before promising a topology.
 2. Check for confirmed Codex custom agents that bind a type to a model, or an explicit model field on the spawn API. A custom agent type is real routing only when its configuration or current runtime confirms the model.
 3. Prefer `gpt-5.6` (Sol) for ambiguous integration and hard engineering, `gpt-5.6-terra` for exploration and bounded implementation, and `gpt-5.6-luna` for high-volume mechanical verification.
-4. Use only identifiers confirmed by the runtime or current official documentation. If routing is unavailable, state that once and use Sol, Terra, and Luna as behavioral profiles only. Never claim a model selection that was not confirmed.
-5. Treat the orchestrator as one occupied concurrency slot. Compute each wave from the currently exposed capacity and active-agent count. Keep spawn depth at one unless deeper delegation is necessary and explicitly bounded.
+4. If native selection is unavailable and the sibling `gpt-engineer` skill is installed, use its guarded `scripts/run_codex_agent.py` fallback for explicitly model-pinned read-heavy delegates. Keep writes sequential and scoped. Otherwise state that model diversity is unavailable and treat the names as behavioral profiles only.
+5. When the user explicitly requests subagents or a fleet, do not silently remain single-agent. Spawn useful bounded agents or report the concrete runtime limitation.
+6. Treat the orchestrator as one occupied concurrency slot. Compute each wave from the currently exposed capacity and active-agent count. Keep spawn depth at one unless deeper delegation is necessary and explicitly bounded.
 
 ## Preserve repository state
 
@@ -47,7 +48,7 @@ For a repository-wide completion pass, prefer this first wave:
 | Luna / `luna_verifier` | Verification | Run test matrices, diff hygiene, residual scans, and acceptance evidence |
 | Orchestrator | Integrator | Resolve overlaps, own cross-cutting judgment, and decide final acceptance |
 
-When Codex custom profiles are present, route by their exact agent types. Otherwise treat the names as behavioral profiles. Keep final semantic acceptance and authority decisions with the orchestrator even when Luna performs mechanical verification.
+When Codex custom profiles are present and selectable, route by their exact agent types. A profile file alone is not proof that the child used its model. Keep final semantic acceptance and authority decisions with the orchestrator even when Luna performs mechanical verification.
 
 ## Write task contracts
 

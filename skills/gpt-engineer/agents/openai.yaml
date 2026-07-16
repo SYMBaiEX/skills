@@ -1,4 +1,4 @@
 interface:
   display_name: "GPT Engineer"
-  short_description: "Research, build, and verify with GPT-5.6 fleets"
-  default_prompt: "Use $gpt-engineer to own this engineering outcome from research through verified implementation."
+  short_description: "Build and verify with genuinely routed agent fleets"
+  default_prompt: "Use $gpt-engineer to own this engineering outcome with model-routed subagents from research through verified implementation."

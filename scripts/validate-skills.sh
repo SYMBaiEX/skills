@@ -3,10 +3,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILLS_REF_REV="38a2ff82958afee88dadf4831509e6f7e9d8ef4e"
-SKILLS_CLI_VERSION="1.5.15"
+SKILLS_CLI_VERSION="1.5.16"
 
 python3 "$ROOT/scripts/check-skills.py"
+python3 "$ROOT/skills/gpt-engineer/scripts/test_bootstrap.py"
 python3 "$ROOT/skills/gpt-engineer/scripts/test_bootstrap_codex.py"
+python3 "$ROOT/skills/gpt-engineer/scripts/test_run_codex_agent.py"
 
 for skill in "$ROOT"/skills/*; do
   if [[ -f "$skill/SKILL.md" ]]; then
