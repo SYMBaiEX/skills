@@ -24,6 +24,7 @@ class RunSparkAgentTests(unittest.TestCase):
             """#!/usr/bin/env python3
 import json
 import pathlib
+import subprocess
 import sys
 import time
 
@@ -59,6 +60,9 @@ if "WRITE_IGNORED" in prompt:
     (cwd / "ignored.txt").write_text("changed\\n")
 if "READ_MUTATION" in prompt:
     (cwd / "read-mutation.txt").write_text("changed\\n")
+if "COMMIT_CHANGE" in prompt:
+    subprocess.run(["git", "add", "-A"], cwd=cwd, check=True)
+    subprocess.run(["git", "-c", "user.name=Delegate", "-c", "user.email=delegate@example.com", "commit", "-qm", "delegate commit"], cwd=cwd, check=True)
 if "TURN_FAILED" in prompt:
     output.write_text("partial\\n")
     print(json.dumps({"type": "turn.failed"}))
@@ -183,6 +187,29 @@ print(json.dumps({"type": "turn.completed"}))
         envelope = json.loads((self.output / "result.json").read_text())
         self.assertIn("out-of-scope candidate change: outside.txt", envelope["violations"])
         self.assertFalse((self.root / "outside.txt").exists())
+
+    def test_writer_commit_fails_closed_but_preserves_candidate_patch(self) -> None:
+        with mock.patch("sys.stdin", io.StringIO("WRITE_ALLOWED COMMIT_CHANGE")):
+            result = run_spark_agent.main(
+                [
+                    "--role",
+                    "spark-worker",
+                    "--cwd",
+                    str(self.root),
+                    "--output-dir",
+                    str(self.output),
+                    "--codex",
+                    str(self.codex),
+                    "--allow-writes",
+                    "--allow-path",
+                    "src",
+                ]
+            )
+        self.assertEqual(result, 1)
+        envelope = json.loads((self.output / "result.json").read_text())
+        self.assertIn("candidate delegate created one or more commits", envelope["violations"])
+        self.assertNotEqual(envelope["candidateBaselineCommit"], envelope["candidateHeadCommit"])
+        self.assertIn("src/generated.txt", Path(envelope["candidatePatch"]).read_text())
 
     def test_writer_fails_closed_on_ignored_file_change(self) -> None:
         (self.root / ".gitignore").write_text("ignored.txt\n")

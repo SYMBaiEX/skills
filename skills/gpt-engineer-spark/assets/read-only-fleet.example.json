@@ -2,13 +2,13 @@
   "tasks": [
     {
       "id": "source-scan",
-      "wave": 0,
+      "dependsOn": [],
       "role": "spark-explorer",
       "prompt": "Inspect src only. Find incomplete or incorrect behavior, cite exact paths and symbols, and report commands run. Do not edit."
     },
     {
       "id": "test-contract",
-      "wave": 0,
+      "dependsOn": [],
       "role": "spark-verifier",
       "prompt": "Inspect the test surface and compare it with source behavior. Report proven contract failures, missing evidence, and commands run. Do not edit."
     }

@@ -89,18 +89,70 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertEqual(len(envelope["delegates"]), 2)
         self.assertTrue(all(item["serverAcceptedRequest"] for item in envelope["delegates"]))
 
-    def test_required_failure_stops_later_waves(self) -> None:
+    def test_required_failure_skips_descendants_but_runs_unrelated_work(self) -> None:
         self.write_manifest(
             [
                 {"id": "fail", "role": "spark-explorer", "wave": 0, "prompt": "FORCE_FAIL"},
-                {"id": "later", "role": "spark-verifier", "wave": 1, "prompt": "SHOULD_NOT_RUN"},
+                {
+                    "id": "blocked",
+                    "role": "spark-verifier",
+                    "dependsOn": ["fail"],
+                    "prompt": "SHOULD_NOT_RUN",
+                },
+                {"id": "unrelated", "role": "spark-verifier", "wave": 1, "prompt": "RUN"},
             ]
         )
         self.assertEqual(self.run_fleet(), 1)
         envelope = json.loads((self.output / "fleet-result.json").read_text())
         self.assertEqual(envelope["status"], "incomplete")
-        self.assertEqual(envelope["stoppedAfterWave"], 0)
-        self.assertEqual(envelope["skippedTaskIds"], ["later"])
+        self.assertEqual(envelope["failedTaskIds"], ["fail"])
+        self.assertEqual(envelope["skippedTaskIds"], ["blocked"])
+        by_id = {item["id"]: item for item in envelope["delegates"]}
+        self.assertEqual(by_id["blocked"]["blockedBy"], ["fail"])
+        self.assertEqual(by_id["unrelated"]["status"], "completed")
+
+    def test_optional_failed_dependency_still_blocks_required_descendant(self) -> None:
+        self.write_manifest(
+            [
+                {
+                    "id": "optional",
+                    "role": "spark-explorer",
+                    "required": False,
+                    "prompt": "FORCE_FAIL",
+                },
+                {
+                    "id": "required",
+                    "role": "spark-verifier",
+                    "dependsOn": ["optional"],
+                    "prompt": "SHOULD_NOT_RUN",
+                },
+            ]
+        )
+        self.assertEqual(self.run_fleet(), 1)
+        envelope = json.loads((self.output / "fleet-result.json").read_text())
+        self.assertEqual(envelope["failedTaskIds"], ["optional"])
+        self.assertEqual(envelope["skippedTaskIds"], ["required"])
+
+    def test_overlapping_candidate_writer_scopes_are_refused(self) -> None:
+        self.write_manifest(
+            [
+                {
+                    "id": "one",
+                    "role": "spark-worker",
+                    "prompt": "WRITE",
+                    "allowPaths": ["src"],
+                },
+                {
+                    "id": "two",
+                    "role": "spark-worker",
+                    "prompt": "WRITE",
+                    "allowPaths": ["src/api"],
+                },
+            ]
+        )
+        with self.assertRaisesRegex(SystemExit, "Overlapping candidate writer scopes"):
+            self.run_fleet("--allow-writes")
+        self.assertFalse(self.output.exists())
 
     def test_worker_requires_fleet_write_authority(self) -> None:
         self.write_manifest(
@@ -157,6 +209,54 @@ print(json.dumps({"type": "turn.completed"}))
         )
         with self.assertRaisesRegex(SystemExit, "terminal fleet wave"):
             self.run_fleet("--allow-writes")
+
+    def test_dependencies_generate_ordered_waves(self) -> None:
+        self.write_manifest(
+            [
+                {"id": "map", "role": "spark-explorer", "dependsOn": [], "prompt": "READ"},
+                {
+                    "id": "write",
+                    "role": "spark-worker",
+                    "dependsOn": ["map"],
+                    "prompt": "WRITE",
+                    "allowPaths": ["src"],
+                },
+            ]
+        )
+        self.assertEqual(self.run_fleet("--allow-writes"), 0)
+        envelope = json.loads((self.output / "fleet-result.json").read_text())
+        self.assertEqual(envelope["schema"], "gpt-engineer-spark-fleet/v2")
+        self.assertEqual([item["wave"] for item in envelope["delegates"]], [0, 1])
+        writer = envelope["delegates"][1]
+        self.assertTrue(writer["candidatePatch"].endswith("candidate.patch"))
+        self.assertTrue(writer["deletedPathsFile"].endswith("deleted-paths.json"))
+        self.assertTrue(Path(writer["candidateChangesDirectory"]).is_dir())
+
+    def test_dependency_cycle_is_refused_before_launch(self) -> None:
+        self.write_manifest(
+            [
+                {"id": "a", "role": "spark-explorer", "dependsOn": ["b"], "prompt": "READ"},
+                {"id": "b", "role": "spark-verifier", "dependsOn": ["a"], "prompt": "READ"},
+            ]
+        )
+        with self.assertRaisesRegex(SystemExit, "a -> b -> a"):
+            self.run_fleet()
+        self.assertFalse(self.output.exists())
+
+    def test_missing_dependency_is_refused_before_launch(self) -> None:
+        self.write_manifest(
+            [
+                {
+                    "id": "verify",
+                    "role": "spark-verifier",
+                    "dependsOn": ["missing"],
+                    "prompt": "READ",
+                }
+            ]
+        )
+        with self.assertRaisesRegex(SystemExit, "Unknown dependencies"):
+            self.run_fleet()
+        self.assertFalse(self.output.exists())
 
 
 if __name__ == "__main__":

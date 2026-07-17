@@ -1,98 +1,115 @@
-# Dynamic workflows — when the orchestrator should reach for one
+# Native dynamic workflows
 
-This skill's default mode is plain [subagents](https://code.claude.com/docs/en/sub-agents): the
-Opus orchestrator decides, turn by turn, what to delegate to a Sonnet `engineer`/`reviewer`/
-`tester`/`planner`. That's the right tool for a single scoped engineering task — a bugfix, a
-feature, a focused refactor.
+Read this reference when choosing, installing, invoking, or editing a Claude Code workflow.
 
-[Dynamic workflows](https://code.claude.com/docs/en/workflows) are a different, separate Claude
-Code primitive: a JavaScript script (Claude writes it, a runtime executes it in the background)
-that holds the orchestration itself — the loop, the branching, and the intermediate results — so
-Claude's own context only ever holds the final answer. They scale to dozens or hundreds of agents
-per run and are resumable within the same session. Reach for one when the task is:
+## Choose the correct primitive
 
-- a codebase-wide sweep (e.g. "audit every route handler for missing auth checks")
-- a large migration across many files, each done in isolation
-- research that needs several sources cross-checked against each other before you trust a claim
-- a plan worth drafting from multiple independent angles and weighing before committing
-- "keep fixing until a check passes" — a bounded retry loop across a whole test/type-check suite
+| Primitive | Plan owner | Best fit |
+| --- | --- | --- |
+| Subagent | Lead Claude turn | A few bounded delegated tasks |
+| Agent team | Lead peer session | A handful of long-running peers that communicate |
+| Dynamic workflow | JavaScript runtime | Repeatable DAGs, broad audits, migrations, cross-checked research, bounded loops |
 
-If the task Codex hands to `run-team.sh`/`launch-team-bg.sh` looks like one of those, don't rely
-on the bundled subagents alone — give the orchestrator a reason to write a workflow instead.
+Use `scripts/run-team.sh` for a normal scoped build. Use `scripts/run-workflow.sh` when the task
+benefits from the bundled research -> plan -> build -> verify -> gap-close script. Claude Code
+dynamic workflows require v2.1.154 or later.
 
-## How to trigger one from this skill's scripts
+## Programmatic invocation
 
-Workflows activate on a **literal trigger in the prompt text**, which means it works exactly the
-same in headless `claude -p`/`--bg` as it does interactively — there's no separate flag:
+Do not depend on `ultracode` prompt text in `claude -p`. In current Claude Code versions, keyword
+opt-in is limited to human-origin prompts. Invoke a saved `/<name>` workflow directly, as
+`scripts/run-workflow.sh` does, or use Agent SDK v0.3.149+ and the `Workflow` tool:
 
-- Prepend the literal keyword `ultracode` to the task, e.g. `ultracode: migrate every component
-  under src/components/ from styled-components to Tailwind, each in its own isolated copy`
-- Or just phrase the task in natural language as a workflow request: `"use a workflow to audit
-  every endpoint under src/routes/ for missing auth checks, then adversarially verify each
-  finding"`
+```ts
+Workflow({
+  scriptPath: "/absolute/path/to/workflow.js",
+  args: { goal: "Migrate every route and verify auth behavior" },
+})
+```
 
-Either form works as-is with `run-team.sh "ultracode: <task>"` or `launch-team-bg.sh "use a
-workflow to <task>"` — no script changes needed, since the trigger lives in the prompt string this
-skill already passes straight through to `claude -p`/`claude --bg`.
+Always inspect the returned `error` field even when status is `async_launched`, then wait for the
+later task-completion event. Preserve `runId`, `scriptPath`, and `transcriptDir` as evidence.
 
-Don't reach for `ultracode` (or `/effort ultracode`) as a blanket default for every task through
-this skill: per Anthropic's own guidance it multiplies token spend meaningfully versus working the
-same task turn-by-turn, and most single-feature tasks this skill is meant for don't need
-dozens-of-agents scale. Use the natural-language trigger only when the task actually matches the
-shapes above.
+For headless CLI runs, set `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` or an explicit high ceiling;
+otherwise a long background workflow can outlive the print-mode wait.
+The bundled wrapper also applies a JSON output schema and treats only `complete: true`,
+`status: "complete"`, and an empty `gaps` array as shell success. Transport success alone is not
+completion.
 
-## Model routing inside a workflow script
+The wrapper requires the saved workflow to be installed globally. Its default isolated mode
+rejects a dirty checkout, creates a detached temporary worktree from the exact current `HEAD`, and
+bundles `candidate.patch`, changed paths, and deleted paths before removing the checkout. Exit `3`
+means Claude finished its candidate, but the outer engineer must still integrate it and verify the
+real checkout. Evidence defaults outside the repository under
+`${CLAUDE_CONFIG_DIR:-~/.claude}/workflow-runs/`. Use `IN_PLACE=1` only when direct mutation is
+explicitly intended. If a writer creates a commit, the wrapper diffs against the captured baseline,
+preserves the patch, and fails closed.
 
-`CLAUDE_CODE_SUBAGENT_MODEL=sonnet` (this skill's global lever, see [SKILL.md](../SKILL.md#model-configuration))
-forces every *classic* subagent onto Sonnet regardless of frontmatter. Workflows are a distinct
-runtime and Anthropic's own docs state the weaker default here: **"Every agent in a workflow uses
-your session's model unless the script routes a stage to a different one."** That means a workflow
-spawned from our Opus-orchestrator session may default every one of its `agent()` calls to Opus
-unless the script explicitly overrides it — the env var is not documented to reach into workflow
-`agent()` calls the way it reaches classic subagents, so don't rely on it there.
+## Saved script contract
 
-If you want a workflow's worker stages on Sonnet (which you almost always do, for the same cost
-reasons this skill exists), say so directly in the task prompt: `"...and route the per-file worker
-agents in the workflow to Sonnet, keeping only the planning/synthesis stage on Opus."` Claude
-writes the script with `agent(prompt, { model: 'sonnet' })` on the stages you named. This is a
-prompt-level instruction, not a flag — there's nothing in this skill's scripts that can force it
-from outside the session.
+Project workflows live at `.claude/workflows/<name>.js`; personal workflows live at
+`${CLAUDE_CONFIG_DIR:-~/.claude}/workflows/<name>.js`. The nearest project definition wins.
 
-## Safety implications specific to workflows
+The first statement must be a literal metadata export:
 
-Read this in addition to [SAFETY.md](SAFETY.md) — workflows change the safety envelope in ways
-that aren't covered by this skill's permission-mode defaults:
+```js
+export const meta = {
+  name: "audit-routes",
+  description: "Audit every route and verify each finding",
+  phases: [{ title: "Audit", detail: "Read-only fan-out", model: "sonnet" }],
+}
+```
 
-- **Workflow-spawned subagents always run in `acceptEdits`, regardless of the session's permission
-  mode.** Even if `launch-team-bg.sh` started the orchestrator under `bypassPermissions`, a
-  workflow it spawns gets its file edits auto-approved under `acceptEdits` specifically — not
-  looser, not stricter, just different. Shell commands, web fetches, and MCP tools outside your
-  allowlist can still prompt mid-run in an interactive session; in headless mode they instead
-  follow your configured permission rules with no one to answer a prompt, same as everywhere else
-  in this skill.
-- **In `claude -p` and `claude --bg`, the workflow launch approval step never appears — the run
-  starts immediately.** Interactively you'd see a "planned phases" confirmation; headless, there is
-  no one to show it to, so a workflow the orchestrator decides to write just starts, up to the
-  runtime's cap of 16 concurrent / 1,000 total agents per run. That cap is the real backstop in
-  headless mode, not a permission prompt.
-- **Cost scales with agent count, not with task size as you'd estimate it turn-by-turn.** This
-  skill's `MAX_BUDGET_USD` / `MAX_TURNS` env vars (read by `run-team.sh`, `resume-team.sh`,
-  `launch-team-bg.sh`) are still the right lever to bound a run that turns into a workflow — set
-  them before handing off anything migration- or audit-shaped, especially in walk-away mode where
-  no one is watching the token counter.
+The body is plain JavaScript with top-level `await` and `return`. Use:
 
-This skill's `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` default (see
-[HANDOFF-PROTOCOL.md](HANDOFF-PROTOCOL.md#a-failure-mode-this-protocol-used-to-have-and-how-its-fixed-now))
-does not affect workflows — that env var scopes to ad hoc subagent/background-Bash-task
-backgrounding specifically. Workflows have their own separate toggle
-(`disableWorkflows`/`CLAUDE_CODE_DISABLE_WORKFLOWS`) and Anthropic's own docs already have `claude
--p` properly wait for a workflow to finish before returning its result, unlike the subagent race
-this skill's other default fixes.
+- `agent(prompt, options)` for one subagent;
+- `parallel([() => agent(...), ...])` for a barrier;
+- `pipeline(items, item => agent(...))` for bounded item fan-out;
+- `phase("Name")` and `log(message)` for progress.
 
-## Requirements
+The workflow script itself cannot read files, run shell commands, or use Node APIs. Agents perform
+all external work. Avoid `Date.now()`, `Math.random()`, and argumentless `new Date()` because resume
+requires deterministic call inputs. Pass variable inputs through the global `args` value.
 
-Dynamic workflows need Claude Code v2.1.154 or later, and are available on all paid plans, direct
-Anthropic API access, Amazon Bedrock, Google Cloud's Agent Platform, and Microsoft Foundry. On a
-Pro plan specifically, they're off by default and need the "Dynamic workflows" toggle turned on in
-`/config` first — if the orchestrator never seems to write a workflow no matter how you phrase the
-task, check that before assuming the natural-language trigger isn't working.
+## Model routing
+
+Route each agent explicitly:
+
+```js
+await agent("Synthesize the verified plan", { model: "opus", effort: "high" })
+await agent("Inspect this bounded subsystem", { model: "sonnet", effort: "high" })
+```
+
+`meta.phases[].model` is display metadata, not execution routing. The environment variable
+`CLAUDE_CODE_SUBAGENT_MODEL` overrides every per-agent model, including workflow agents. Leave it
+unset for a mixed Opus/Sonnet workflow. `scripts/run-workflow.sh` unsets it deliberately.
+That wrapper has no default fallback; set `FALLBACK_MODEL` only when the alternate model is an
+authorized route and record the change in the run evidence.
+
+Claude workflow agents can select only Claude models. They cannot select GPT Sol, Terra, Luna, or
+Spark. Sequence those providers in the outer GPT Engineer orchestration.
+
+## Safety, completion, and scale
+
+- Workflow subagents always use `acceptEdits` and inherit the session tool allowlist.
+- Headless and Agent SDK launches do not show a workflow approval prompt.
+- Keep one coordinated writer per shared checkout. Put parallel writers in isolated worktrees and
+  integrate them through an explicit parent gate.
+- Treat agent text as a claim. Completion requires structured results plus direct repository and
+  command evidence.
+- Up to 16 agents run concurrently and up to 1,000 may be created per run. Start on a small slice
+  and set budget/turn limits before broad work.
+- There is no mid-run user sign-off. Split approval boundaries into separate workflow runs.
+
+Pause and resume from `/workflows` in the same session. Completed unchanged `agent()` calls are
+cached; an agent that was still running restarts. Exiting the session makes the next run start
+fresh, so never represent cross-session restart as a resume.
+
+Claude Code has no dedicated workflow-start/workflow-stop hook. The bundled settings log the
+`Workflow` tool plus `SubagentStart`, `SubagentStop`, and `TaskCompleted` events to
+`.claude-team/workflow-events.jsonl`; use the final task result, not that log alone, as the
+completion barrier.
+
+Official references: [dynamic workflows](https://code.claude.com/docs/en/workflows),
+[Agent SDK Workflow tool](https://code.claude.com/docs/en/agent-sdk/typescript), and
+[worktree isolation](https://code.claude.com/docs/en/worktrees).

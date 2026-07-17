@@ -79,6 +79,14 @@ See [SAFETY.md](SAFETY.md) for what each permission mode actually skips.
 | `claude stop <id>` (alias `claude kill`) | Stop a background session. |
 | `claude rm <id>` | Remove a session from the list (transcript stays on disk, still resumable). |
 
+## Dynamic workflows
+
+There is no `claude workflow` CLI subcommand. Saved scripts live in `.claude/workflows/` or
+`~/.claude/workflows/` and run as `/<name>`. For deterministic SDK invocation, use Agent SDK
+v0.3.149+ `Workflow({ name | scriptPath | script, args, resumeFromRunId })`. Set
+`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` for a headless call that must wait beyond the default
+background ceiling. See [WORKFLOWS.md](WORKFLOWS.md) for the script/runtime contract.
+
 ## Session ids and resume
 
 Session id lookup is **scoped to the current project directory and its git worktrees**. Always run

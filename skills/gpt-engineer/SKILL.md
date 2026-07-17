@@ -8,6 +8,8 @@ description: "Own a software-engineering outcome end to end with a provider-rout
 Act as the accountable lead engineer. Deliver verified software, not merely research, plans, agent summaries, or plausible-looking patches.
 
 Read [the Codex and GPT-5.6 routing reference](references/codex-gpt-5.6.md) when model selection, Codex setup, hooks, or subagent topology affects the task.
+Read [the dynamic workflow routing reference](references/dynamic-workflows.md) when the task needs
+adaptive fan-out, a repeatable DAG, resumable execution, or more than one provider.
 
 ## Establish the engineering contract
 
@@ -46,6 +48,19 @@ For Claude Code, route to `gpt-engineer-lead` (Opus), `gpt-engineer-explorer` an
 
 Count the orchestrator as a concurrency slot. Keep the Codex default one-level hierarchy unless deeper nesting is genuinely necessary. Prefer independent parallel work over recursive fan-out.
 
+### Choose the workflow surface dynamically
+
+Use native subagents for a few lead-supervised shards, the model-pinned runners when exact Codex
+routing is otherwise unavailable, the Spark fleet for fast bounded work, and Claude's native
+JavaScript workflow runtime for repeatable high-fanout audits, migrations, cross-checking, or
+bounded repair loops. Keep cross-provider sequencing in this outer lead: Claude workflow agents
+cannot select Sol, Terra, Luna, or Spark.
+
+After every research, build, integration, or verification barrier, recompute only the downstream
+graph from validated evidence. Reject cycles, missing dependencies, silent model fallback, and
+overlapping writers. Candidate patches remain incomplete until the main agent reviews and
+integrates them; any later file change invalidates prior verification.
+
 ### Use the Codex CLI fallback safely
 
 Pass the task through stdin and keep evidence outside the repository:
@@ -61,6 +76,9 @@ PROMPT
 ```
 
 Writer roles require `--allow-writes` and at least one repository-relative `--allow-path`. Explicitly review and list any permitted pre-existing dirty path with `--allow-dirty-path`. The runner pins the role's model, disables recursive delegation and network access, uses a repository lock, refuses output inside the worktree, captures JSONL and the final message, and fails closed on incomplete events or scope violations. Never add bypass-permissions flags.
+Writer execution happens in an isolated candidate copy and returns `candidate-changes/`,
+`candidate.patch`, and deletion metadata; it never applies the edits to the original repository.
+The main agent must inspect and integrate that bundle before downstream verification.
 
 ## Run the engineering loop
 

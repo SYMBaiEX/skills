@@ -8,6 +8,8 @@ description: Lead end-to-end engineering work with a capable main agent and a pa
 Own the outcome as the main agent. Keep planning, architecture, conflict resolution, integration, security-sensitive judgment, and final acceptance in the main thread. Delegate small, explicit shards to `gpt-5.3-codex-spark` for speed.
 
 Read [references/codex-spark.md](references/codex-spark.md) before claiming availability, performance, or route proof.
+When Spark participates in a larger adaptive graph, also read the installed GPT Engineer
+`references/dynamic-workflows.md`; the capable main agent remains the outer orchestrator.
 
 ## Establish the route
 
@@ -50,6 +52,12 @@ Give every child:
 Spark is optimized for bounded iteration, not broad ambiguity. Keep product decisions, cross-cutting architecture, migrations, auth/crypto/security judgment, shared contracts, lockfiles, generated roots, and final acceptance with the main agent.
 
 ## Execute in waves
+
+Generate waves from dependencies and current evidence rather than fixing the fleet shape up front.
+After each barrier, validate results, revise only downstream shards, and stop if a required
+predecessor failed. Never silently replace unavailable Spark with another model. A candidate writer
+is not an integration gate: the main agent must review and apply its bundle before any verifier is
+allowed to judge the integrated repository.
 
 ### 1. Map
 

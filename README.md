@@ -8,12 +8,11 @@ work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
 - [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: provider-routed
   research, implementation, integration, verification, goal persistence, and Codex/Claude bootstrap.
 - [`skills/gpt-engineer-spark/`](skills/gpt-engineer-spark/) — keep a capable lead in control while
-  a model-pinned GPT-5.3-Codex-Spark fleet handles bounded parallel exploration, candidate edits, and checks.
+  a model-pinned GPT-5.3-Codex-Spark fleet handles dependency-aware exploration, isolated candidate
+  edits, and checks.
 - [`skills/claude-multi-agent/`](skills/claude-multi-agent/) — delegate real engineering work to
-  Claude Code CLI as an autonomous multi-agent team: an Opus 4.8 orchestrator delegating to
-  Sonnet 5 subagents, driven headlessly via `claude -p` / `claude --bg`. Built for hand-off from
-  another agent (e.g. OpenAI Codex acting as the product owner) that wants to give Claude Code a
-  task and walk away.
+  Claude Code as an autonomous team or a saved native dynamic workflow with explicit research,
+  planning, build, verification, and bounded gap-closing phases.
 - [`skills/gpt-orchestration/`](skills/gpt-orchestration/) — coordinate native agent fleets for
   repository-wide audits and implementation work with explicit ownership, safe concurrency,
   runtime-honest model handling, and independent verification.
@@ -64,6 +63,26 @@ python3 ~/.agents/skills/gpt-engineer-spark/scripts/bootstrap.py --check --globa
 
 Spark fallback writers use isolated candidate copies and return reviewable change bundles. The capable
 main agent integrates those bundles and owns the final repository checks.
+
+Install the Claude team/workflow adapter and bootstrap it into a target repository:
+
+```bash
+npx skills add https://github.com/SYMBaiEX/skills \
+  --skill claude-multi-agent --agent claude-code --global --yes
+bash ~/.agents/skills/claude-multi-agent/scripts/bootstrap.sh --global
+cd /path/to/repository
+bash ~/.agents/skills/claude-multi-agent/scripts/run-workflow.sh \
+  "Research, implement, verify, and gap-close this engineering goal"
+```
+
+The saved `.claude/workflows/gpt-engineer-dynamic.js` uses Claude's native workflow runtime. The
+default runner starts from the exact clean `HEAD` and returns an isolated candidate patch; exit `3`
+means the outer engineer must integrate and verify it. The outer GPT Engineer remains responsible
+for any transition to Codex Sol, Terra, Luna, or Spark.
+
+Project hooks/settings are optional: run `bootstrap.sh /path/to/repository`, then commit those files
+before an isolated workflow run (or explicitly use `IN_PLACE=1`). Workflow evidence defaults to a
+unique directory under `${CLAUDE_CONFIG_DIR:-~/.claude}/workflow-runs/`, outside the repository.
 
 Or just copy the skill folder into your own agent's skill directory (e.g. `.claude/skills/`,
 `.codex/skills/`, or wherever your agent looks for skills — see the `skills` CLI's supported-agent

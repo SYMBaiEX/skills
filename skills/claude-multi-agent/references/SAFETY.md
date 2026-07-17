@@ -18,14 +18,14 @@ a long task.
 Override any script's default with the `PERMISSION_MODE` env var, e.g.
 `PERMISSION_MODE=dontAsk bash scripts/run-team.sh "..."`.
 
-## Why every script defaults to `--worktree`
+## Why write-capable launches default to worktree isolation
 
 `bypassPermissions` (and even `acceptEdits`, to a lesser degree) trades human review for
 throughput. The mitigation this skill relies on is **blast-radius containment, not permission
-strictness**: every script passes `--worktree <name>`, which runs the session against an isolated
-git worktree at `<repo>/.claude/worktrees/<name>` rather than your actual checkout. A runaway or
-wrong-headed change lands in a disposable branch you can inspect, diff, or delete — it never
-touches your working tree directly.
+strictness**. Team launchers pass `--worktree <name>`. The dynamic workflow wrapper creates a
+detached temporary worktree from the exact current `HEAD`, emits a candidate patch and path
+manifests, and removes that checkout. A runaway or wrong-headed change lands in an isolated
+candidate rather than the working tree.
 
 ### `IN_PLACE=1` opts out of this
 
@@ -65,8 +65,8 @@ as the host. For that class of task:
 
 ## If the orchestrator writes a dynamic workflow
 
-Everything above assumes plain subagents. If the task prompt nudges the orchestrator into writing
-a [dynamic workflow](https://code.claude.com/docs/en/workflows) instead (see
+Everything above assumes plain subagents. If you invoke the bundled
+[dynamic workflow](https://code.claude.com/docs/en/workflows) (see
 [WORKFLOWS.md](WORKFLOWS.md)), the envelope changes in ways this skill's `PERMISSION_MODE` doesn't
 control:
 
@@ -79,6 +79,11 @@ control:
 - Cost scales with agent count, not with how big the task looked when you wrote the prompt. Set
   `MAX_BUDGET_USD` before handing off anything migration- or audit-shaped, especially in walk-away
   mode where nothing is watching the token counter.
+- `scripts/run-workflow.sh` unsets `CLAUDE_CODE_SUBAGENT_MODEL` so the saved script's explicit
+  Opus/Sonnet routing works. Do not reintroduce a global override unless flattening every workflow
+  stage to one model is intentional.
+- The workflow wrapper has no automatic fallback model. `FALLBACK_MODEL` is opt-in because a
+  silent orchestrator route change weakens provenance and can change completion quality.
 
 ## Never use Fable here
 

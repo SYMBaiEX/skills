@@ -1,11 +1,6 @@
 ---
 name: claude-multi-agent
-description: Hand off real engineering work to Claude Code CLI as an autonomous, staffed multi-agent team - an Opus 4.8 orchestrator that plans, delegates to Sonnet 5 subagents (engineer, reviewer, tester, planner), and reports back. Use when another agent (e.g. OpenAI Codex acting as the product owner/user) needs Claude Code to act as the engineering team on a task and run headlessly via `claude -p` / `claude --bg`, including "give it a task and walk away" autonomous runs, iterative design follow-up loops, CI automation, or setting up `.claude/agents`, hooks, and permission modes for headless multi-agent Claude Code work.
-license: MIT
-metadata:
-  author: SYMBaiEX
-  version: "1.0"
-allowed-tools: Bash(claude:*) Bash(git:*) Bash(jq:*) Read Write
+description: Hand off engineering work to Claude Code as an autonomous team or native dynamic workflow, with explicit Opus/Sonnet routing, foreground completion barriers, resumable sessions, repeatable JavaScript workflow phases, hooks, and worktree isolation. Use when another agent or CI needs Claude Code to implement a scoped task, run a codebase-wide audit or migration, execute research-build-verify-gap-close phases, launch work in the background, or install project subagents and `.claude/workflows`.
 ---
 
 # Claude Multi-Agent
@@ -22,7 +17,7 @@ orchestrator seat (needs Opus's reasoning) or the worker seat (needs Sonnet's co
 
 ## The core mechanism
 
-Three levers control who does what and how reliably, and all three ship pre-wired in this skill:
+Four levers control who does what and how reliably, and all four ship pre-wired in this skill:
 
 1. **The orchestrator is the main session**, launched with `--model opus`. It's the thing making
    decisions, writing the plan, and deciding what to delegate vs. do itself.
@@ -37,14 +32,18 @@ Three levers control who does what and how reliably, and all three ship pre-wire
    working, and there's nothing for it to poll or sleep-wait on. See
    [references/HANDOFF-PROTOCOL.md](references/HANDOFF-PROTOCOL.md#a-failure-mode-this-protocol-used-to-have-and-how-its-fixed-now)
    for the real bug this fixes.
+4. **Large repeatable work uses a native dynamic workflow.** `assets/workflows/gpt-engineer-dynamic.js`
+   moves research, planning, building, verification, and bounded gap closure into a resumable
+   JavaScript orchestration. `scripts/run-workflow.sh` invokes the saved workflow directly and
+   deliberately unsets `CLAUDE_CODE_SUBAGENT_MODEL` so its explicit phase models are honored.
 
-Everything below is just plumbing around those three facts.
+Everything below is just plumbing around those four facts.
 
 ## Quickstart
 
 ```bash
-# 1. One-time: install the bundled subagents, settings, and hooks into the target repo
-bash scripts/bootstrap.sh /path/to/target/repo
+# 1. One-time: install the agents and saved workflow for every repository
+bash scripts/bootstrap.sh --global
 
 # 2. Kick off a synchronous run (blocks until done, prints JSON result)
 cd /path/to/target/repo
@@ -57,13 +56,17 @@ bash /path/to/claude-multi-agent/scripts/check-team.sh <id>     # tail a specifi
 
 # 4. Follow up like a user reviewing the work (Codex plays this role)
 bash /path/to/claude-multi-agent/scripts/resume-team.sh "Good, now also add a test for the 429 response"
+
+# 5. For repository-wide or repeatable work, run the bundled native workflow
+bash /path/to/claude-multi-agent/scripts/run-workflow.sh "Finish the SDK migration and verify every user journey"
 ```
 
-Run `bootstrap.sh` once per target repo. The `scripts/*.sh` themselves can live anywhere (this
-skill folder, a copied-out location, wherever) — they only assume they're invoked from *inside*
-the target repo's working directory, because Claude Code session lookups are scoped to cwd.
+Project hooks/settings are optional. Run `bootstrap.sh /path/to/target/repo` only when you want
+them, then commit those files before the default isolated workflow (or use `IN_PLACE=1`). The
+`scripts/*.sh` themselves can live anywhere; invoke them from inside the target repository because
+Claude Code session lookups are scoped to cwd.
 
-## The three usage patterns
+## The four usage patterns
 
 ### 1. Synchronous — you're driving the loop yourself
 
@@ -103,13 +106,35 @@ just standing in for the human.
 Session resume is scoped to the directory it was started in — always run these scripts from the
 same working directory (or the worktree, if you used `-w`) as the original invocation.
 
+### 4. Native dynamic workflow — script owns the orchestration
+
+Use `scripts/run-workflow.sh "<goal>"` when the task needs high-fanout discovery, repeatable phases,
+cross-checked verification, or bounded repair cycles. The bootstrap installs
+`.claude/workflows/gpt-engineer-dynamic.js`; the wrapper invokes that saved command directly,
+captures the full event stream, and waits without the default background ceiling.
+
+Pass structured controls with `WORKFLOW_SCOPE`, `WORKFLOW_ACCEPTANCE_JSON='["criterion"]'`, and
+`MAX_CYCLES=1..3`. The wrapper requires a structured final result and exits `2` when status is
+partial, blocked, or failed. Its default isolated mode starts from the current `HEAD`, rejects a
+dirty checkout, and returns exit `3` plus `candidate.patch`, changed/deleted path manifests, and a
+`requiresMainAgentIntegration` result when code changed. The outer engineer must integrate that
+candidate and rerun checks in the real checkout. It has no implicit fallback model; set
+`FALLBACK_MODEL` only when that route change is explicitly authorized.
+Evidence defaults to a unique directory under
+`${CLAUDE_CONFIG_DIR:-~/.claude}/workflow-runs/`, outside the repository; set `STATE_DIR` to an
+explicit external directory when CI needs a known artifact path.
+
+Do not rely on an `ultracode` keyword in `claude -p`: current Claude Code only treats human-origin
+prompts as keyword opt-ins. A saved workflow command or Agent SDK `Workflow` tool call is the
+programmatic route. Resume a paused workflow only inside the same Claude session; a new session
+starts it fresh. Read [references/WORKFLOWS.md](references/WORKFLOWS.md) before modifying the script.
+
 ## Working directly in a dirty repo
 
-`--worktree` isolation (the default) makes a fresh checkout — it does **not** carry over your
-current uncommitted changes, since a new worktree branches from the last commit, not your working
-tree's dirty state. If the task genuinely needs to operate on a repo that has uncommitted changes
-present, set `IN_PLACE=1` to skip `--worktree` entirely and run directly against the current
-checkout:
+Worktree isolation does **not** carry over your current uncommitted changes. The team launchers use
+Claude's native `--worktree`; the dynamic wrapper creates its own detached worktree from the exact
+current `HEAD`, bundles the resulting patch, and removes the temporary checkout. If the task
+genuinely needs the current uncommitted state, set `IN_PLACE=1` to run directly against it:
 
 ```bash
 IN_PLACE=1 bash scripts/run-team.sh "Finish the half-done refactor in the working tree"
@@ -144,7 +169,7 @@ external systems.
 
 ## Hooks
 
-Two hooks ship in `scripts/hooks/` and get wired into `assets/settings.json`:
+Three hooks ship in `scripts/hooks/` and get wired into `assets/settings.json`:
 
 - **`post-edit-lint.sh`** (`PostToolUse`, matches `Edit|Write`): best-effort auto-format after
   every file change (prettier/ruff/rustfmt/gofmt, whichever applies), so the Sonnet engineer
@@ -152,6 +177,9 @@ Two hooks ship in `scripts/hooks/` and get wired into `assets/settings.json`:
   — always exits 0.
 - **`on-stop-notify.sh`** (`Stop`): writes the `.claude-team/done-<session_id>.json` completion
   marker described above, the signal a walk-away poller waits for.
+- **`workflow-event-log.sh`** (`Workflow`, `SubagentStart`, `SubagentStop`, `TaskCompleted`): appends
+  structured lifecycle evidence to `.claude-team/workflow-events.jsonl`. It is observability, not
+  a completion barrier; trust the final workflow/task result as well.
 
 Add your own — a `PreToolUse` hook to block writes outside an allowed path, a `SubagentStop` hook
 to log per-subagent cost, whatever the target repo needs. See
@@ -175,22 +203,12 @@ or delete what the target repo doesn't need. Keep every one of them on `model: s
 an agent that genuinely needs Opus-level reasoning for its own subtask, that's a signal the
 orchestrator should be doing that piece itself rather than delegating it.
 
-## Subagents vs. dynamic workflows
+## Teams vs. dynamic workflows
 
-Everything above is the classic subagent mechanism: the Opus orchestrator decides, turn by turn,
-what to delegate. That's the right default for a single scoped task. Claude Code separately has
-[dynamic workflows](https://code.claude.com/docs/en/workflows) — a JS script Claude writes and a
-runtime executes in the background, holding the orchestration itself instead of Claude's turn-by-
-turn context, scaling to hundreds of agents per run. This skill does **not** turn workflows on by
-default, but the orchestrator can reach for one on its own if the task calls for it — a
-codebase-wide audit, a large multi-file migration, or research that needs cross-checking. Trigger
-it by phrasing the task as a workflow request (e.g. `"use a workflow to migrate every component
-under src/ from styled-components to Tailwind, each in its own isolated copy"`) — it's plain prompt
-text, so it works the same in headless `-p`/`--bg` mode as interactively. See
-[references/WORKFLOWS.md](references/WORKFLOWS.md) for when to reach for one, how to route a
-workflow's own agents onto Sonnet, and the safety implications that differ from the rest of this
-skill (workflow subagents always run in `acceptEdits`, and headless launches never prompt for
-approval).
+Use classic subagents when a lead needs to decide turn by turn. Use agent teams for a handful of
+long-running peers that communicate. Use the bundled workflow when the orchestration itself should
+be repeatable, resumable, inspectable code. A Claude workflow may route only Claude models; keep
+Terra, Luna, Spark, and any cross-provider transitions in the outer GPT Engineer orchestrator.
 
 ## Reference material
 

@@ -23,6 +23,7 @@ class RunCodexAgentTests(unittest.TestCase):
             """#!/usr/bin/env python3
 import json
 import pathlib
+import subprocess
 import sys
 
 args = sys.argv[1:]
@@ -43,6 +44,9 @@ if "WRITE_OUTSIDE" in prompt:
     (cwd / "outside.txt").write_text("outside\\n")
 if "WRITE_IGNORED" in prompt:
     (cwd / "ignored.txt").write_text("changed\\n")
+if "COMMIT_CHANGE" in prompt:
+    subprocess.run(["git", "add", "-A"], cwd=cwd, check=True)
+    subprocess.run(["git", "-c", "user.name=Delegate", "-c", "user.email=delegate@example.com", "commit", "-qm", "delegate commit"], cwd=cwd, check=True)
 print(json.dumps({"type": "turn.completed"}))
 """
         )
@@ -133,6 +137,13 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertEqual(result, 0)
         envelope = json.loads((self.output / "result.json").read_text())
         self.assertEqual(envelope["changedPaths"], ["src/generated.txt"])
+        self.assertFalse(envelope["appliedToRepository"])
+        self.assertFalse((self.root / "src" / "generated.txt").exists())
+        self.assertEqual(
+            (Path(envelope["candidateChangesDirectory"]) / "src" / "generated.txt").read_text(),
+            "allowed\n",
+        )
+        self.assertTrue(Path(envelope["candidatePatch"]).is_file())
 
     def test_writer_fails_closed_on_out_of_scope_change(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("WRITE_OUTSIDE")):
@@ -153,7 +164,30 @@ print(json.dumps({"type": "turn.completed"}))
             )
         self.assertEqual(result, 1)
         envelope = json.loads((self.output / "result.json").read_text())
-        self.assertIn("out-of-scope changed path: outside.txt", envelope["violations"])
+        self.assertIn("out-of-scope candidate change: outside.txt", envelope["violations"])
+
+    def test_writer_commit_fails_closed_but_preserves_candidate_patch(self) -> None:
+        with mock.patch("sys.stdin", io.StringIO("WRITE_ALLOWED COMMIT_CHANGE")):
+            result = run_codex_agent.main(
+                [
+                    "--role",
+                    "terra-worker",
+                    "--cwd",
+                    str(self.root),
+                    "--output-dir",
+                    str(self.output),
+                    "--codex",
+                    str(self.codex),
+                    "--allow-writes",
+                    "--allow-path",
+                    "src",
+                ]
+            )
+        self.assertEqual(result, 1)
+        envelope = json.loads((self.output / "result.json").read_text())
+        self.assertIn("candidate delegate created one or more commits", envelope["violations"])
+        self.assertNotEqual(envelope["candidateBaselineCommit"], envelope["candidateHeadCommit"])
+        self.assertIn("src/generated.txt", Path(envelope["candidatePatch"]).read_text())
 
     def test_writer_fails_closed_on_ignored_file_change(self) -> None:
         (self.root / ".gitignore").write_text("ignored.txt\n")
@@ -177,7 +211,7 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertEqual(result, 1)
         envelope = json.loads((self.output / "result.json").read_text())
         self.assertIn("ignored.txt", envelope["changedPaths"])
-        self.assertIn("modified pre-existing dirty path: ignored.txt", envelope["violations"])
+        self.assertIn("out-of-scope candidate change: ignored.txt", envelope["violations"])
 
     def test_writer_refuses_external_symlink_targets(self) -> None:
         outside = Path(self.temp.name) / "outside.txt"

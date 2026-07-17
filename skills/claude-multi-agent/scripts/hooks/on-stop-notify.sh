@@ -6,7 +6,7 @@ set -uo pipefail
 INPUT=$(cat)
 SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // "unknown"' 2>/dev/null)
 
-STATE_DIR=".claude-team"
+STATE_DIR="${CLAUDE_TEAM_STATE_DIR:-.claude-team}"
 mkdir -p "$STATE_DIR"
 
 jq -n --arg id "$SESSION_ID" '{session_id: $id, status: "done"}' \

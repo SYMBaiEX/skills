@@ -132,6 +132,88 @@ def snapshot(cwd: Path) -> dict[str, str]:
     return {path: fingerprint(cwd, path) for path in sorted(git_paths(cwd))}
 
 
+def filesystem_snapshot(root: Path) -> dict[str, str]:
+    paths: list[str] = []
+    for target in root.rglob("*"):
+        relative = target.relative_to(root)
+        if ".git" in relative.parts or ".gpt-engineer-evidence" in relative.parts:
+            continue
+        if target.is_file() or target.is_symlink():
+            paths.append(relative.as_posix())
+    return {path: fingerprint(root, path) for path in sorted(paths)}
+
+
+def prepare_candidate(cwd: Path, output_dir: Path) -> tuple[Path, str]:
+    candidate = output_dir / "candidate-worktree"
+    shutil.copytree(cwd, candidate, symlinks=True, ignore=shutil.ignore_patterns(".git"))
+    subprocess.run(["git", "init", "-q"], cwd=candidate, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=candidate, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=SYMBaiEX",
+            "-c",
+            "user.email=solsymbaiex@gmail.com",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "Candidate baseline",
+        ],
+        cwd=candidate,
+        check=True,
+    )
+    baseline_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=candidate,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    return candidate, baseline_commit
+
+
+def bundle_candidate_changes(
+    candidate: Path,
+    output_dir: Path,
+    changed_paths: list[str],
+    baseline_commit: str,
+) -> tuple[str, str, list[str]]:
+    unsafe_symlinks: list[str] = []
+    for path in changed_paths:
+        target = candidate / path
+        if target.is_symlink():
+            resolved = target.resolve(strict=False)
+            if resolved != candidate and candidate not in resolved.parents:
+                unsafe_symlinks.append(path)
+    patch_result = subprocess.run(
+        ["git", "diff", "--binary", "--no-ext-diff", baseline_commit, "--"],
+        cwd=candidate,
+        check=True,
+        capture_output=True,
+    )
+    patch_path = output_dir / "candidate.patch"
+    patch_path.write_bytes(patch_result.stdout)
+    changes_dir = output_dir / "candidate-changes"
+    changes_dir.mkdir()
+    deleted: list[str] = []
+    if not unsafe_symlinks:
+        for path in changed_paths:
+            source = candidate / path
+            destination = changes_dir / path
+            if not source.exists() and not source.is_symlink():
+                deleted.append(path)
+            elif source.is_file() and not source.is_symlink():
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+            elif source.is_symlink():
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.symlink_to(os.readlink(source))
+    (output_dir / "deleted-paths.json").write_text(json.dumps(deleted, indent=2) + "\n")
+    return str(changes_dir), str(patch_path), unsafe_symlinks
+
+
 def external_symlinks(cwd: Path) -> list[str]:
     commands = (
         ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
@@ -186,7 +268,7 @@ def build_command(
     codex: str,
     role: str,
     cwd: Path,
-    output_dir: Path,
+    final_message_path: Path,
     allow_writes: bool,
 ) -> list[str]:
     profile = ROLES[role]
@@ -202,7 +284,7 @@ def build_command(
         "--ephemeral",
         "--json",
         "--output-last-message",
-        str(output_dir / "last-message.txt"),
+        str(final_message_path),
         "--cd",
         str(cwd),
         "--sandbox",
@@ -217,7 +299,16 @@ def build_command(
         'web_search="disabled"',
     ]
     if sandbox == "workspace-write":
-        command.extend(["--config", "sandbox_workspace_write.network_access=false"])
+        command.extend(
+            [
+                "--config",
+                "sandbox_workspace_write.network_access=false",
+                "--config",
+                "sandbox_workspace_write.exclude_tmpdir_env_var=true",
+                "--config",
+                "sandbox_workspace_write.exclude_slash_tmp=true",
+            ]
+        )
     command.append("-")
     return command
 
@@ -300,28 +391,16 @@ def main(argv: list[str] | None = None) -> int:
     allow_dirty = normalize_scope(args.allow_dirty_path)
     profile = ROLES[args.role]
     write_mode = bool(profile["write_capable"] and args.allow_writes)
-    baseline = snapshot(cwd)
-    if write_mode:
-        validate_write_scope(cwd, baseline, allow_paths, allow_dirty)
-
-    command = build_command(codex, args.role, cwd, output_dir, args.allow_writes)
-    delegated_prompt = (
-        role_instructions(args.role)
-        + "\n\nDo not delegate further. Stay within the exact task and authority below.\n\n"
-        + (
-            "Write only within these repository-relative paths: " + ", ".join(allow_paths) + ".\n"
-            if write_mode
-            else "This is a read-only task. Do not modify repository files.\n"
-        )
-        + (
-            "Reviewed pre-existing dirty paths you may modify: " + ", ".join(allow_dirty) + ".\n"
-            if allow_dirty
-            else "Do not modify any pre-existing dirty path.\n"
-        )
-        + prompt.strip()
-        + "\n"
-    )
     if args.dry_run:
+        if write_mode:
+            validate_write_scope(cwd, snapshot(cwd), allow_paths, allow_dirty)
+        command = build_command(
+            codex,
+            args.role,
+            cwd,
+            output_dir / "last-message.txt",
+            args.allow_writes,
+        )
         print(
             json.dumps(
                 {
@@ -330,7 +409,8 @@ def main(argv: list[str] | None = None) -> int:
                     "codexVersion": codex_version_text,
                     "sandbox": command[command.index("--sandbox") + 1],
                     "allowPaths": allow_paths,
-                    "promptCharacters": len(delegated_prompt),
+                    "isolatedCandidate": write_mode,
+                    "promptCharacters": len(prompt),
                     "command": command,
                 },
                 indent=2,
@@ -338,73 +418,143 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise SystemExit("--output-dir must be new or empty to prevent stale delegate evidence")
     output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(output_dir, 0o700)
     lock = acquire_lock(cwd, write_mode, args.lock_timeout)
-    try:
-        process = subprocess.Popen(
-            command,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            start_new_session=True,
-        )
-    except OSError as exc:
-        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
-        lock.close()
-        message = f"Failed to launch Codex delegate: {exc}"
-        (output_dir / "events.jsonl").write_text("")
-        (output_dir / "stderr.log").write_text(message + "\n")
-        envelope = {
-            "role": args.role,
-            "requestedModel": profile["model"],
-            "codexVersion": codex_version_text,
-            "status": "failed",
-            "exitCode": None,
-            "changedPaths": [],
-            "violations": [],
-            "finalMessage": "",
-            "launchError": message,
-        }
-        (output_dir / "result.json").write_text(json.dumps(envelope, indent=2) + "\n")
-        print(f"Codex delegate failed closed; inspect {output_dir}", file=sys.stderr)
-        return 1
+    process: subprocess.Popen[str] | None = None
+    stdout = ""
+    stderr = ""
     timed_out = False
+    launch_error: str | None = None
+    candidate: Path | None = None
+    candidate_baseline_commit: str | None = None
+    candidate_head_commit: str | None = None
+    candidate_before: dict[str, str] = {}
+    candidate_after: dict[str, str] = {}
+    final_message_path = output_dir / "last-message.txt"
     try:
-        stdout, stderr = process.communicate(input=delegated_prompt, timeout=args.timeout)
-    except subprocess.TimeoutExpired:
-        timed_out = True
-        stop_process_group(process)
-        stdout, stderr = process.communicate()
+        baseline = snapshot(cwd)
+        if write_mode:
+            validate_write_scope(cwd, baseline, allow_paths, allow_dirty)
+            candidate, candidate_baseline_commit = prepare_candidate(cwd, output_dir)
+            candidate_before = filesystem_snapshot(candidate)
+            internal_evidence = candidate / ".gpt-engineer-evidence"
+            internal_evidence.mkdir()
+            final_message_path = internal_evidence / "last-message.txt"
+            execution_cwd = candidate
+        else:
+            execution_cwd = cwd
+        command = build_command(
+            codex,
+            args.role,
+            execution_cwd,
+            final_message_path,
+            args.allow_writes,
+        )
+        delegated_prompt = (
+            role_instructions(args.role)
+            + "\n\nDo not delegate further. Stay within the exact task and authority below.\n\n"
+            + (
+                "You are editing an isolated candidate copy. The original repository is not writable. "
+                "Write only within these repository-relative paths: "
+                + ", ".join(allow_paths)
+                + ". Return a candidate change set for main-agent review; do not commit.\n"
+                if write_mode
+                else "This is a read-only task. Do not modify repository files.\n"
+            )
+            + (
+                "The candidate includes these reviewed pre-existing dirty paths: "
+                + ", ".join(allow_dirty)
+                + ".\n"
+                if allow_dirty
+                else "Do not modify any pre-existing dirty path.\n"
+            )
+            + prompt.strip()
+            + "\n"
+        )
+        try:
+            process = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                start_new_session=True,
+            )
+            try:
+                stdout, stderr = process.communicate(input=delegated_prompt, timeout=args.timeout)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                stop_process_group(process)
+                stdout, stderr = process.communicate()
+        except OSError as exc:
+            launch_error = f"Failed to launch Codex delegate: {exc}"
+            stderr = launch_error
+        after = snapshot(cwd)
+        if candidate is not None:
+            candidate_after = filesystem_snapshot(candidate)
+            candidate_head_commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=candidate,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
     finally:
         fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
         lock.close()
 
     (output_dir / "events.jsonl").write_text(stdout)
     (output_dir / "stderr.log").write_text(stderr + ("\nTimed out.\n" if timed_out else ""))
-    final_path = output_dir / "last-message.txt"
     completed, failure = event_status(stdout)
-    final_message = final_path.read_text().strip() if final_path.exists() else ""
-    after = snapshot(cwd)
-    changed_paths = sorted(
+    final_message = final_message_path.read_text().strip() if final_message_path.exists() else ""
+    if final_message:
+        (output_dir / "last-message.txt").write_text(final_message + "\n")
+    violations: list[str] = []
+    original_changes = sorted(
         path for path in set(baseline) | set(after) if baseline.get(path) != after.get(path)
     )
-    violations: list[str] = []
-    for path, before_fingerprint in baseline.items():
-        if fingerprint(cwd, path) != before_fingerprint and not path_in_scope(path, allow_dirty):
-            violations.append(f"modified pre-existing dirty path: {path}")
     if write_mode:
-        violations.extend(
-            f"out-of-scope changed path: {path}"
-            for path in after
-            if path not in baseline and not path_in_scope(path, allow_paths)
+        changed_paths = sorted(
+            path
+            for path in set(candidate_before) | set(candidate_after)
+            if candidate_before.get(path) != candidate_after.get(path)
         )
-    elif after != baseline:
-        violations.append("read-only delegate changed repository state")
+        violations.extend(
+            f"original repository changed during isolated candidate run: {path}"
+            for path in original_changes
+        )
+        violations.extend(
+            f"out-of-scope candidate change: {path}"
+            for path in changed_paths
+            if not path_in_scope(path, allow_paths)
+        )
+        if candidate_head_commit != candidate_baseline_commit:
+            violations.append("candidate delegate created one or more commits")
+    else:
+        changed_paths = original_changes
+        if original_changes:
+            violations.append("read-only delegate changed repository state")
+
+    changes_directory: str | None = None
+    candidate_patch: str | None = None
+    if candidate is not None:
+        assert candidate_baseline_commit is not None
+        changes_directory, candidate_patch, unsafe_links = bundle_candidate_changes(
+            candidate,
+            output_dir,
+            changed_paths,
+            candidate_baseline_commit,
+        )
+        violations.extend(f"candidate symlink escapes worktree: {path}" for path in unsafe_links)
+        shutil.rmtree(candidate)
 
     success = (
         not timed_out
+        and launch_error is None
+        and process is not None
         and process.returncode == 0
         and completed
         and failure is None
@@ -416,11 +566,18 @@ def main(argv: list[str] | None = None) -> int:
         "requestedModel": profile["model"],
         "codexVersion": codex_version_text,
         "status": "completed" if success else "failed",
-        "exitCode": process.returncode,
+        "exitCode": process.returncode if process is not None else None,
         "changedPaths": changed_paths,
         "violations": violations,
         "finalMessage": final_message,
+        "appliedToRepository": False if write_mode else None,
+        "candidateChangesDirectory": changes_directory,
+        "candidatePatch": candidate_patch,
+        "candidateBaselineCommit": candidate_baseline_commit,
+        "candidateHeadCommit": candidate_head_commit,
     }
+    if launch_error:
+        envelope["launchError"] = launch_error
     (output_dir / "result.json").write_text(json.dumps(envelope, indent=2) + "\n")
     if not success:
         print(f"Codex delegate failed closed; inspect {output_dir}", file=sys.stderr)

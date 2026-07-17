@@ -1,4 +1,4 @@
 interface:
   display_name: "Claude Multi-Agent"
-  short_description: "Run Claude Code as an autonomous agent team"
-  default_prompt: "Use $claude-multi-agent to delegate this engineering task to a staffed Claude Code team."
+  short_description: "Run Claude teams and native dynamic workflows"
+  default_prompt: "Use $claude-multi-agent to execute this engineering goal with the appropriate Claude team or saved dynamic workflow."

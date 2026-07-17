@@ -137,7 +137,7 @@ def filesystem_snapshot(root: Path) -> dict[str, str]:
     return {path: fingerprint(root, path) for path in sorted(paths)}
 
 
-def prepare_candidate(cwd: Path, output_dir: Path) -> Path:
+def prepare_candidate(cwd: Path, output_dir: Path) -> tuple[Path, str]:
     candidate = output_dir / "candidate-worktree"
     shutil.copytree(
         cwd,
@@ -163,13 +163,21 @@ def prepare_candidate(cwd: Path, output_dir: Path) -> Path:
         cwd=candidate,
         check=True,
     )
-    return candidate
+    baseline_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=candidate,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    return candidate, baseline_commit
 
 
 def bundle_candidate_changes(
     candidate: Path,
     output_dir: Path,
     changed_paths: list[str],
+    baseline_commit: str,
 ) -> tuple[str, str, list[str]]:
     unsafe_symlinks: list[str] = []
     for path in changed_paths:
@@ -179,7 +187,7 @@ def bundle_candidate_changes(
             if resolved != candidate and candidate not in resolved.parents:
                 unsafe_symlinks.append(path)
     patch_result = subprocess.run(
-        ["git", "diff", "--binary", "--no-ext-diff", "HEAD", "--"],
+        ["git", "diff", "--binary", "--no-ext-diff", baseline_commit, "--"],
         cwd=candidate,
         check=True,
         capture_output=True,
@@ -187,6 +195,7 @@ def bundle_candidate_changes(
     patch_path = output_dir / "candidate.patch"
     patch_path.write_bytes(patch_result.stdout)
     changes_dir = output_dir / "candidate-changes"
+    changes_dir.mkdir()
     deleted: list[str] = []
     if not unsafe_symlinks:
         for path in changed_paths:
@@ -419,6 +428,8 @@ def main(argv: list[str] | None = None) -> int:
     timed_out = False
     launch_error: str | None = None
     candidate: Path | None = None
+    candidate_baseline_commit: str | None = None
+    candidate_head_commit: str | None = None
     candidate_before: dict[str, str] = {}
     candidate_after: dict[str, str] = {}
     final_message_path = output_dir / "last-message.txt"
@@ -426,7 +437,7 @@ def main(argv: list[str] | None = None) -> int:
         baseline = snapshot(cwd)
         if write_mode:
             validate_write_scope(cwd, baseline, allow_paths, allow_dirty)
-            candidate = prepare_candidate(cwd, output_dir)
+            candidate, candidate_baseline_commit = prepare_candidate(cwd, output_dir)
             candidate_before = filesystem_snapshot(candidate)
             internal_evidence = candidate / ".gpt-engineer-evidence"
             internal_evidence.mkdir()
@@ -483,6 +494,13 @@ def main(argv: list[str] | None = None) -> int:
         after = snapshot(cwd)
         if candidate is not None:
             candidate_after = filesystem_snapshot(candidate)
+            candidate_head_commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=candidate,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
     finally:
         fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
         lock.close()
@@ -512,6 +530,8 @@ def main(argv: list[str] | None = None) -> int:
             for path in changed_paths
             if not path_in_scope(path, allow_paths)
         )
+        if candidate_head_commit != candidate_baseline_commit:
+            violations.append("candidate delegate created one or more commits")
     else:
         changed_paths = original_changes
         if original_changes:
@@ -520,13 +540,14 @@ def main(argv: list[str] | None = None) -> int:
     changes_directory: str | None = None
     candidate_patch: str | None = None
     if candidate is not None:
-        if not violations:
-            changes_directory, candidate_patch, unsafe_links = bundle_candidate_changes(
-                candidate,
-                output_dir,
-                changed_paths,
-            )
-            violations.extend(f"candidate symlink escapes worktree: {path}" for path in unsafe_links)
+        assert candidate_baseline_commit is not None
+        changes_directory, candidate_patch, unsafe_links = bundle_candidate_changes(
+            candidate,
+            output_dir,
+            changed_paths,
+            candidate_baseline_commit,
+        )
+        violations.extend(f"candidate symlink escapes worktree: {path}" for path in unsafe_links)
         shutil.rmtree(candidate)
 
     success = (
@@ -551,6 +572,8 @@ def main(argv: list[str] | None = None) -> int:
         "appliedToRepository": False if write_mode else None,
         "candidateChangesDirectory": changes_directory,
         "candidatePatch": candidate_patch,
+        "candidateBaselineCommit": candidate_baseline_commit,
+        "candidateHeadCommit": candidate_head_commit,
     }
     if launch_error:
         envelope["launchError"] = launch_error

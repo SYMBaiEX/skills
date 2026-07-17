@@ -12,6 +12,7 @@ python3 "$ROOT/skills/gpt-engineer/scripts/test_run_codex_agent.py"
 python3 "$ROOT/skills/gpt-engineer-spark/scripts/test_bootstrap.py"
 python3 "$ROOT/skills/gpt-engineer-spark/scripts/test_run_spark_agent.py"
 python3 "$ROOT/skills/gpt-engineer-spark/scripts/test_run_spark_fleet.py"
+python3 "$ROOT/skills/claude-multi-agent/scripts/test_workflow.py"
 
 for skill in "$ROOT"/skills/*; do
   if [[ -f "$skill/SKILL.md" ]]; then
