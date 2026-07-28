@@ -25,7 +25,7 @@ Inspect the live collaboration tools, agent types, capacity, and current agent t
 
 Choose the smallest graph that can prove the outcome:
 
-- **Fast:** for a known isolated path, keep the work in the main thread or use one exact Terra worker, then run focused verification.
+- **Fast:** for a known isolated path, keep the work in the main thread, use one exact Luna worker for a clear mechanical change with deterministic checks, or use one Terra worker when ordinary engineering judgment is still required.
 - **Standard:** for at least two independent shards, use a small Terra research/build wave and one Luna verification pass.
 - **Broad:** for repository-scale uncertainty, use bounded parallel exploration, dependency-ordered writers, integration, and repository-wide acceptance.
 
@@ -33,11 +33,13 @@ Spawn subagents when the user explicitly requests a fleet or when at least two i
 
 Run this routing preflight:
 
-1. Confirm that the intended profiles are installed in a directory the selected agent actually loads.
-2. Inspect the active spawn schema for an `agent_type`, `model`, or equivalent selector. Profile files alone do not prove that a child used their model.
-3. Prefer native subagents when the runtime can select the exact profile. Do not use a full-history fork when the runtime rejects model or role overrides with that mode.
-4. When exact Codex routing is unavailable natively, use `scripts/run_codex_agent.py` for explicit model-pinned delegates. Run no more than two read-only delegates concurrently, never overlap a writer with another delegate in the same repository, and inspect every result envelope.
-5. If neither exact native routing nor the model-pinned runner is available, do not spawn a generic, inherited, behavioral, or fixed legacy agent. Continue with the exact-model parent when safe, or report the routing blocker. Never silently substitute a model.
+1. Confirm that the intended profiles are installed in a directory the selected agent actually loads. Run `python3 scripts/audit_routing.py --cwd <repo> --parent-model <observed-parent-model> --json` when the parent model is observable; omit the last option only when it is not.
+2. Record every candidate profile's source, `name`, exact model, reasoning effort, and hash. A project profile with the same `name` can shadow a valid user profile; any conflicting candidate fails latest-only preflight.
+3. Inspect the active spawn schema for an `agent_type`, `model`, or equivalent selector. Profile files alone do not prove that a child used their model. In Codex, a custom file's model or effort wins when present; otherwise precedence is explicit spawn value, `[agents]` default, then parent value.
+4. Record the effective sandbox and approval behavior. Interactive parent overrides are reapplied to children and can override a custom agent's sandbox default. If a read-only lane cannot remain read-only, use the runner or keep it in the parent.
+5. Prefer native subagents when the runtime can select the exact profile. Use `fork_turns="none"` or the smallest useful positive fork for model-overridden children. Use a full-history fork only when inherited model and effort are acceptable and the complete history is necessary.
+6. When exact Codex routing is unavailable natively, use `scripts/run_codex_agent.py` for explicit model-pinned delegates. Run no more than two read-only delegates concurrently, never overlap a writer with another delegate in the same repository, and inspect every result envelope and structured handoff.
+7. If neither exact native routing nor the model-pinned runner is available, do not spawn a generic, inherited, behavioral, or fixed legacy agent. Continue only when the parent is proven to use an allowed exact model; otherwise report the routing blocker. Never silently substitute a model.
 
 ### Enforce latest-only routing
 
@@ -58,13 +60,16 @@ When the bundled Codex profiles are installed and selectable, prefer:
 | `sol_engineer` | `gpt-5.6-sol`, high reasoning | Ambiguous architecture, hard implementation, integration, and root-cause debugging |
 | `terra_explorer` | `gpt-5.6-terra`, medium reasoning | Read-heavy architecture tracing, documentation research, dependency and incomplete-code scans |
 | `terra_worker` | `gpt-5.6-terra`, medium reasoning | Bounded routine implementation with focused tests |
+| `luna_worker` | `gpt-5.6-luna`, low reasoning | Clear, repeatable, low-risk implementation with deterministic acceptance checks |
 | `luna_verifier` | `gpt-5.6-luna`, medium reasoning | High-volume test execution, diff hygiene, residual searches, and acceptance evidence |
 
-Use Sol for the main engineering judgment when the current surface lets the user or runtime select it. Keep high-stakes integration and final acceptance with the orchestrator even when delegated.
+Use Sol for complex, open-ended engineering judgment, Terra as the everyday workhorse, and Luna for clear, repeatable or high-volume work. Start the parent at medium reasoning when the surface allows it. Raise effort only when the task's ambiguity or measured validation failures justify the extra time and usage. Keep high-stakes integration and final acceptance with Sol or the accountable orchestrator even when delegated.
 
 For an explicitly authorized Claude Code workflow, route to `gpt-engineer-lead` (Opus), `gpt-engineer-explorer` and `gpt-engineer-worker` (Sonnet), and `gpt-engineer-verifier` (Haiku). If `CLAUDE_CODE_SUBAGENT_MODEL` is set, report that it overrides every profile. Claude profiles cannot run GPT models and are never an automatic fallback from latest-only mode.
 
-Count the orchestrator as a concurrency slot. Keep the Codex default one-level hierarchy unless deeper nesting is genuinely necessary. Prefer independent parallel work over recursive fan-out.
+Use the live child-thread capacity rather than assuming a fixed number. Codex's `agents.max_concurrent_threads_per_session` excludes the primary thread; a surfaced runtime capacity may describe total active agents instead, so follow the active tool's contract. Keep the primary in the cost and coordination budget even when it does not consume the configured child cap.
+
+Default to at most three active children and one level of delegation. Use fewer when the tasks are not independent. Do not spawn a shard unless its result can unblock a named downstream decision. Reuse an existing agent with a follow-up for the same lane, steer it instead of duplicating it, and interrupt stale work when a failed prerequisite invalidates the task. Prefer independent parallel reads over recursive fan-out or concurrent shared-state writes.
 
 ### Choose the workflow surface dynamically
 
@@ -85,6 +90,7 @@ Pass the task through stdin and keep evidence outside the repository:
 ```bash
 python3 scripts/run_codex_agent.py \
   --role terra-explorer \
+  --stage-id architecture-map \
   --cwd /path/to/repo \
   --output-dir /tmp/gpt-engineer/architecture \
   <<'PROMPT'
@@ -94,8 +100,10 @@ PROMPT
 
 Writer roles require `--allow-writes` and at least one repository-relative `--allow-path`. Explicitly review and list any permitted pre-existing dirty path with `--allow-dirty-path`. The runner pins the role's model, disables recursive delegation and network access, uses a repository lock, refuses output inside the worktree, captures JSONL and the final message, and fails closed on incomplete events or scope violations. Never add bypass-permissions flags.
 Writer execution happens in an isolated candidate copy and returns `candidate-changes/`,
-`candidate.patch`, and deletion metadata; it never applies the edits to the original repository.
-The main agent must inspect and integrate that bundle before downstream verification.
+`candidate.patch`, deletion metadata, a structured `handoff`, and route evidence; it never
+applies edits to the original repository. The runner constrains the final response with
+`assets/codex/handoff.schema.json`. The main agent must inspect the result, validate the handoff,
+and integrate the candidate bundle before downstream verification.
 
 ## Run the engineering loop
 
@@ -126,9 +134,29 @@ Give every subagent:
 - applicable repository instructions and dirty-state constraints;
 - expected commands and evidence;
 - prohibited files and external effects;
-- required return: findings, changed files, tests, failures, and residual risks.
+- the downstream decision its result must unblock;
+- a stop condition and bounded output budget;
+- required return: stage ID, status, bounded summary, route evidence, `file:symbol` evidence, changed files, checks with passed/failed/not-run state, blockers, and one next action.
 
 Use explorers for noisy discovery, workers for isolated writes, and verifiers for independent checks. Never ask overlapping writers to fix anything they find across the repository.
+
+Treat a subagent response as a handoff, not completion. Normalize native-agent results to the same
+shape as `assets/codex/handoff.schema.json`, keep raw logs out of the main thread, and reject a
+handoff whose route, scope, evidence, or status cannot be verified. Wait for every requested result
+that is still relevant, reconcile conflicts and duplicates, then make one accountable integration
+decision.
+
+## Control usage and latency
+
+Every child performs independent model and tool work. Before each wave, record the number of
+children, exact model and effort, expected decision value, and cancellation condition.
+
+- Prefer the smallest model and lowest effort that can satisfy the acceptance contract.
+- Use Luna low only for clear, repeatable work; use Terra medium for ordinary engineering; reserve Sol high for hard judgment.
+- Do not inherit a high-effort parent into children, use full-history forks by default, duplicate reviewers, or saturate available capacity merely because slots exist.
+- Run independent reads concurrently. Serialize shared-state writers and integration.
+- After a prerequisite fails or a finding becomes invalid, cancel dependent work instead of waiting for a now-useless wave.
+- Compare task success, latency, tool loops, and usage on representative runs before changing default effort or fleet size.
 
 ## Use tools deliberately
 

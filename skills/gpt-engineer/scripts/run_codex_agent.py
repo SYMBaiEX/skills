@@ -19,6 +19,7 @@ from pathlib import Path, PurePosixPath
 
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
+HANDOFF_SCHEMA = SKILL_ROOT / "assets" / "codex" / "handoff.schema.json"
 ROLES = {
     "sol-engineer": {
         "model": "gpt-5.6-sol",
@@ -36,6 +37,12 @@ ROLES = {
         "model": "gpt-5.6-terra",
         "effort": "medium",
         "profile": "terra-worker.toml",
+        "write_capable": True,
+    },
+    "luna-worker": {
+        "model": "gpt-5.6-luna",
+        "effort": "low",
+        "profile": "luna-worker.toml",
         "write_capable": True,
     },
     "luna-verifier": {
@@ -312,8 +319,8 @@ def build_command(
     allow_writes: bool,
 ) -> list[str]:
     profile = ROLES[role]
-    if role == "terra-worker" and not allow_writes:
-        raise SystemExit("terra-worker requires --allow-writes")
+    if role in {"terra-worker", "luna-worker"} and not allow_writes:
+        raise SystemExit(f"{role} requires --allow-writes")
     sandbox = "workspace-write" if profile["write_capable"] and allow_writes else "read-only"
     command = [
         codex,
@@ -325,6 +332,8 @@ def build_command(
         "--json",
         "--output-last-message",
         str(final_message_path),
+        "--output-schema",
+        str(HANDOFF_SCHEMA),
         "--cd",
         str(cwd),
         "--sandbox",
@@ -402,6 +411,7 @@ def event_status(stdout: str) -> tuple[bool, str | None]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--role", choices=tuple(ROLES), required=True)
+    parser.add_argument("--stage-id", help="Stable stage identifier; defaults to the role")
     parser.add_argument("--cwd", default=".", help="Trusted Git worktree for the delegated task")
     parser.add_argument("--prompt-file", help="Prompt file; otherwise read stdin")
     parser.add_argument("--output-dir", required=True, help="Directory outside the repository for run evidence")
@@ -415,6 +425,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lock-timeout", type=int, default=30)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    stage_id = args.stage_id or args.role
 
     cwd = Path(args.cwd).expanduser().resolve()
     if not (cwd / ".git").exists():
@@ -445,7 +456,18 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(
                 {
                     "role": args.role,
+                    "stageId": stage_id,
                     "model": profile["model"],
+                    "reasoningEffort": profile["effort"],
+                    "profileSha256": hashlib.sha256(
+                        (
+                            SKILL_ROOT
+                            / "assets"
+                            / "codex"
+                            / "agents"
+                            / str(profile["profile"])
+                        ).read_bytes()
+                    ).hexdigest(),
                     "codexVersion": codex_version_text,
                     "sandbox": command[command.index("--sandbox") + 1],
                     "allowPaths": allow_paths,
@@ -513,6 +535,10 @@ def main(argv: list[str] | None = None) -> int:
                 else "Do not modify any pre-existing dirty path.\n"
             )
             + prompt.strip()
+            + "\n\nReturn only the JSON handoff required by the configured output schema. "
+            + f"Set stage_id to {stage_id!r}. Keep the summary bounded, cite file:symbol or "
+            + "file:line evidence, distinguish passed/failed/not-run checks, and name one "
+            + "concrete next action.\n"
             + "\n"
         )
         try:
@@ -553,6 +579,21 @@ def main(argv: list[str] | None = None) -> int:
     if final_message:
         (output_dir / "last-message.txt").write_text(final_message + "\n")
     violations: list[str] = []
+    handoff: dict[str, object] | None = None
+    if final_message:
+        try:
+            parsed_handoff = json.loads(final_message)
+            if not isinstance(parsed_handoff, dict):
+                violations.append("delegate handoff is not a JSON object")
+            else:
+                handoff = parsed_handoff
+                if handoff.get("stage_id") != stage_id:
+                    violations.append(
+                        "delegate handoff stage_id does not match requested stage: "
+                        f"{handoff.get('stage_id')!r} != {stage_id!r}"
+                    )
+        except json.JSONDecodeError as exc:
+            violations.append(f"delegate handoff is not valid JSON: {exc}")
     original_changes = sorted(
         path for path in set(baseline) | set(after) if baseline.get(path) != after.get(path)
     )
@@ -601,13 +642,31 @@ def main(argv: list[str] | None = None) -> int:
     )
     envelope = {
         "role": args.role,
+        "stageId": stage_id,
         "requestedModel": profile["model"],
+        "requestedReasoningEffort": profile["effort"],
+        "profileSha256": hashlib.sha256(
+            (
+                SKILL_ROOT
+                / "assets"
+                / "codex"
+                / "agents"
+                / str(profile["profile"])
+            ).read_bytes()
+        ).hexdigest(),
         "codexVersion": codex_version_text,
         "status": "completed" if success else "failed",
         "exitCode": process.returncode if process is not None else None,
         "changedPaths": changed_paths,
         "violations": violations,
         "finalMessage": final_message,
+        "handoff": handoff,
+        "routeEvidence": {
+            "explicitModelFlag": True,
+            "explicitReasoningConfig": True,
+            "ignoredUserConfig": True,
+            "recursiveDelegationDisabled": True,
+        },
         "appliedToRepository": False if write_mode else None,
         "candidateChangesDirectory": changes_directory,
         "candidatePatch": candidate_patch,

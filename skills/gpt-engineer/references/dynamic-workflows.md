@@ -9,6 +9,7 @@ state, or more than one provider.
 | --- | --- | --- |
 | Native Codex subagents | A few evidence-driven shards with direct lead supervision | Runtime may not expose a model selector |
 | Model-pinned Codex runner | Exact Sol/Terra/Luna routing with external evidence | At most two readers; candidate writers are serialized |
+| Responses API Multi-agent beta | One-model hosted fan-out in an API application | Subagents share the request model; not a mixed Sol/Terra/Luna router |
 | GPT Engineer Spark fleet | Explicitly requested fast, bounded exploration, candidate edits, and verification | Opt-in older model; Spark never owns architecture or final acceptance |
 | Claude dynamic workflow | Explicitly authorized repeatable high-fanout audits, migrations, cross-checking, and bounded loops | Opt-in separate provider; same-session resume |
 
@@ -26,6 +27,7 @@ models, and a Codex child cannot prove a Claude phase completed. Record every st
 - stable ID, objective, dependencies, provider, role, and exact requested model;
 - read, candidate-write, integration-gate, or verify mode;
 - path ownership, dirty-path exceptions, prohibited effects, retry and stop bounds;
+- decision unblocked, maximum output, cancellation condition, and handoff schema;
 - evidence directory, result status, changed paths, violations, and final disposition.
 
 Never silently reroute a failed stage to another provider or model. A fallback must be explicitly
@@ -46,10 +48,16 @@ Treat the first plan as provisional. After each barrier:
 Dynamic does not mean unbounded. Persist the resolved graph, attempts, and completion barriers so a
 restart cannot reinterpret a partial run as complete.
 
+Default to no more than three active children and one delegation level. A configured Codex child
+cap excludes the primary thread, but the primary still belongs in the usage and coordination
+budget. Do not use a full-history fork when a smaller context packet is sufficient. Reuse a
+completed agent for a related follow-up instead of spawning a duplicate lane.
+
 ## Provider-specific completion
 
-- **Codex/Spark:** inspect each `result.json`. Candidate patches are artifacts, not integrated code.
-  Apply them only after main-agent review, then run verification in the real checkout.
+- **Codex/Spark:** inspect each `result.json` and structured handoff. Candidate patches are
+  artifacts, not integrated code. Apply them only after main-agent review, then run verification
+  in the real checkout.
 - **Claude:** prefer the saved JavaScript workflow or Agent SDK `Workflow` tool over keyword-based
   triggering. Preserve `runId`, `scriptPath`, and `transcriptDir`. Resume only in the same session.
 - **All providers:** natural-language confidence is never a completion barrier. Required nodes,

@@ -36,7 +36,13 @@ class BootstrapCodexTests(unittest.TestCase):
         agents = sorted(path.name for path in (self.root / ".codex" / "agents").glob("*.toml"))
         self.assertEqual(
             agents,
-            ["luna-verifier.toml", "sol-engineer.toml", "terra-explorer.toml", "terra-worker.toml"],
+            [
+                "luna-verifier.toml",
+                "luna-worker.toml",
+                "sol-engineer.toml",
+                "terra-explorer.toml",
+                "terra-worker.toml",
+            ],
         )
 
     def test_merges_existing_hooks_without_losing_them(self) -> None:

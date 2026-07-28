@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import subprocess
 import tempfile
 import unittest
@@ -23,6 +24,7 @@ class RunCodexAgentTests(unittest.TestCase):
             """#!/usr/bin/env python3
 import json
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -32,9 +34,21 @@ if args == ["--version"]:
     raise SystemExit(0)
 output = pathlib.Path(args[args.index("--output-last-message") + 1])
 output.parent.mkdir(parents=True, exist_ok=True)
-output.write_text("delegate complete\\n")
 (output.parent / "args.json").write_text(json.dumps(args))
 prompt = sys.stdin.read()
+stage_match = re.search(r"Set stage_id to '([^']+)'", prompt)
+stage_id = stage_match.group(1) if stage_match else "unknown"
+handoff = {
+    "stage_id": stage_id,
+    "status": "completed",
+    "summary": "delegate complete",
+    "evidence": [],
+    "changed_paths": [],
+    "checks": [],
+    "blockers": [],
+    "next_action": "Return to the parent.",
+}
+output.write_text(json.dumps(handoff) + "\\n")
 cwd = pathlib.Path(args[args.index("--cd") + 1])
 if "WRITE_ALLOWED" in prompt:
     target = cwd / "src" / "generated.txt"
@@ -74,8 +88,10 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertEqual(result, 0)
         rendered = stdout.getvalue()
         self.assertIn('"model": "gpt-5.6-luna"', rendered)
+        self.assertIn('"reasoningEffort": "medium"', rendered)
         self.assertIn('"sandbox": "read-only"', rendered)
         self.assertNotIn("dangerously-bypass", rendered)
+        self.assertIn("--output-schema", rendered)
 
     def test_terra_worker_requires_explicit_write_authority(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Implement the bounded fix.")):
@@ -84,6 +100,23 @@ print(json.dumps({"type": "turn.completed"}))
                     [
                         "--role",
                         "terra-worker",
+                        "--cwd",
+                        str(self.root),
+                        "--output-dir",
+                        str(self.output),
+                        "--codex",
+                        str(self.codex),
+                        "--dry-run",
+                    ]
+                )
+
+    def test_luna_worker_is_low_effort_and_requires_write_authority(self) -> None:
+        with mock.patch("sys.stdin", io.StringIO("Implement the mechanical fix.")):
+            with self.assertRaisesRegex(SystemExit, "luna-worker requires --allow-writes"):
+                run_codex_agent.main(
+                    [
+                        "--role",
+                        "luna-worker",
                         "--cwd",
                         str(self.root),
                         "--output-dir",
@@ -116,6 +149,9 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
         result_json = json.loads((self.output / "result.json").read_text())
         self.assertEqual(result_json["status"], "completed")
+        self.assertEqual(result_json["handoff"]["stage_id"], "terra-explorer")
+        self.assertEqual(result_json["requestedReasoningEffort"], "medium")
+        self.assertTrue(result_json["routeEvidence"]["ignoredUserConfig"])
 
     def test_writer_accepts_only_explicit_path_scope(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("WRITE_ALLOWED")):
