@@ -1,4 +1,4 @@
 interface:
   display_name: "GPT Orchestration Auto"
   short_description: "Run a goal-driven research and build loop"
-  default_prompt: "Use $gpt-orchestration-auto to pursue this goal through research, implementation, and verification."
+  default_prompt: "Use $gpt-orchestration-auto with exact GPT-5.6 routes and delta-only continuation to pursue this goal through verified completion."

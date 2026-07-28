@@ -5,8 +5,8 @@ work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
 
 ## Skills
 
-- [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: provider-routed
-  research, implementation, integration, verification, goal persistence, and Codex/Claude bootstrap.
+- [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: strict
+  GPT-5.6 Sol/Terra/Luna research, implementation, integration, verification, and bounded goal persistence.
 - [`skills/gpt-engineer-spark/`](skills/gpt-engineer-spark/) — keep a capable lead in control while
   a model-pinned GPT-5.3-Codex-Spark fleet handles dependency-aware exploration, isolated candidate
   edits, and checks.
@@ -44,13 +44,14 @@ bundled provider-native model profiles, then restart both clients:
 ```bash
 npx skills add https://github.com/SYMBaiEX/skills \
   --skill gpt-engineer --agent codex claude-code --global --yes
-python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --global
-python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --check --global
+python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --provider codex --upgrade --global
+python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --provider codex --check --global
 ```
 
-The profile bootstrap is deliberately separate from skills.sh: it refuses conflicting files and does
-not edit provider configuration. For project-local profiles and conservative Codex hooks, replace
-`--global` with `/path/to/repository`.
+The profile bootstrap is deliberately separate from skills.sh. It never edits provider configuration;
+`--upgrade` replaces only bundled agent-profile destinations. Use `--provider all --upgrade` only
+when Claude profiles are explicitly wanted. For project-local profiles and conservative Codex hooks,
+replace `--global` with `/path/to/repository`.
 
 Install and register the Codex-only Spark fleet separately:
 

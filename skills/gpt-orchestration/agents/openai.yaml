@@ -1,4 +1,4 @@
 interface:
   display_name: "GPT Orchestration"
-  short_description: "Coordinate safe, evidence-driven agent fleets"
-  default_prompt: "Use $gpt-orchestration to research this codebase, build every confirmed in-scope finding, and verify the integrated result."
+  short_description: "Coordinate strict GPT-5.6 agent fleets"
+  default_prompt: "Use $gpt-orchestration with exact GPT-5.6 routes to research this codebase, build confirmed findings, and verify the result."

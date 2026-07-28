@@ -4,7 +4,7 @@ Use this reference when selecting models, defining Codex custom agents, or decid
 
 ## Model roles
 
-- **Sol:** `gpt-5.6` routes to `gpt-5.6-sol`. Use it for frontier capability, ambiguous multi-step engineering, architecture, difficult debugging, integration, and final judgment.
+- **Sol:** use the explicit `gpt-5.6-sol` identifier for strict routing. The `gpt-5.6` family alias currently routes to Sol, but an alias is weaker evidence than an explicit target.
 - **Terra:** `gpt-5.6-terra` balances intelligence and cost. Codex specifically recommends it for exploration, read-heavy scans, large-file review, and supporting-document work. It is also suitable for bounded routine implementation.
 - **Luna:** `gpt-5.6-luna` targets cost-sensitive, high-volume workloads. Using it for mechanical verification, test matrices, residual searches, and structured evidence collection is an orchestration inference from that documented positioning; keep semantic acceptance and high-risk decisions with Sol or the orchestrator.
 
@@ -18,7 +18,19 @@ Codex defaults to six concurrent agent threads and a maximum spawn depth of one.
 
 Subagents are enabled in current Codex releases and can be requested directly or by applicable `AGENTS.md` or skill instructions. ChatGPT Work can also run parallel hosted subagent workflows where available.
 
-Agent files are configuration, not proof of selection. Inspect the current spawn tool for an agent-type or model selector. When that selector is unavailable, use the bundled `run_codex_agent.py` wrapper to pin `codex exec --model`; otherwise describe the child as inheriting the parent model.
+Agent files are configuration, not proof of selection. Inspect the current spawn tool for an agent-type or model selector. When that selector is unavailable, use the bundled `run_codex_agent.py` wrapper to pin `codex exec --model`. In latest-only mode, never use a generic or inherited child as a fallback.
+
+## Strict and fast routing
+
+The default GPT Engineer route allows only `gpt-5.6-sol`, `gpt-5.6-terra`, and
+`gpt-5.6-luna`. Spark and Claude remain explicit opt-in surfaces because they are not members of
+the GPT-5.6 family. If exact routing cannot be proven, keep the work with an exact-model parent or
+report the blocker.
+
+Use medium reasoning as the normal baseline, one lower setting for clear latency-sensitive work
+when validation still passes, and high only for hard judgment. Do not raise reasoning automatically.
+Codex Fast mode can speed supported GPT-5.6 models at higher credit use; it is a user/runtime choice,
+not a model substitution.
 
 ## Claude Code agents
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "GPT Engineer"
-  short_description: "Build with adaptive model-routed agent workflows"
-  default_prompt: "Use $gpt-engineer to own this outcome through adaptive research, isolated implementation, integration, verification, and gap closure."
+  short_description: "Build with strict GPT-5.6 agent routing"
+  default_prompt: "Use $gpt-engineer with exact GPT-5.6 Sol, Terra, and Luna routes to own this outcome through the smallest verified workflow."

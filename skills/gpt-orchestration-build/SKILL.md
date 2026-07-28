@@ -39,7 +39,7 @@ Order confirmed work by dependency and blast radius:
 5. cleanup, documentation, and generated artifacts;
 6. independent verification and residual-gap scan.
 
-Use the runtime's available concurrency, counting the orchestrator as a slot. Give one writer ownership of each file or tightly coupled subsystem. When confirmed Codex custom agents are installed and selectable, use `sol_engineer` (`gpt-5.6`) for hard integration, `terra_worker` (`gpt-5.6-terra`) for bounded implementation, `terra_explorer` for read-heavy gaps, and `luna_verifier` (`gpt-5.6-luna`) for high-volume mechanical checks. If the native spawn schema cannot select a model and the sibling `gpt-engineer` skill is installed, use its guarded CLI runner for model-pinned delegates. Otherwise disclose the limitation. When the user asked for a fleet, do not silently complete the task with only the parent agent.
+Use the runtime's available concurrency, counting the orchestrator as a slot. Give one writer ownership of each file or tightly coupled subsystem. Latest-only is the default: use confirmed `sol_engineer` (`gpt-5.6-sol`) for hard integration, `terra_worker` (`gpt-5.6-terra`) for bounded implementation, `terra_explorer` for read-heavy gaps, and `luna_verifier` (`gpt-5.6-luna`) for mechanical checks. If the native spawn schema cannot prove an exact route and the sibling `gpt-engineer` skill is installed, use its guarded CLI runner. Otherwise never use a generic, inherited, model-less, GPT-5, GPT-5.4, Spark, or Claude substitute; keep the work with the exact-model parent or report the limitation.
 
 Every writer contract must include exact paths, success criteria, prohibited side effects, required tests, baseline constraints, and expected handoff evidence. Keep overlapping work read-only.
 
@@ -58,10 +58,11 @@ Do not drop difficult items. A confirmed in-scope finding must end as implemente
 
 ## Integrate and prove the result
 
-After all waves:
+After all waves, run checks selected by the changed behavior and acceptance criteria:
 
-- regenerate code and lockfiles with the repository's pinned toolchain;
-- run diff hygiene, lint or static analysis, type checking, tests, and production build as applicable;
+- regenerate code only when its source schema changed and regenerate lockfiles only when dependency inputs changed;
+- always run diff hygiene plus the focused lint, static analysis, type checks, tests, build, or runtime checks that cover the affected system;
+- reserve repository-wide gates and production builds for cross-cutting changes, broad completion claims, or explicit acceptance criteria;
 - exercise the affected user path against a verified local or disposable target;
 - inspect scripts before running them and never let a smoke command default to production;
 - run a residual search for the original findings and incomplete-code markers;

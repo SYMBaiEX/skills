@@ -32,10 +32,15 @@ def repo_root(target: str | None) -> Path:
     return root
 
 
-def install_file(source: Path, destination: Path, check: bool) -> None:
+def install_file(source: Path, destination: Path, check: bool, upgrade: bool = False) -> None:
     if destination.exists():
-        if destination.read_bytes() != source.read_bytes():
+        if destination.read_bytes() == source.read_bytes():
+            return
+        if check:
+            raise SystemExit(f"Installed file differs from bundled profile: {destination}")
+        if not upgrade:
             raise SystemExit(f"Refusing to overwrite conflicting file: {destination}")
+        shutil.copy2(source, destination)
         return
     if check:
         raise SystemExit(f"Missing installed file: {destination}")
@@ -72,16 +77,28 @@ def merge_codex_hooks(destination: Path, check: bool) -> None:
         temporary.replace(destination)
 
 
-def install_agents(source_dir: Path, destination_dir: Path, pattern: str, check: bool) -> None:
+def install_agents(
+    source_dir: Path,
+    destination_dir: Path,
+    pattern: str,
+    check: bool,
+    upgrade: bool,
+) -> None:
     sources = sorted(source_dir.glob(pattern))
     if not sources:
         raise SystemExit(f"No agent assets found in: {source_dir}")
     for source in sources:
-        install_file(source, destination_dir / source.name, check)
+        install_file(source, destination_dir / source.name, check, upgrade)
 
 
-def install_codex(destination: Path, check: bool, project: bool) -> None:
-    install_agents(ASSET_ROOT / "codex" / "agents", destination / "agents", "*.toml", check)
+def install_codex(destination: Path, check: bool, project: bool, upgrade: bool) -> None:
+    install_agents(
+        ASSET_ROOT / "codex" / "agents",
+        destination / "agents",
+        "*.toml",
+        check,
+        upgrade,
+    )
     if not project:
         return
     for source in sorted((ASSET_ROOT / "codex" / "hooks").glob("*.py")):
@@ -89,7 +106,7 @@ def install_codex(destination: Path, check: bool, project: bool) -> None:
     merge_codex_hooks(destination / "hooks.json", check)
 
 
-def install_claude(destination: Path, check: bool) -> None:
+def install_claude(destination: Path, check: bool, upgrade: bool) -> None:
     forced_model = os.environ.get("CLAUDE_CODE_SUBAGENT_MODEL", "").strip()
     if forced_model and forced_model.lower() != "inherit":
         print(
@@ -97,7 +114,13 @@ def install_claude(destination: Path, check: bool) -> None:
             f"with {forced_model!r}",
             file=sys.stderr,
         )
-    install_agents(ASSET_ROOT / "claude" / "agents", destination / "agents", "*.md", check)
+    install_agents(
+        ASSET_ROOT / "claude" / "agents",
+        destination / "agents",
+        "*.md",
+        check,
+        upgrade,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -107,6 +130,11 @@ def main(argv: list[str] | None = None) -> int:
     scope.add_argument("--global", dest="global_install", action="store_true", help="Install user-level agents")
     parser.add_argument("--provider", choices=("all", "codex", "claude"), default="all")
     parser.add_argument("--check", action="store_true", help="Verify installation without writing")
+    parser.add_argument(
+        "--upgrade",
+        action="store_true",
+        help="Replace differing bundled agent profiles; never changes provider config",
+    )
     args = parser.parse_args(argv)
 
     if args.global_install:
@@ -124,9 +152,9 @@ def main(argv: list[str] | None = None) -> int:
     for provider in providers:
         destination = destinations[provider]
         if provider == "codex":
-            install_codex(destination, args.check, project)
+            install_codex(destination, args.check, project, args.upgrade)
         else:
-            install_claude(destination, args.check)
+            install_claude(destination, args.check, args.upgrade)
 
     action = "Verified" if args.check else "Installed"
     scope_name = "user-level" if args.global_install else "project-level"

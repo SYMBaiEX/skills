@@ -61,6 +61,14 @@ class BootstrapTests(unittest.TestCase):
         self.assertIn("Refusing to overwrite conflicting file", result.stderr)
         self.assertEqual(conflict.read_text(), "user-owned\n")
 
+    def test_explicit_upgrade_replaces_bundled_profile(self) -> None:
+        conflict = self.root / ".codex" / "agents" / "sol-engineer.toml"
+        conflict.parent.mkdir(parents=True)
+        conflict.write_text('name = "sol_engineer"\nmodel = "gpt-5.6"\n')
+        result = self.run_script("--provider", "codex", "--upgrade", str(self.root))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('model = "gpt-5.6-sol"', conflict.read_text())
+
     def test_warns_when_claude_forces_one_subagent_model(self) -> None:
         env = os.environ.copy()
         env["CLAUDE_CODE_SUBAGENT_MODEL"] = "opus"

@@ -21,7 +21,7 @@ from pathlib import Path, PurePosixPath
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 ROLES = {
     "sol-engineer": {
-        "model": "gpt-5.6",
+        "model": "gpt-5.6-sol",
         "effort": "high",
         "profile": "sol-engineer.toml",
         "write_capable": True,
@@ -104,7 +104,6 @@ def git_paths(cwd: Path) -> set[str]:
         ["git", "diff", "--name-only", "-z"],
         ["git", "diff", "--cached", "--name-only", "-z"],
         ["git", "ls-files", "--others", "--exclude-standard", "-z"],
-        ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
     )
     paths: set[str] = set()
     for command in commands:
@@ -132,21 +131,65 @@ def snapshot(cwd: Path) -> dict[str, str]:
     return {path: fingerprint(cwd, path) for path in sorted(git_paths(cwd))}
 
 
-def filesystem_snapshot(root: Path) -> dict[str, str]:
-    paths: list[str] = []
-    for target in root.rglob("*"):
-        relative = target.relative_to(root)
-        if ".git" in relative.parts or ".gpt-engineer-evidence" in relative.parts:
-            continue
-        if target.is_file() or target.is_symlink():
-            paths.append(relative.as_posix())
-    return {path: fingerprint(root, path) for path in sorted(paths)}
+def copy_path(source: Path, destination: Path) -> None:
+    if not source.exists() and not source.is_symlink():
+        if destination.is_dir() and not destination.is_symlink():
+            shutil.rmtree(destination)
+        elif destination.exists() or destination.is_symlink():
+            destination.unlink()
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.is_dir() and not destination.is_symlink():
+        shutil.rmtree(destination)
+    elif destination.exists() or destination.is_symlink():
+        destination.unlink()
+    if source.is_symlink():
+        destination.symlink_to(os.readlink(source))
+    elif source.is_dir():
+        shutil.copytree(source, destination, symlinks=True)
+    else:
+        shutil.copy2(source, destination)
 
 
-def prepare_candidate(cwd: Path, output_dir: Path) -> tuple[Path, str]:
+def git_changed_paths(candidate: Path, baseline_commit: str) -> list[str]:
+    commands = (
+        ["git", "diff", "--name-only", "-z", baseline_commit, "--"],
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+    )
+    paths: set[str] = set()
+    for command in commands:
+        result = subprocess.run(command, cwd=candidate, check=True, capture_output=True)
+        paths.update(part.decode("utf-8") for part in result.stdout.split(b"\0") if part)
+    return sorted(
+        path
+        for path in paths
+        if path != ".gpt-engineer-evidence"
+        and not path.startswith(".gpt-engineer-evidence/")
+    )
+
+
+def prepare_candidate(
+    cwd: Path,
+    output_dir: Path,
+    baseline_paths: set[str],
+) -> tuple[Path, str]:
     candidate = output_dir / "candidate-worktree"
-    shutil.copytree(cwd, candidate, symlinks=True, ignore=shutil.ignore_patterns(".git"))
-    subprocess.run(["git", "init", "-q"], cwd=candidate, check=True)
+    subprocess.run(
+        [
+            "git",
+            "clone",
+            "--quiet",
+            "--no-local",
+            "--depth",
+            "1",
+            str(cwd),
+            str(candidate),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    for path in sorted(baseline_paths):
+        copy_path(cwd / path, candidate / path)
     subprocess.run(["git", "add", "-A"], cwd=candidate, check=True)
     subprocess.run(
         [
@@ -215,10 +258,7 @@ def bundle_candidate_changes(
 
 
 def external_symlinks(cwd: Path) -> list[str]:
-    commands = (
-        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-        ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
-    )
+    commands = (["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],)
     paths: set[str] = set()
     for command in commands:
         result = subprocess.run(command, cwd=cwd, check=True, capture_output=True)
@@ -431,15 +471,16 @@ def main(argv: list[str] | None = None) -> int:
     candidate: Path | None = None
     candidate_baseline_commit: str | None = None
     candidate_head_commit: str | None = None
-    candidate_before: dict[str, str] = {}
-    candidate_after: dict[str, str] = {}
     final_message_path = output_dir / "last-message.txt"
     try:
         baseline = snapshot(cwd)
         if write_mode:
             validate_write_scope(cwd, baseline, allow_paths, allow_dirty)
-            candidate, candidate_baseline_commit = prepare_candidate(cwd, output_dir)
-            candidate_before = filesystem_snapshot(candidate)
+            candidate, candidate_baseline_commit = prepare_candidate(
+                cwd,
+                output_dir,
+                set(baseline),
+            )
             internal_evidence = candidate / ".gpt-engineer-evidence"
             internal_evidence.mkdir()
             final_message_path = internal_evidence / "last-message.txt"
@@ -494,7 +535,6 @@ def main(argv: list[str] | None = None) -> int:
             stderr = launch_error
         after = snapshot(cwd)
         if candidate is not None:
-            candidate_after = filesystem_snapshot(candidate)
             candidate_head_commit = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
                 cwd=candidate,
@@ -517,11 +557,9 @@ def main(argv: list[str] | None = None) -> int:
         path for path in set(baseline) | set(after) if baseline.get(path) != after.get(path)
     )
     if write_mode:
-        changed_paths = sorted(
-            path
-            for path in set(candidate_before) | set(candidate_after)
-            if candidate_before.get(path) != candidate_after.get(path)
-        )
+        assert candidate is not None
+        assert candidate_baseline_commit is not None
+        changed_paths = git_changed_paths(candidate, candidate_baseline_commit)
         violations.extend(
             f"original repository changed during isolated candidate run: {path}"
             for path in original_changes

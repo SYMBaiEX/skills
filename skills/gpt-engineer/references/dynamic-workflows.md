@@ -9,11 +9,14 @@ state, or more than one provider.
 | --- | --- | --- |
 | Native Codex subagents | A few evidence-driven shards with direct lead supervision | Runtime may not expose a model selector |
 | Model-pinned Codex runner | Exact Sol/Terra/Luna routing with external evidence | At most two readers; candidate writers are serialized |
-| GPT Engineer Spark fleet | Fast, bounded exploration, candidate edits, and verification | Spark never owns architecture or final acceptance |
-| Claude dynamic workflow | Repeatable high-fanout audits, migrations, cross-checking, and bounded loops | Claude models only; same-session resume |
+| GPT Engineer Spark fleet | Explicitly requested fast, bounded exploration, candidate edits, and verification | Opt-in older model; Spark never owns architecture or final acceptance |
+| Claude dynamic workflow | Explicitly authorized repeatable high-fanout audits, migrations, cross-checking, and bounded loops | Opt-in separate provider; same-session resume |
 
 Do not force every task through the largest surface. Start with the smallest primitive that can
 hold the dependency graph and completion evidence.
+
+Latest-only is the default. Use exact Sol, Terra, and Luna routes unless the user explicitly selects
+Spark, Claude, or another provider. Never treat provider fallback as a speed optimization.
 
 ## Keep one outer contract
 

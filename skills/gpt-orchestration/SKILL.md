@@ -4,7 +4,7 @@ description: Coordinate hierarchical coding-agent fleets for repository-wide aud
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 # GPT Orchestration
@@ -17,8 +17,8 @@ Treat findings as inputs to action, not the end product. When the user authorize
 
 1. Inspect the available collaboration tool schemas, custom agent types, and current agent tree before promising a topology.
 2. Check for confirmed Codex custom agents that bind a type to a model, or an explicit model field on the spawn API. A custom agent type is real routing only when its configuration or current runtime confirms the model.
-3. Prefer `gpt-5.6` (Sol) for ambiguous integration and hard engineering, `gpt-5.6-terra` for exploration and bounded implementation, and `gpt-5.6-luna` for high-volume mechanical verification.
-4. If native selection is unavailable and the sibling `gpt-engineer` skill is installed, use its guarded `scripts/run_codex_agent.py` fallback for explicitly model-pinned read-heavy delegates. Keep writes sequential and scoped. Otherwise state that model diversity is unavailable and treat the names as behavioral profiles only.
+3. Latest-only is the default. Allow exactly `gpt-5.6-sol` for ambiguous integration and hard engineering, `gpt-5.6-terra` for exploration and bounded implementation, and `gpt-5.6-luna` for high-volume mechanical verification.
+4. If native selection is unavailable and the sibling `gpt-engineer` skill is installed, use its guarded `scripts/run_codex_agent.py` fallback for explicitly model-pinned delegates. Otherwise do not spawn a generic, inherited, model-less, GPT-5, GPT-5.4, Spark, or Claude fallback; keep work with the exact-model parent or report the blocker.
 5. When the user explicitly requests subagents or a fleet, do not silently remain single-agent. Spawn useful bounded agents or report the concrete runtime limitation.
 6. Treat the orchestrator as one occupied concurrency slot. Compute each wave from the currently exposed capacity and active-agent count. Keep spawn depth at one unless deeper delegation is necessary and explicitly bounded.
 
@@ -67,13 +67,19 @@ Use prompts that are independently actionable. Do not ask multiple writers to fi
 
 ## Execute in waves
 
-1. **Inventory:** Inspect repository structure, manifests, instructions, status, CI, and available scripts locally. Search for incomplete markers with context; do not equate every `TODO` string with a defect.
+Choose **fast** for one known path, **standard** for two or more independent shards, and **broad** only for repository-scale uncertainty. A fast task may stay with the orchestrator and focused checks; it does not require an inventory fleet.
+
+1. **Inventory:** For standard or broad work, inspect repository structure, manifests, instructions, status, CI, and available scripts locally. Search for incomplete markers with context; do not equate every `TODO` string with a defect.
 2. **Scout:** Spawn independent read-only specialists in parallel. Continue useful orchestrator work while they run.
 3. **Synthesize:** Normalize findings by severity, user impact, confidence, path ownership, dependencies, and verification method. Deduplicate symptoms that share a root cause.
 4. **Assign writes:** Create non-overlapping remediation contracts. Prefer subsystem ownership over issue-by-issue edits when files are tightly coupled.
 5. **Integrate:** Review each diff immediately. Check that the agent stayed in scope and preserved baseline changes before starting the next dependent wave.
 6. **Verify independently:** Give Luna-profile reviewers raw artifacts and acceptance criteria, not the intended conclusion. Use a fresh reviewer where capacity permits.
 7. **Close:** Run repository-wide gates, inspect the final diff against the baseline, and report completed work plus any genuinely unresolved items.
+
+After the first cycle, work delta-only: reuse accepted evidence, inspect confirmed residuals and
+changed paths, and rerun only invalidated checks. Do not restart broad discovery or full verification
+without new cross-cutting evidence.
 
 Maintain a finding ledger across the waves. Give each finding an identifier, evidence, severity, affected paths, dependencies, owner, planned verification, and one final disposition: implemented, already satisfied, invalid, duplicate, blocked, or explicitly deferred. Never silently drop a finding between research and build.
 

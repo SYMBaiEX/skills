@@ -10,6 +10,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
+LATEST_ONLY = {
+    "gpt-engineer",
+    "gpt-orchestration",
+    "gpt-orchestration-auto",
+    "gpt-orchestration-build",
+}
 
 
 def fail(message: str) -> None:
@@ -48,6 +54,38 @@ def main() -> int:
         metadata_text = metadata.read_text()
         if f"${name}" not in metadata_text:
             fail(f"default prompt does not invoke ${name}: {metadata}")
+        if name in LATEST_ONLY:
+            lowered = text.lower()
+            for required in (
+                "latest-only is the default",
+                "gpt-5.6-sol",
+                "gpt-5.6-terra",
+                "gpt-5.6-luna",
+            ):
+                if required not in lowered:
+                    fail(f"latest-only contract missing {required!r}: {path}")
+            for forbidden in (
+                "use generic subagents only",
+                "behavioral profiles only",
+                "disclose same-model inheritance",
+            ):
+                if forbidden in lowered:
+                    fail(f"fail-open routing phrase remains {forbidden!r}: {path}")
+        if name == "gpt-engineer":
+            for required in ("**fast:**", "delta-only", "explicitly"):
+                if required not in text.lower():
+                    fail(f"GPT Engineer fast-path contract missing {required!r}: {path}")
+        if name == "gpt-engineer-spark":
+            for required in ("explicitly requests spark", "not a gpt-5.6 latest-only route"):
+                if required not in text.lower():
+                    fail(f"Spark opt-in contract missing {required!r}: {path}")
+
+    sol_profile = SKILLS / "gpt-engineer" / "assets" / "codex" / "agents" / "sol-engineer.toml"
+    if 'model = "gpt-5.6-sol"' not in sol_profile.read_text():
+        fail(f"Sol profile is not explicitly pinned to gpt-5.6-sol: {sol_profile}")
+    codex_runner = SKILLS / "gpt-engineer" / "scripts" / "run_codex_agent.py"
+    if '"model": "gpt-5.6-sol"' not in codex_runner.read_text():
+        fail(f"Codex fallback is not explicitly pinned to gpt-5.6-sol: {codex_runner}")
 
     print(f"Validated {len(names)} skill directories: {', '.join(sorted(names))}")
     return 0

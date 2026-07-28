@@ -211,7 +211,7 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertNotEqual(envelope["candidateBaselineCommit"], envelope["candidateHeadCommit"])
         self.assertIn("src/generated.txt", Path(envelope["candidatePatch"]).read_text())
 
-    def test_writer_fails_closed_on_ignored_file_change(self) -> None:
+    def test_writer_excludes_ignored_files_from_candidate_tracking(self) -> None:
         (self.root / ".gitignore").write_text("ignored.txt\n")
         (self.root / "ignored.txt").write_text("baseline\n")
         with mock.patch("sys.stdin", io.StringIO("WRITE_IGNORED")):
@@ -230,10 +230,9 @@ print(json.dumps({"type": "turn.completed"}))
                     "src",
                 ]
             )
-        self.assertEqual(result, 1)
+        self.assertEqual(result, 0)
         envelope = json.loads((self.output / "result.json").read_text())
-        self.assertIn("ignored.txt", envelope["changedPaths"])
-        self.assertIn("out-of-scope candidate change: ignored.txt", envelope["violations"])
+        self.assertNotIn("ignored.txt", envelope["changedPaths"])
         self.assertEqual((self.root / "ignored.txt").read_text(), "baseline\n")
 
     def test_writer_refuses_external_symlink_targets(self) -> None:

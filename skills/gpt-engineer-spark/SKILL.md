@@ -7,6 +7,10 @@ description: Lead end-to-end engineering work with a capable main agent and a pa
 
 Own the outcome as the main agent. Keep planning, architecture, conflict resolution, integration, security-sensitive judgment, and final acceptance in the main thread. Delegate small, explicit shards to `gpt-5.3-codex-spark` for speed.
 
+Spark is intentionally an older speed-specialist model, not a GPT-5.6 latest-only route. Activate
+this skill only when the user explicitly requests Spark or authorizes that tradeoff. Never enter it
+automatically from GPT Engineer's latest-only mode.
+
 Read [references/codex-spark.md](references/codex-spark.md) before claiming availability, performance, or route proof.
 When Spark participates in a larger adaptive graph, also read the installed GPT Engineer
 `references/dynamic-workflows.md`; the capable main agent remains the outer orchestrator.
@@ -103,6 +107,9 @@ disables recursive delegation and network access, copies the current repository 
 sandboxed candidate worktree, and returns `candidate-changes/`, `candidate.patch`, and deletion
 metadata. It never applies candidate edits to the original repository. The main agent must inspect
 and integrate the bundle with normal editing tools, then run verification from the integrated state.
+
+The fallback clones only Git-tracked state plus non-ignored dirty and untracked paths, avoiding
+ignored dependency and build trees that can erase Spark's latency advantage.
 
 For multiple fallback children, use `run_spark_fleet.py` with a JSON manifest. Start from
 `assets/read-only-fleet.example.json`. Put explorers in the same read-only wave. Candidate writers
