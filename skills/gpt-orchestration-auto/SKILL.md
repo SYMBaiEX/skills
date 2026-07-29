@@ -1,6 +1,10 @@
 ---
 name: gpt-orchestration-auto
 description: Autonomously pursue a sustained engineering outcome through repeated research, planning, multi-agent implementation, integration, verification, and gap-closing cycles. Use when the user asks for a /goal-style run, says do not stop, finish the whole codebase, research and build autonomously, babysit an outcome, or wants the orchestrator to keep working across continuations until genuinely complete. Use native goal tracking when explicitly requested and available; otherwise maintain an equivalent goal ledger without inventing tool capabilities or broadening authority.
+license: MIT
+metadata:
+  author: SYMBaiEX
+  version: "1.4.0"
 ---
 
 # GPT Orchestration Auto
@@ -62,6 +66,14 @@ Inspect the live agent tree and tool schema before choosing a topology. Count th
 - Keep one writer per file or tightly coupled subsystem.
 - Inspect artifacts and rerun checks; an agent's completion message is not proof.
 
+## Reconcile lifecycle state
+
+At every cycle boundary, reconcile the finding ledger with both the live agent tree and a task-owned resource ledger. Do not start a new wave while superseded workers or their owned subprocesses are still consuming capacity.
+
+When a worker finishes, collect its handoff, verify its artifacts, wait for its terminal state, and reclaim its task-owned subprocess groups, watchers, listeners, temporary worktrees, and other temporary resources. Preserve evidence first. Use recorded ownership plus parentage, working directory, launch time, and agent state; never kill by executable name alone. Shared MCP services, the Codex host, another task's cohort, and unclassified processes are outside the cleanup envelope.
+
+Before marking the goal complete, interrupt stale or invalidated agents, inspect the live tree again, and compare the final process and listener inventory with the baseline. If the host retains a runtime helper and offers no safe task-scoped teardown, record that residual explicitly rather than broad-killing it.
+
 ## Maintain forward progress
 
 Choose the next action by leverage: unblock critical dependencies, close user-facing paths, remove false completion signals, and strengthen verification before cosmetic cleanup. When an approach fails, diagnose it, try safe alternatives, and record the evidence.
@@ -80,6 +92,7 @@ Finish only when:
 - every confirmed in-scope finding has a final disposition;
 - focused and repository-wide gates have passed or are explicitly unavailable for a concrete external reason;
 - the final diff matches the authority envelope and preserves user work;
+- every required agent has handed back and task-owned runtime resources are stopped, reaped, removed, or explicitly authorized to remain;
 - no safe, required, in-scope action remains.
 
-Mark a native goal complete only after those conditions hold. Return the outcome, cycles completed, finding dispositions, verification matrix, external-only checks, residual risks, and exact next action if anything remains.
+Mark a native goal complete only after those conditions hold. Return the outcome, cycles completed, finding dispositions, verification matrix, fleet teardown result, external-only checks, residual risks, and exact next action if anything remains.

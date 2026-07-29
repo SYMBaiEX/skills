@@ -180,6 +180,7 @@ print(json.dumps({"type": "turn.completed"}))
             "allowed\n",
         )
         self.assertTrue(Path(envelope["candidatePatch"]).is_file())
+        self.assertFalse((self.output / "candidate-worktree").exists())
 
     def test_writer_fails_closed_on_out_of_scope_change(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("WRITE_OUTSIDE")):

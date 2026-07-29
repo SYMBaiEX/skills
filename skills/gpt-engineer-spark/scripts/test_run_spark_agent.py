@@ -165,6 +165,7 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertFalse(envelope["appliedToRepository"])
         changes = Path(envelope["candidateChangesDirectory"])
         self.assertEqual((changes / "src" / "generated.txt").read_text(), "allowed\n")
+        self.assertFalse((self.output / "candidate-worktree").exists())
 
     def test_writer_fails_closed_on_out_of_scope_change(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("WRITE_OUTSIDE")):

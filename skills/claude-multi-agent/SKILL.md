@@ -1,6 +1,10 @@
 ---
 name: claude-multi-agent
 description: Hand off engineering work to Claude Code as an autonomous team or native dynamic workflow, with explicit Opus/Sonnet routing, foreground completion barriers, resumable sessions, repeatable JavaScript workflow phases, hooks, and worktree isolation. Use when another agent or CI needs Claude Code to implement a scoped task, run a codebase-wide audit or migration, execute research-build-verify-gap-close phases, launch work in the background, or install project subagents and `.claude/workflows`.
+license: MIT
+metadata:
+  author: SYMBaiEX
+  version: "1.4.0"
 ---
 
 # Claude Multi-Agent
@@ -80,19 +84,16 @@ and fine waiting synchronously for each round.
 
 ### 2. Walk away — true fire-and-forget
 
-`scripts/launch-team-bg.sh "<task>"` uses `claude --bg`, which starts a background session and
-returns immediately (it cannot be combined with `-p`). Claude Code's own supervisor keeps it
-running. Come back later with:
+`scripts/launch-team-bg.sh "<task>"` detaches `run-team.sh` with `nohup`. The detached runner
+still starts Claude in the foreground, so it owns a direct child it can stop, reap, and document
+on `INT`, `TERM`, `HUP`, or `EXIT`; it never uses a command-name search or kills a shared MCP.
+Follow `background-runner.json` and its `log` path, then use the normal result files once it exits.
 
-- `claude agents --json --cwd <path>` (wrapped by `scripts/check-team.sh`) to list active/completed sessions
-- `claude logs <id>` to see recent output
-- `claude attach <id>` to reconnect interactively
-- `claude stop <id>` to kill it
-
-The `Stop` hook (see [Hooks](#hooks)) also drops a `.claude-team/done-<session_id>.json` marker
-file the moment the orchestrator finishes, so a polling loop doesn't have to parse `claude logs`
-output to know when it's safe to check results. Because subagents run in the foreground (see
-above), that marker reliably means the whole run — not just the top-level turn — is done.
+The final handoff barrier is explicit: do not treat a `Stop` hook marker, a quiet log, or a dead
+launcher PID as completion. Require (1) `last-result.json`, (2) the structured result's success
+conditions, and (3) a `runner_teardown_complete` event in `.claude-team/lifecycle.jsonl`. Then
+review the worktree diff and run the real checks before integrating. The `Stop` hook remains useful
+observability, but is not the handoff barrier by itself.
 
 ### 3. Iterative follow-up — Codex as the user
 

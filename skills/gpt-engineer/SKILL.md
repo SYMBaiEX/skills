@@ -1,6 +1,10 @@
 ---
 name: gpt-engineer
 description: "Own a software-engineering outcome end to end with a strictly model-routed agent fleet: research the real codebase, turn findings into implementation waves, edit safely, test and inspect the result, and persist through bounded gap-closing cycles until the authorized goal is complete. Use when the user asks for a GPT engineer, autonomous engineer, complete feature or repository build, broad remediation, research plus implementation, multi-agent coding, explicit subagents, different models, or a durable /goal-style engineering run. Default to exact GPT-5.6 Sol, Terra, and Luna routes; preflight routing and never silently use an inherited, generic, older, Spark, or Claude child."
+license: MIT
+metadata:
+  author: SYMBaiEX
+  version: "1.4.0"
 ---
 
 # GPT Engineer
@@ -193,5 +197,15 @@ are replaced. It never edits provider config, installs no global hooks, and merg
 ## Close like an owner
 
 Every confirmed finding must end as implemented, already satisfied, invalid, duplicate, blocked, or explicitly deferred by the user. Do not silently lose findings or defer difficult work yourself.
+
+### Delegated-fleet teardown
+
+Close every delegated lane before reporting completion. Keep an ownership ledger with each child’s
+stage, repository/candidate cwd, process group or native handle, allowed paths, evidence directory,
+and close state. On timeout, interruption, SIGTERM/SIGHUP, or any runner exception, stop and join
+only the recorded child process groups, then capture available evidence and candidate bundles before
+removing the candidate worktree. Verify no recorded child remains afterward. Never kill processes by
+binary name: classify a process by its recorded parent and cwd first, so shared MCP servers and other
+tasks remain untouched.
 
 Finish only when every acceptance criterion has evidence, repository-wide gates pass or have a concrete external-only limitation, the final diff preserves user work, and no safe required in-scope action remains. Report the outcome first, then finding dispositions, verification, model-routing reality, external-only checks, and residual risks.

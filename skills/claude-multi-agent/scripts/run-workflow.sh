@@ -3,6 +3,9 @@
 # Usage: run-workflow.sh "<engineering goal>" [worktree-name]
 set -euo pipefail
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$SCRIPT_DIR/lib/lifecycle.sh"
+
 TASK="${1:?Usage: run-workflow.sh \"<engineering goal>\" [worktree-name]}"
 WORKTREE="${2:-workflow-$(date +%s)-$$}"
 if [[ ! "$WORKTREE" =~ ^[A-Za-z0-9._-]+$ ]]; then
@@ -19,6 +22,8 @@ CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 STATE_DIR_INPUT="${STATE_DIR:-$CLAUDE_HOME/workflow-runs/$WORKTREE}"
 mkdir -p "$STATE_DIR_INPUT"
 STATE_DIR=$(cd "$STATE_DIR_INPUT" && pwd)
+claude_team_init_lifecycle "$STATE_DIR"
+claude_team_install_lifecycle_traps
 PROJECT_WORKFLOW="$REPO_ROOT/.claude/workflows/gpt-engineer-dynamic.js"
 GLOBAL_WORKFLOW="$CLAUDE_HOME/workflows/gpt-engineer-dynamic.js"
 
@@ -115,7 +120,9 @@ cleanup() {
     rmdir "$CANDIDATE_PARENT" >/dev/null 2>&1 || true
   fi
 }
-trap cleanup EXIT
+claude_team_release_resources() {
+  cleanup
+}
 
 if [[ "${IN_PLACE:-0}" != "1" ]]; then
   if [[ "$BASE_COMMIT" == "unborn" ]]; then
@@ -128,14 +135,14 @@ if [[ "${IN_PLACE:-0}" != "1" ]]; then
   git -C "$REPO_ROOT" worktree add --detach "$EXECUTION_DIR" HEAD >/dev/null
 fi
 
+ERROR_LOG_FILE="$STATE_DIR/claude.stderr.log"
+: > "$ERROR_LOG_FILE"
+claude_team_run_child "$LOG_FILE" "$ERROR_LOG_FILE" bash -c 'cd "$1" && shift && exec "$@"' _ "$EXECUTION_DIR" claude "${ARGS[@]}"
 set +e
-(
-  cd "$EXECUTION_DIR"
-  claude "${ARGS[@]}"
-) | tee "$LOG_FILE" | jq -c 'select(.type == "result")' > "$RESULT_FILE"
-PIPE_CODES=("${PIPESTATUS[@]}")
+claude_team_wait_for_child
+CLAUDE_STATUS=$?
 set -e
-CLAUDE_STATUS="${PIPE_CODES[0]}"
+jq -c 'select(.type == "result")' "$LOG_FILE" > "$RESULT_FILE"
 CANDIDATE_HEAD="$BASE_COMMIT"
 CANDIDATE_COMMIT_VIOLATION=false
 
@@ -170,7 +177,7 @@ if [[ ! -s "$RESULT_FILE" ]]; then
 fi
 
 if [[ "$CLAUDE_STATUS" != "0" ]]; then
-  echo "error: Claude Code exited with status $CLAUDE_STATUS; inspect $LOG_FILE." >&2
+  echo "error: Claude Code exited with status $CLAUDE_STATUS; inspect $LOG_FILE and $ERROR_LOG_FILE." >&2
   exit 1
 fi
 

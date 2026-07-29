@@ -14,6 +14,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path, PurePosixPath
 
@@ -369,7 +370,10 @@ def stop_process_group(process: subprocess.Popen[str]) -> None:
     for sig, grace in ((signal.SIGINT, 2), (signal.SIGTERM, 2), (signal.SIGKILL, 0)):
         if process.poll() is not None:
             return
-        os.killpg(process.pid, sig)
+        try:
+            os.killpg(process.pid, sig)
+        except ProcessLookupError:
+            return
         if grace:
             try:
                 process.wait(timeout=grace)
@@ -462,10 +466,27 @@ def main(argv: list[str] | None = None) -> int:
     stderr = ""
     timed_out = False
     launch_error: str | None = None
+    lifecycle_error: str | None = None
+    baseline: dict[str, str] = {}
+    after: dict[str, str] = {}
     candidate: Path | None = None
     candidate_baseline_commit: str | None = None
     candidate_head_commit: str | None = None
     final_message_path = output_dir / "last-message.txt"
+    lifecycle_signals = (signal.SIGTERM, signal.SIGHUP)
+    previous_handlers = (
+        {sig: signal.getsignal(sig) for sig in lifecycle_signals}
+        if threading.current_thread() is threading.main_thread()
+        else {}
+    )
+
+    def interrupt(signum: int, _frame: object) -> None:
+        if process is not None:
+            stop_process_group(process)
+        raise KeyboardInterrupt(f"delegate runner received signal {signum}")
+
+    for sig in previous_handlers:
+        signal.signal(sig, interrupt)
     try:
         baseline = snapshot(cwd)
         if write_mode:
@@ -536,7 +557,26 @@ def main(argv: list[str] | None = None) -> int:
                 capture_output=True,
                 text=True,
             ).stdout.strip()
+    except KeyboardInterrupt as exc:
+        if process is not None:
+            stop_process_group(process)
+        lifecycle_error = f"Delegate lifecycle interrupted: {type(exc).__name__}: {exc}"
+        stderr = (stderr + "\n" if stderr else "") + lifecycle_error
+        try:
+            after = snapshot(cwd)
+        except Exception as snapshot_error:
+            after = baseline
+            stderr += f"\nFailed to capture post-interruption snapshot: {snapshot_error}"
+    except Exception:
+        if candidate is not None:
+            shutil.rmtree(candidate, ignore_errors=True)
+            candidate = None
+        raise
     finally:
+        if process is not None:
+            stop_process_group(process)
+        for sig, handler in previous_handlers.items():
+            signal.signal(sig, handler)
         fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
         lock.close()
 
@@ -574,18 +614,21 @@ def main(argv: list[str] | None = None) -> int:
     candidate_patch: str | None = None
     if candidate is not None:
         assert candidate_baseline_commit is not None
-        changes_directory, candidate_patch, unsafe_links = bundle_candidate_changes(
-            candidate,
-            output_dir,
-            changed_paths,
-            candidate_baseline_commit,
-        )
-        violations.extend(f"candidate symlink escapes worktree: {path}" for path in unsafe_links)
-        shutil.rmtree(candidate)
+        try:
+            changes_directory, candidate_patch, unsafe_links = bundle_candidate_changes(
+                candidate,
+                output_dir,
+                changed_paths,
+                candidate_baseline_commit,
+            )
+            violations.extend(f"candidate symlink escapes worktree: {path}" for path in unsafe_links)
+        finally:
+            shutil.rmtree(candidate, ignore_errors=True)
 
     success = (
         not timed_out
         and launch_error is None
+        and lifecycle_error is None
         and process is not None
         and process.returncode == 0
         and completed
@@ -610,6 +653,8 @@ def main(argv: list[str] | None = None) -> int:
     }
     if launch_error:
         envelope["launchError"] = launch_error
+    if lifecycle_error:
+        envelope["lifecycleError"] = lifecycle_error
     (output_dir / "result.json").write_text(json.dumps(envelope, indent=2) + "\n")
     if not success:
         print(f"Codex delegate failed closed; inspect {output_dir}", file=sys.stderr)

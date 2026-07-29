@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -15,6 +16,49 @@ WORKFLOW = SKILL_ROOT / "assets" / "workflows" / "gpt-engineer-dynamic.js"
 
 
 class ClaudeWorkflowTests(unittest.TestCase):
+    def test_lifecycle_signal_reaps_only_the_recorded_child_tree_and_preserves_evidence(self) -> None:
+        lifecycle = SCRIPT_DIR / "lib" / "lifecycle.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state = root / "state"
+            child_pid_file = root / "grandchild.pid"
+            runner = root / "runner.sh"
+            runner.write_text(
+                f"""#!/usr/bin/env bash
+set -euo pipefail
+source {lifecycle!s}
+claude_team_init_lifecycle "$1"
+claude_team_install_lifecycle_traps
+claude_team_run_child "$1/stream.jsonl" "$1/claude.stderr.log" bash -c 'sleep 30 & echo $! > "$1"; wait' _ "$2"
+claude_team_wait_for_child
+"""
+            )
+            runner.chmod(0o755)
+            process = subprocess.Popen([str(runner), str(state), str(child_pid_file)])
+            deadline = time.monotonic() + 5
+            while not child_pid_file.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertTrue(child_pid_file.exists(), "test child did not start")
+            grandchild_pid = int(child_pid_file.read_text().strip())
+            process.terminate()
+            self.assertEqual(process.wait(timeout=10), 143)
+            still_running = (
+                Path(f"/proc/{grandchild_pid}").exists()
+                if Path("/proc").exists()
+                else self._pid_is_running(grandchild_pid)
+            )
+            self.assertFalse(still_running)
+            events = [json.loads(line) for line in (state / "lifecycle.jsonl").read_text().splitlines()]
+            self.assertIn("signal_received", [event["event"] for event in events])
+            self.assertIn("child_reaped", [event["event"] for event in events])
+            self.assertEqual(events[-1]["event"], "runner_teardown_complete")
+
+    @staticmethod
+    def _pid_is_running(pid: int) -> bool:
+        return subprocess.run(
+            ["kill", "-0", str(pid)], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        ).returncode == 0
+
     def test_saved_workflow_has_deterministic_runtime_contract(self) -> None:
         source = WORKFLOW.read_text()
         self.assertTrue(source.startswith("export const meta = {"))
@@ -239,6 +283,10 @@ print(json.dumps({"type":"result","is_error":False,"structured_output":{"status"
             self.assertIn("built.txt", (state / "candidate.patch").read_text())
             self.assertNotIn(".claude-team", (state / "candidate.patch").read_text())
             self.assertTrue((state / "workflow-events.jsonl").is_file())
+            lifecycle_events = [
+                json.loads(line) for line in (state / "lifecycle.jsonl").read_text().splitlines()
+            ]
+            self.assertEqual(lifecycle_events[-1]["event"], "runner_teardown_complete")
 
             committed_state = Path(temporary) / "committed-state"
             env.update({"STATE_DIR": str(committed_state), "FAKE_COMMIT": "1"})

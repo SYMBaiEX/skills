@@ -6,9 +6,12 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import json
+import os
 import re
+import signal
 import subprocess
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -19,6 +22,8 @@ ROLES = {"spark-explorer", "spark-worker", "spark-verifier"}
 READ_ONLY_ROLES = {"spark-explorer", "spark-verifier"}
 TASK_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 RUNNER = Path(__file__).resolve().with_name("run_spark_agent.py")
+ACTIVE_PROCESSES: set[subprocess.Popen[str]] = set()
+ACTIVE_PROCESSES_LOCK = threading.Lock()
 
 
 def now() -> str:
@@ -165,6 +170,28 @@ def delegate_command(
     return command
 
 
+def stop_process_group(process: subprocess.Popen[str]) -> None:
+    for sig, grace in ((signal.SIGINT, 1), (signal.SIGTERM, 1), (signal.SIGKILL, 0)):
+        if process.poll() is not None:
+            return
+        try:
+            os.killpg(process.pid, sig)
+        except ProcessLookupError:
+            return
+        if grace:
+            try:
+                process.wait(timeout=grace)
+            except subprocess.TimeoutExpired:
+                continue
+
+
+def close_owned_children() -> None:
+    with ACTIVE_PROCESSES_LOCK:
+        processes = tuple(ACTIVE_PROCESSES)
+    for process in processes:
+        stop_process_group(process)
+
+
 def run_task(
     task: dict[str, Any],
     cwd: Path,
@@ -172,23 +199,56 @@ def run_task(
     codex: str | None,
     allow_writes: bool,
     timeout: int,
+    cancelled: threading.Event | None = None,
 ) -> dict[str, Any]:
     started = now()
     task_output = output_root / task["id"]
     command = delegate_command(task, cwd, task_output, codex, allow_writes, timeout)
+    process: subprocess.Popen[str] | None = None
+    was_cancelled = False
     try:
-        process = subprocess.run(
+        process = subprocess.Popen(
             command,
-            input=task["prompt"] + "\n",
-            capture_output=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
             text=True,
-            check=False,
         )
+        with ACTIVE_PROCESSES_LOCK:
+            ACTIVE_PROCESSES.add(process)
+        sent_input = False
+        while True:
+            if cancelled is not None and cancelled.is_set():
+                was_cancelled = True
+                stop_process_group(process)
+            try:
+                _stdout, stderr = process.communicate(
+                    input=None if sent_input else task["prompt"] + "\n", timeout=0.1
+                )
+                break
+            except subprocess.TimeoutExpired:
+                sent_input = True
+                continue
         returncode: int | None = process.returncode
-        stderr = process.stderr
     except OSError as exc:
         returncode = None
         stderr = f"Failed to launch Spark delegate runner: {exc}"
+    except KeyboardInterrupt as exc:
+        if process is not None:
+            stop_process_group(process)
+        was_cancelled = True
+        returncode = process.returncode if process is not None else None
+        stderr = f"Spark delegate runner interrupted: {exc}"
+    except Exception as exc:
+        if process is not None:
+            stop_process_group(process)
+        returncode = process.returncode if process is not None else None
+        stderr = f"Unexpected Spark delegate runner error: {type(exc).__name__}: {exc}"
+    finally:
+        if process is not None:
+            with ACTIVE_PROCESSES_LOCK:
+                ACTIVE_PROCESSES.discard(process)
     result_path = task_output / "result.json"
     if result_path.exists():
         try:
@@ -209,7 +269,7 @@ def run_task(
             "violations": ["delegate did not emit result.json"],
             "finalMessage": "",
         }
-    completed = returncode == 0 and result.get("status") == "completed"
+    completed = not was_cancelled and returncode == 0 and result.get("status") == "completed"
     return {
         "id": task["id"],
         "wave": task["wave"],
@@ -221,7 +281,7 @@ def run_task(
         "modelAttestedByRuntime": None,
         "startedAt": started,
         "endedAt": now(),
-        "status": "completed" if completed else "failed",
+        "status": "completed" if completed else ("cancelled" if was_cancelled else "failed"),
         "changedPaths": result.get("changedPaths", []),
         "violations": result.get("violations", []),
         "finalMessage": result.get("finalMessage", ""),
@@ -234,6 +294,37 @@ def run_task(
         ),
         "evidenceDirectory": str(task_output),
         "stderrTail": stderr[-2000:],
+    }
+
+
+def unfinished_task_result(
+    task: dict[str, Any],
+    *,
+    status: str,
+    violation: str,
+    blocked_by: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "id": task["id"],
+        "wave": task["wave"],
+        "role": task["role"],
+        "required": task["required"],
+        "routeMethod": "cli-explicit-model",
+        "requestedModel": REQUIRED_MODEL,
+        "serverAcceptedRequest": False,
+        "modelAttestedByRuntime": None,
+        "startedAt": None,
+        "endedAt": now(),
+        "status": status,
+        "blockedBy": blocked_by or [],
+        "changedPaths": [],
+        "violations": [violation],
+        "finalMessage": "",
+        "candidateChangesDirectory": None,
+        "candidatePatch": None,
+        "deletedPathsFile": None,
+        "evidenceDirectory": None,
+        "stderrTail": "",
     }
 
 
@@ -255,13 +346,37 @@ def run_wave(
             for task in tasks
         ]
     results: dict[str, dict[str, Any]] = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_parallel, len(tasks))) as pool:
+    cancelled = threading.Event()
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=min(max_parallel, len(tasks)))
+    futures: dict[concurrent.futures.Future[dict[str, Any]], str] = {}
+    try:
         futures = {
-            pool.submit(run_task, task, cwd, output_root, codex, allow_writes, timeout): task["id"]
+            pool.submit(run_task, task, cwd, output_root, codex, allow_writes, timeout, cancelled): task["id"]
             for task in tasks
         }
         for future in concurrent.futures.as_completed(futures):
-            results[futures[future]] = future.result()
+            task_id = futures[future]
+            task = next(item for item in tasks if item["id"] == task_id)
+            try:
+                results[task_id] = future.result()
+            except Exception as exc:
+                cancelled.set()
+                close_owned_children()
+                results[task_id] = unfinished_task_result(
+                    task,
+                    status="failed",
+                    violation=f"fleet task exception: {type(exc).__name__}: {exc}",
+                )
+                for pending in futures:
+                    pending.cancel()
+    except BaseException:
+        cancelled.set()
+        close_owned_children()
+        for future in futures:
+            future.cancel()
+        raise
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
     return [results[task["id"]] for task in tasks]
 
 
@@ -313,64 +428,91 @@ def main(argv: list[str] | None = None) -> int:
     output_root.mkdir(mode=0o700, parents=True, exist_ok=True)
     output_root.chmod(0o700)
 
+    interrupted_reason: str | None = None
+    interrupted_wave: int | None = None
+    current_wave: int | None = None
+    previous_handlers: dict[int, Any] = {}
+    if threading.current_thread() is threading.main_thread():
+        def interrupt(signum: int, _frame: object) -> None:
+            nonlocal interrupted_reason, interrupted_wave
+            interrupted_reason = f"received signal {signal.Signals(signum).name}"
+            interrupted_wave = current_wave
+            close_owned_children()
+
+        for lifecycle_signal in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            previous_handlers[lifecycle_signal] = signal.getsignal(lifecycle_signal)
+            signal.signal(lifecycle_signal, interrupt)
+
     all_results: list[dict[str, Any]] = []
     results_by_id: dict[str, dict[str, Any]] = {}
-    for wave in sorted({task["wave"] for task in tasks}):
-        wave_tasks = [task for task in tasks if task["wave"] == wave]
-        runnable: list[dict[str, Any]] = []
-        results: list[dict[str, Any]] = []
-        for task in wave_tasks:
-            blocked_by = [
-                dependency
-                for dependency in task["dependsOn"]
-                if results_by_id[dependency]["status"] != "completed"
-            ]
-            if blocked_by:
-                result = {
-                    "id": task["id"],
-                    "wave": task["wave"],
-                    "role": task["role"],
-                    "required": task["required"],
-                    "routeMethod": "cli-explicit-model",
-                    "requestedModel": REQUIRED_MODEL,
-                    "serverAcceptedRequest": False,
-                    "modelAttestedByRuntime": None,
-                    "startedAt": None,
-                    "endedAt": None,
-                    "status": "skipped",
-                    "blockedBy": blocked_by,
-                    "changedPaths": [],
-                    "violations": ["dependency did not complete"],
-                    "finalMessage": "",
-                    "candidateChangesDirectory": None,
-                    "candidatePatch": None,
-                    "deletedPathsFile": None,
-                    "evidenceDirectory": None,
-                    "stderrTail": "",
-                }
-                results.append(result)
-                results_by_id[task["id"]] = result
-            else:
-                runnable.append(task)
-        if runnable:
-            executed = run_wave(
-                runnable,
-                cwd,
-                output_root,
-                args.codex,
-                args.allow_writes,
-                args.timeout,
-                args.max_parallel,
-            )
-            results.extend(executed)
-            results_by_id.update({result["id"]: result for result in executed})
-        results.sort(key=lambda result: [task["id"] for task in wave_tasks].index(result["id"]))
-        all_results.extend(results)
+    try:
+        for wave in sorted({task["wave"] for task in tasks}):
+            current_wave = wave
+            wave_tasks = [task for task in tasks if task["wave"] == wave]
+            runnable: list[dict[str, Any]] = []
+            results: list[dict[str, Any]] = []
+            for task in wave_tasks:
+                if interrupted_reason is not None:
+                    result = unfinished_task_result(
+                        task,
+                        status="skipped",
+                        violation=f"fleet interrupted: {interrupted_reason}",
+                    )
+                    results.append(result)
+                    results_by_id[task["id"]] = result
+                    continue
+                blocked_by = [
+                    dependency
+                    for dependency in task["dependsOn"]
+                    if results_by_id[dependency]["status"] != "completed"
+                ]
+                if blocked_by:
+                    result = unfinished_task_result(
+                        task,
+                        status="skipped",
+                        violation="dependency did not complete",
+                        blocked_by=blocked_by,
+                    )
+                    results.append(result)
+                    results_by_id[task["id"]] = result
+                else:
+                    runnable.append(task)
+            if runnable:
+                executed = run_wave(
+                    runnable,
+                    cwd,
+                    output_root,
+                    args.codex,
+                    args.allow_writes,
+                    args.timeout,
+                    args.max_parallel,
+                )
+                results.extend(executed)
+                results_by_id.update({result["id"]: result for result in executed})
+            results.sort(key=lambda result: [task["id"] for task in wave_tasks].index(result["id"]))
+            all_results.extend(results)
+    finally:
+        close_owned_children()
+        for lifecycle_signal, handler in previous_handlers.items():
+            signal.signal(lifecycle_signal, handler)
 
     skipped = [result["id"] for result in all_results if result["status"] == "skipped"]
     failed = [result["id"] for result in all_results if result["status"] == "failed"]
+    cancelled = [result["id"] for result in all_results if result["status"] == "cancelled"]
     complete = all(
         not result["required"] or result["status"] == "completed" for result in all_results
+    ) and interrupted_reason is None
+    stopped_after_wave = (
+        interrupted_wave
+        if interrupted_reason is not None
+        else max(
+            (
+                result["wave"]
+                for result in all_results
+                if result["status"] in {"failed", "cancelled"}
+            ),
+            default=None,
+        )
     )
     envelope = {
         "schema": "gpt-engineer-spark-fleet/v2",
@@ -378,13 +520,18 @@ def main(argv: list[str] | None = None) -> int:
         "requiredModel": REQUIRED_MODEL,
         "routeMethod": "cli-explicit-model",
         "maxParallel": args.max_parallel,
-        "stoppedAfterWave": None,
+        "stoppedAfterWave": stopped_after_wave,
+        "interruption": interrupted_reason,
         "failedTaskIds": failed,
+        "cancelledTaskIds": cancelled,
         "skippedTaskIds": skipped,
         "delegates": all_results,
         "requiresMainAgentIntegration": bool(writer_waves),
     }
     (output_root / "fleet-result.json").write_text(json.dumps(envelope, indent=2) + "\n")
+    if interrupted_reason is not None:
+        print(f"Spark fleet interrupted; inspect {output_root}", file=sys.stderr)
+        return 130
     if not complete:
         print(f"Spark fleet incomplete; inspect {output_root}", file=sys.stderr)
         return 1

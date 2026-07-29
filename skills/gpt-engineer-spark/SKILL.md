@@ -1,6 +1,10 @@
 ---
 name: gpt-engineer-spark
 description: Lead end-to-end engineering work with a capable main agent and a parallel fleet of model-pinned GPT-5.3-Codex-Spark subagents. Use when the user asks for a Spark fleet, ultra-fast parallel coding agents, rapid repository exploration, many bounded implementation shards, or low-latency independent verification while retaining architecture, integration, and final acceptance with the main agent.
+license: MIT
+metadata:
+  author: SYMBaiEX
+  version: "1.4.0"
 ---
 
 # GPT Engineer Spark
@@ -87,6 +91,15 @@ Run independent `spark-verifier` children over separate risk areas. Treat their 
 ### 5. Close
 
 Account for every requirement and finding as implemented, already satisfied, invalid, duplicate, blocked, or explicitly deferred. Completion requires integrated evidence, not child confidence.
+
+### Spark-fleet teardown
+
+Before closing a Spark fleet, close the fleet explicitly. Maintain an ownership ledger for every
+child: task id, wave, role, parent/fleet identity, child runner cwd, candidate cwd if any, evidence
+directory, and close state. If one child errors or the fleet is interrupted, cancel and join every
+remaining child in that fleet wave, do not launch later waves, capture any available evidence/bundles,
+remove every candidate worktree, and verify that no ledger-owned child remains. Classify cleanup by
+recorded parent and cwd, never by executable name, to preserve shared MCPs and unrelated tasks.
 
 ## Use the guarded fallback
 

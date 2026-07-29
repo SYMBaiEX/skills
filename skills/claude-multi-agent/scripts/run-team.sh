@@ -16,10 +16,15 @@
 #                                   you need present (see references/SAFETY.md)
 set -euo pipefail
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$SCRIPT_DIR/lib/lifecycle.sh"
+
 TASK="${1:?Usage: run-team.sh \"<task>\" [worktree-name]}"
 WORKTREE="${2:-team-$(date +%s)}"
 STATE_DIR=".claude-team"
 mkdir -p "$STATE_DIR"
+claude_team_init_lifecycle "$STATE_DIR"
+claude_team_install_lifecycle_traps
 
 export CLAUDE_CODE_SUBAGENT_MODEL="${CLAUDE_CODE_SUBAGENT_MODEL:-sonnet}"
 export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS="${CLAUDE_CODE_DISABLE_BACKGROUND_TASKS:-1}"
@@ -40,11 +45,23 @@ fi
 [[ -n "${MAX_BUDGET_USD:-}" ]] && ARGS+=(--max-budget-usd "$MAX_BUDGET_USD")
 
 LOG_FILE="$STATE_DIR/stream.jsonl"
+ERROR_LOG_FILE="$STATE_DIR/claude.stderr.log"
 : > "$LOG_FILE"
+: > "$ERROR_LOG_FILE"
 
-# tee the full turn-by-turn stream to a file Codex (or you) can `tail -f` for a liveness
+# Capture the full turn-by-turn stream to a file Codex (or you) can `tail -f` for a liveness
 # signal, while filtering out just the final `result` event for the last-result.json contract.
-claude "${ARGS[@]}" | tee "$LOG_FILE" | jq -c 'select(.type == "result")' > "$STATE_DIR/last-result.json"
+claude_team_run_child "$LOG_FILE" "$ERROR_LOG_FILE" claude "${ARGS[@]}"
+set +e
+claude_team_wait_for_child
+CLAUDE_STATUS=$?
+set -e
+jq -c 'select(.type == "result")' "$LOG_FILE" > "$STATE_DIR/last-result.json"
+
+if [[ "$CLAUDE_STATUS" != "0" ]]; then
+  echo "error: Claude Code exited with status $CLAUDE_STATUS; inspect $LOG_FILE and $ERROR_LOG_FILE." >&2
+  exit "$CLAUDE_STATUS"
+fi
 
 if [[ ! -s "$STATE_DIR/last-result.json" ]]; then
   echo "error: no final result event captured — the run may have errored or been interrupted." >&2

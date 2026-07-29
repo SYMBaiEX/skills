@@ -4,7 +4,7 @@ description: Coordinate hierarchical coding-agent fleets for repository-wide aud
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # GPT Orchestration
@@ -75,7 +75,7 @@ Choose **fast** for one known path, **standard** for two or more independent sha
 4. **Assign writes:** Create non-overlapping remediation contracts. Prefer subsystem ownership over issue-by-issue edits when files are tightly coupled.
 5. **Integrate:** Review each diff immediately. Check that the agent stayed in scope and preserved baseline changes before starting the next dependent wave.
 6. **Verify independently:** Give Luna-profile reviewers raw artifacts and acceptance criteria, not the intended conclusion. Use a fresh reviewer where capacity permits.
-7. **Close:** Run repository-wide gates, inspect the final diff against the baseline, and report completed work plus any genuinely unresolved items.
+7. **Close:** Run repository-wide gates, inspect the final diff against the baseline, close the fleet, and report completed work plus any genuinely unresolved items.
 
 After the first cycle, work delta-only: reuse accepted evidence, inspect confirmed residuals and
 changed paths, and rerun only invalidated checks. Do not restart broad discovery or full verification
@@ -96,6 +96,19 @@ Inspect agent state after spawning and at wave boundaries. Integrate communicati
 - Record each agent's owner, paths, mode, dependencies, status, changes, evidence, and blockers in the working notes or plan.
 
 Never treat an agent's completion message as proof by itself. Inspect its artifacts and rerun proportionate checks from the orchestrator context.
+
+## Close the fleet
+
+Fleet completion includes teardown. Before returning control:
+
+1. Collect every relevant handoff and wait for all required agents to reach a terminal state.
+2. Interrupt agents whose work was invalidated, superseded, or left running after their bounded task.
+3. Reinspect the live agent tree. Only the orchestrator and agents explicitly authorized to continue may remain active.
+4. Keep an ownership ledger for background servers, watchers, simulators, subprocess groups, temporary worktrees, and other resources launched during the task. Record the owning agent, PID or resource identifier when exposed, purpose, working directory, and intended lifetime.
+5. Stop and reap task-owned processes, close task-owned listeners, and remove task-owned temporary resources unless the user explicitly asked to keep them running. Preserve logs and handoff evidence before teardown.
+6. Compare a final process and listener inventory with the baseline. Classify by parentage, working directory, launch time, and agent state; never kill by executable name alone.
+
+A finished subagent does not imply that its MCP servers or runtime helpers were reclaimed. Native runtime helpers may be shared or retained by the host, so never terminate the Codex app, shared MCP services, another task's cohort, or an unclassified process. If the runtime owns a residual helper and exposes no safe task-scoped teardown, report it precisely instead of using a broad process kill.
 
 ## Apply verification gates
 

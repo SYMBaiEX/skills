@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# True "give it a task and walk away" run: starts a background Claude Code session and returns
-# immediately. Check back with check-team.sh, `claude logs <id>`, or `claude attach <id>`.
+# True "give it a task and walk away" run: detaches a lifecycle-managed foreground runner and
+# returns immediately. The runner owns its Claude child and handles INT/TERM/HUP/EXIT safely.
 # Usage: launch-team-bg.sh "<task description>" [worktree-name]
 #
 # Defaults PERMISSION_MODE to bypassPermissions because a walk-away session with no human
@@ -11,6 +11,8 @@
 # CLAUDE_CODE_SUBAGENT_MODEL, MAX_TURNS, MAX_BUDGET_USD all apply here too.
 set -euo pipefail
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 TASK="${1:?Usage: launch-team-bg.sh \"<task>\" [worktree-name]}"
 WORKTREE="${2:-team-$(date +%s)}"
 STATE_DIR=".claude-team"
@@ -19,29 +21,26 @@ mkdir -p "$STATE_DIR"
 export CLAUDE_CODE_SUBAGENT_MODEL="${CLAUDE_CODE_SUBAGENT_MODEL:-sonnet}"
 export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS="${CLAUDE_CODE_DISABLE_BACKGROUND_TASKS:-1}"
 
-ARGS=(
-  --bg "$TASK"
-  --model "${ORCHESTRATOR_MODEL:-opus}"
-  --fallback-model "sonnet,haiku"
-  --permission-mode "${PERMISSION_MODE:-bypassPermissions}"
-  --append-system-prompt "Subagents you spawn in this session run in the foreground: the Agent tool call itself blocks until the subagent returns a result. Do not poll, sleep, or use Monitor to wait for a subagent to finish — there is nothing to wait for beyond the tool call already returning."
-)
-if [[ "${IN_PLACE:-0}" != "1" ]]; then
-  ARGS+=(--worktree "$WORKTREE")
-fi
-[[ -n "${MAX_TURNS:-}" ]] && ARGS+=(--max-turns "$MAX_TURNS")
-[[ -n "${MAX_BUDGET_USD:-}" ]] && ARGS+=(--max-budget-usd "$MAX_BUDGET_USD")
-
-claude "${ARGS[@]}" | tee "$STATE_DIR/last-bg-launch.log"
+RUNNER_LOG="$STATE_DIR/bg-runner-${WORKTREE}.log"
+nohup env \
+  ORCHESTRATOR_MODEL="${ORCHESTRATOR_MODEL:-opus}" \
+  PERMISSION_MODE="${PERMISSION_MODE:-bypassPermissions}" \
+  CLAUDE_CODE_SUBAGENT_MODEL="$CLAUDE_CODE_SUBAGENT_MODEL" \
+  CLAUDE_CODE_DISABLE_BACKGROUND_TASKS="$CLAUDE_CODE_DISABLE_BACKGROUND_TASKS" \
+  MAX_TURNS="${MAX_TURNS:-}" \
+  MAX_BUDGET_USD="${MAX_BUDGET_USD:-}" \
+  IN_PLACE="${IN_PLACE:-0}" \
+  bash "$SCRIPT_DIR/run-team.sh" "$TASK" "$WORKTREE" > "$RUNNER_LOG" 2>&1 < /dev/null &
+RUNNER_PID=$!
+jq -n \
+  --argjson pid "$RUNNER_PID" \
+  --arg worktree "$WORKTREE" \
+  --arg log "$RUNNER_LOG" \
+  '{runnerPid: $pid, worktree: $worktree, log: $log, status: "running"}' \
+  > "$STATE_DIR/background-runner.json"
 
 echo >&2
-if [[ "${IN_PLACE:-0}" == "1" ]]; then
-  echo "Session launched in the background (in-place, no worktree)." >&2
-else
-  echo "Session launched in the background (worktree: $WORKTREE)." >&2
-fi
-echo "Poll with: bash \"$(dirname "${BASH_SOURCE[0]}")/check-team.sh\" [session-id]" >&2
-echo "Completion marker will appear at: $STATE_DIR/done-<session_id>.json" >&2
-echo "That marker means the orchestrator's own turn ended, not necessarily that every subagent" >&2
-echo "it spawned has finished — see references/HANDOFF-PROTOCOL.md for why this default now" >&2
-echo "forces subagents to run in the foreground instead of relying on the marker alone." >&2
+echo "Lifecycle-managed runner launched (pid: $RUNNER_PID)." >&2
+echo "Follow progress with: tail -f $RUNNER_LOG" >&2
+echo "Before handoff, wait for the runner to exit and require last-result.json plus" >&2
+echo "lifecycle.jsonl's runner_teardown_complete event; see references/HANDOFF-PROTOCOL.md." >&2

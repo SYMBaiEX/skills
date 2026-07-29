@@ -39,3 +39,11 @@ Ask for tests explicitly. A fast child should not infer that testing is optional
 The guarded CLI writer edits an isolated candidate copy and emits a change bundle. It does not mutate
 or automatically restore the original checkout. Review and integrate that bundle in the main agent,
 then verify the real integrated repository.
+
+## Lifecycle ownership
+
+The runner owns only the process group it started and the candidate worktree it created. Record that
+ownership with parent identity and cwd. On timeout, interruption, SIGTERM/SIGHUP, or an exception,
+terminate and join owned groups, preserve available evidence and change bundles, then remove the
+candidate worktree. A fleet failure cancels and joins its remaining children before it marks later
+waves skipped. Do not sweep by process name: shared MCPs and other tasks may use the same executable.

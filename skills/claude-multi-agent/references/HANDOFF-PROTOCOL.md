@@ -53,6 +53,33 @@ None of this is Claude Code's own state (that lives under `~/.claude/`) — it's
 grep/jq-able contract this skill defines on top, so the calling agent doesn't need to understand
 Claude Code's internal transcript format at all.
 
+## Lifecycle teardown and final handoff barrier
+
+Each foreground runner (`run-team.sh`, `resume-team.sh`, and `run-workflow.sh`) records lifecycle
+events in `.claude-team/lifecycle.jsonl` (or the external workflow `STATE_DIR`). It traps `INT`,
+`TERM`, `HUP`, and `EXIT`. On interruption it signals only the recorded direct Claude child and
+the descendants it observes below that PID, waits/reaps the direct child, and runs the wrapper's
+resource cleanup. It never scans or kills by process name, so shared MCPs and work from another
+task are outside its blast radius. `run-workflow.sh` additionally removes its temporary detached
+worktree after it has captured the candidate patch and manifests; those evidence files stay in the
+external state directory.
+
+`launch-team-bg.sh` detaches a `run-team.sh` runner rather than a Claude-native daemon. Its
+`background-runner.json` points to the runner PID and log. Send a signal to that runner if you need
+to stop it; the runner owns the direct Claude process and performs the same scoped teardown.
+
+Completion is a three-part barrier, not a single marker:
+
+1. The runner has exited and `last-result.json` exists.
+2. The result meets its semantic success contract (for a workflow, inspect `result-envelope.json`;
+   exit `3` is a candidate handoff, not an integrated success).
+3. `lifecycle.jsonl` ends with `runner_teardown_complete`, proving the runner reaped its owned
+   child and released its temporary resources.
+
+Only after that barrier should the outer agent inspect the candidate/worktree diff, run the real
+checks, and decide whether to integrate or discard it. A Stop-hook `done-<session_id>.json` file
+is corroborating evidence only; it is never sufficient by itself.
+
 If `run-team.sh`/`resume-team.sh` exit with `error: no final result event captured`, the run
 errored or was interrupted before producing a result — check `stream.jsonl` for what was happening
 right before it stopped rather than assuming the process just hung.

@@ -6,13 +6,14 @@ work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
 ## Skills
 
 - [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: strict
-  GPT-5.6 Sol/Terra/Luna research, implementation, integration, verification, and bounded goal persistence.
+  GPT-5.6 Sol/Terra/Luna research, implementation, integration, verification, bounded goal
+  persistence, and task-owned resource teardown.
 - [`skills/gpt-engineer-spark/`](skills/gpt-engineer-spark/) — keep a capable lead in control while
   a model-pinned GPT-5.3-Codex-Spark fleet handles dependency-aware exploration, isolated candidate
   edits, and checks.
 - [`skills/claude-multi-agent/`](skills/claude-multi-agent/) — delegate real engineering work to
   Claude Code as an autonomous team or a saved native dynamic workflow with explicit research,
-  planning, build, verification, and bounded gap-closing phases.
+  planning, build, verification, bounded gap-closing, and child-process cleanup phases.
 - [`skills/gpt-orchestration/`](skills/gpt-orchestration/) — coordinate native agent fleets for
   repository-wide audits and implementation work with explicit ownership, safe concurrency,
   runtime-honest model handling, and independent verification.
@@ -63,7 +64,9 @@ python3 ~/.agents/skills/gpt-engineer-spark/scripts/bootstrap.py --check --globa
 ```
 
 Spark fallback writers use isolated candidate copies and return reviewable change bundles. The capable
-main agent integrates those bundles and owns the final repository checks.
+main agent integrates those bundles, owns the final repository checks, and reclaims task-owned agents,
+subprocesses, listeners, and temporary worktrees. Shared MCP services and other active tasks are never
+cleanup targets.
 
 Install the Claude team/workflow adapter and bootstrap it into a target repository:
 

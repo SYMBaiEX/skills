@@ -16,6 +16,14 @@ LATEST_ONLY = {
     "gpt-orchestration-auto",
     "gpt-orchestration-build",
 }
+FLEET_LIFECYCLE = {
+    "claude-multi-agent",
+    "gpt-engineer",
+    "gpt-engineer-spark",
+    "gpt-orchestration",
+    "gpt-orchestration-auto",
+    "gpt-orchestration-build",
+}
 
 
 def fail(message: str) -> None:
@@ -79,6 +87,11 @@ def main() -> int:
             for required in ("explicitly requests spark", "not a gpt-5.6 latest-only route"):
                 if required not in text.lower():
                     fail(f"Spark opt-in contract missing {required!r}: {path}")
+        if name in FLEET_LIFECYCLE:
+            lowered = text.lower()
+            for required in ("teardown", "shared mcp"):
+                if required not in lowered:
+                    fail(f"fleet lifecycle contract missing {required!r}: {path}")
 
     sol_profile = SKILLS / "gpt-engineer" / "assets" / "codex" / "agents" / "sol-engineer.toml"
     if 'model = "gpt-5.6-sol"' not in sol_profile.read_text():

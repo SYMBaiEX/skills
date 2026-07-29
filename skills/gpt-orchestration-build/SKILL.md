@@ -1,6 +1,10 @@
 ---
 name: gpt-orchestration-build
 description: Turn an existing audit, finding list, issue set, review, failing-test report, or implementation plan into completed, verified code through a coordinated agent fleet. Use when the user asks to build from findings, implement every audit item, finish a known backlog, remediate review results, or continue from research without repeating the whole investigation. Validate each finding, preserve repository state, assign non-overlapping writers, integrate in dependency order, and track every item to an explicit disposition.
+license: MIT
+metadata:
+  author: SYMBaiEX
+  version: "1.4.0"
 ---
 
 # GPT Orchestration Build
@@ -70,6 +74,12 @@ After all waves, run checks selected by the changed behavior and acceptance crit
 
 Keep credentialed, destructive, deployment, messaging, merge, and push actions outside scope unless the user separately authorized them.
 
+## Tear down the build fleet
+
+After accepting the last implementation result, wait for every required handoff and inspect the live agent tree. Interrupt superseded or stale agents, then verify that no bounded worker remains active.
+
+Track every background process or temporary resource launched by the fleet. Preserve evidence, then stop and reap task-owned subprocess groups, watchers, servers, and listeners and remove task-owned temporary worktrees unless the user explicitly requested continued runtime. Classify ownership using agent state, parent process, working directory, launch time, and recorded PID or resource identifier. Never kill by process name alone, and never terminate shared MCP services, the host application, another task's cohort, or an unclassified process. Report host-retained helpers when the runtime provides no safe task-scoped teardown.
+
 ## Close the ledger
 
-Return the outcome first, followed by the finding ledger disposition summary, changed subsystems, verification matrix, preserved user work, and exact blockers. Claim completion only when every confirmed finding has an acceptance result and no required build work remains.
+Return the outcome first, followed by the finding ledger disposition summary, changed subsystems, verification matrix, fleet teardown result, preserved user work, and exact blockers. Claim completion only when every confirmed finding has an acceptance result, no required build work remains, and task-owned resources have been reclaimed or explicitly retained.

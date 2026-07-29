@@ -4,8 +4,10 @@ from __future__ import annotations
 import json
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import run_spark_fleet
 
@@ -33,10 +35,13 @@ if args == ["--version"]:
 output = pathlib.Path(args[args.index("--output-last-message") + 1])
 output.parent.mkdir(parents=True, exist_ok=True)
 prompt = sys.stdin.read()
+fleet_root = output.parent.parent
+if "SLOW" in prompt:
+    (fleet_root / "slow.ready").write_text("ready")
+    time.sleep(30)
 if "FORCE_FAIL" in prompt:
     print(json.dumps({"type": "turn.failed"}))
     raise SystemExit(7)
-fleet_root = output.parent.parent
 if "BARRIER_A" in prompt or "BARRIER_B" in prompt:
     mine = "a.ready" if "BARRIER_A" in prompt else "b.ready"
     other = "b.ready" if "BARRIER_A" in prompt else "a.ready"
@@ -89,6 +94,63 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertEqual(len(envelope["delegates"]), 2)
         self.assertTrue(all(item["serverAcceptedRequest"] for item in envelope["delegates"]))
 
+    def test_launch_oserror_is_failed_not_cancelled(self) -> None:
+        task = {
+            "id": "launch",
+            "wave": 0,
+            "role": "spark-explorer",
+            "required": True,
+            "prompt": "READ",
+            "allowPaths": [],
+            "allowDirtyPaths": [],
+        }
+        with mock.patch.object(
+            run_spark_fleet.subprocess,
+            "Popen",
+            side_effect=OSError("runner unavailable"),
+        ):
+            result = run_spark_fleet.run_task(
+                task,
+                self.root,
+                self.output,
+                str(self.codex),
+                False,
+                30,
+            )
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("Failed to launch", result["stderrTail"])
+
+    def test_sigterm_writes_interruption_envelope_and_reaps_children(self) -> None:
+        self.write_manifest(
+            [{"id": "slow", "role": "spark-explorer", "wave": 0, "prompt": "SLOW"}]
+        )
+        process = subprocess.Popen(
+            [
+                str(Path(run_spark_fleet.__file__)),
+                "--manifest",
+                str(self.manifest),
+                "--cwd",
+                str(self.root),
+                "--output-dir",
+                str(self.output),
+                "--codex",
+                str(self.codex),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        deadline = time.monotonic() + 10
+        while not (self.output / "slow.ready").exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertTrue((self.output / "slow.ready").exists(), "slow delegate never started")
+        process.terminate()
+        stdout, stderr = process.communicate(timeout=20)
+        self.assertEqual(process.returncode, 130, (stdout, stderr))
+        envelope = json.loads((self.output / "fleet-result.json").read_text())
+        self.assertEqual(envelope["interruption"], "received signal SIGTERM")
+        self.assertEqual(envelope["stoppedAfterWave"], 0)
+
     def test_required_failure_skips_descendants_but_runs_unrelated_work(self) -> None:
         self.write_manifest(
             [
@@ -110,6 +172,7 @@ print(json.dumps({"type": "turn.completed"}))
         by_id = {item["id"]: item for item in envelope["delegates"]}
         self.assertEqual(by_id["blocked"]["blockedBy"], ["fail"])
         self.assertEqual(by_id["unrelated"]["status"], "completed")
+        self.assertEqual(envelope["stoppedAfterWave"], 0)
 
     def test_optional_failed_dependency_still_blocks_required_descendant(self) -> None:
         self.write_manifest(
