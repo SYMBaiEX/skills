@@ -8,7 +8,7 @@ Use this reference when selecting models, defining Codex custom agents, or decid
 - **Terra:** `gpt-5.6-terra` balances intelligence and cost. Codex specifically recommends it for exploration, read-heavy scans, large-file review, and supporting-document work. It is also suitable for bounded routine implementation.
 - **Luna:** `gpt-5.6-luna` is the fastest, lowest-cost family member for clear, repeatable, or high-volume work. Use it for deterministic transformations, narrow mechanical changes, test matrices, residual searches, and structured evidence collection. Keep ambiguous architecture, semantic acceptance, and high-risk decisions with Terra, Sol, or the orchestrator.
 
-GPT-5.6 supports `none`, `low`, `medium`, `high`, `xhigh`, and `max` in the API. Current Codex surfaces also expose higher efforts when the selected model supports them. Use the lowest effort that passes representative checks: low for clear latency-sensitive work, medium as the normal baseline, and high or above only for measured hard cases. The bundled Luna worker uses low; the everyday Terra lanes and Luna verifier use medium; the Sol specialist uses high.
+GPT-5.6 supports `none`, `low`, `medium`, `high`, `xhigh`, and `max` in the API. Current Codex surfaces also expose higher efforts when the selected model supports them. Use the lowest effort that passes representative checks: low for clear latency-sensitive work, medium as the normal baseline, and high or above only for measured hard cases. The bundled Luna worker uses low; the everyday Terra lanes and Luna verifier use medium; the Sol specialist uses high. The separate `luna_max_worker` pins Max plus the Fast service tier and is deliberately opt-in because both choices can increase usage.
 
 ## Codex custom agents
 
@@ -33,6 +33,40 @@ Use medium reasoning as the normal baseline, low for clear latency-sensitive wor
 when validation still passes, and high only for hard judgment. Do not raise reasoning automatically.
 Codex Fast mode can speed supported GPT-5.6 models at higher credit use; it is a user/runtime choice,
 not a model substitution.
+
+## Temporary Luna Multi-Agent V2 compatibility
+
+As of Codex CLI 0.144.6, the shipped catalog can mark Sol and Terra as Multi-Agent V2 while marking
+Luna as V1. The V2 spawn path filters requested models by that version, so a Sol/Terra parent can
+reject Luna before execution. This is a real catalog compatibility defect, but it is not a stable
+public configuration contract and should not be hidden inside normal bootstrap.
+
+Use `scripts/configure_luna_v2.py` only after it validates that exact mismatch. The script derives a
+managed catalog from the current `~/.codex/models_cache.json`, changes only Luna's
+`multi_agent_version` to `v2`, and points the supported top-level `model_catalog_json` setting at the
+copy. It can also enable `features.fast_mode`; the `luna_max_worker` profile independently pins
+`service_tier = "fast"`. Native spawns should select `agent_type="luna_max_worker"` with
+`fork_turns="none"` so neither model nor history is inherited from the Sol orchestrator.
+
+This workaround has operational costs:
+
+- Codex snapshots custom catalog content at process startup, so every apply, refresh, or disable
+  requires a full restart.
+- A custom catalog freezes upstream metadata until the managed copy is refreshed. Re-run `--apply`
+  after Codex updates, then restart again.
+- Desktop and app-server catalog behavior has had active bugs. Keep the CLI runner as the fail-closed
+  fallback and verify the exact route in a fresh process.
+- Fast mode is documented as faster with increased usage. Do not infer that Luna Max/Fast is cheaper
+  than Terra standard without current account-level measurements.
+
+When the stock Luna entry becomes V2, run `python3 scripts/configure_luna_v2.py --disable`, restart,
+and return to the upstream catalog.
+
+Primary references: [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents),
+[Codex configuration](https://developers.openai.com/codex/config-reference),
+[Luna V1/V2 mismatch report](https://github.com/openai/codex/issues/34301),
+[custom catalog startup caching](https://github.com/openai/codex/issues/35129), and
+[Multi-Agent V2 routing limitations](https://github.com/openai/codex/issues/32705).
 
 An optional default guard for model-less children is:
 

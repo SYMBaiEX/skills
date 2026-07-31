@@ -46,6 +46,13 @@ ROLES = {
         "profile": "luna-worker.toml",
         "write_capable": True,
     },
+    "luna-max-worker": {
+        "model": "gpt-5.6-luna",
+        "effort": "max",
+        "service_tier": "fast",
+        "profile": "luna-max-worker.toml",
+        "write_capable": True,
+    },
     "luna-verifier": {
         "model": "gpt-5.6-luna",
         "effort": "medium",
@@ -320,7 +327,7 @@ def build_command(
     allow_writes: bool,
 ) -> list[str]:
     profile = ROLES[role]
-    if role in {"terra-worker", "luna-worker"} and not allow_writes:
+    if role in {"terra-worker", "luna-worker", "luna-max-worker"} and not allow_writes:
         raise SystemExit(f"{role} requires --allow-writes")
     sandbox = "workspace-write" if profile["write_capable"] and allow_writes else "read-only"
     command = [
@@ -348,6 +355,15 @@ def build_command(
         "--config",
         'web_search="disabled"',
     ]
+    if profile.get("service_tier"):
+        command.extend(
+            [
+                "--config",
+                f'service_tier="{profile["service_tier"]}"',
+                "--config",
+                "features.fast_mode=true",
+            ]
+        )
     if sandbox == "workspace-write":
         command.extend(
             [
@@ -463,6 +479,7 @@ def main(argv: list[str] | None = None) -> int:
                     "stageId": stage_id,
                     "model": profile["model"],
                     "reasoningEffort": profile["effort"],
+                    "serviceTier": profile.get("service_tier", "default"),
                     "profileSha256": hashlib.sha256(
                         (
                             SKILL_ROOT

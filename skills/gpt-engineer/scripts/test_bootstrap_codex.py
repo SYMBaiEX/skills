@@ -37,6 +37,7 @@ class BootstrapCodexTests(unittest.TestCase):
         self.assertEqual(
             agents,
             [
+                "luna-max-worker.toml",
                 "luna-verifier.toml",
                 "luna-worker.toml",
                 "sol-engineer.toml",

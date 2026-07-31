@@ -127,6 +127,47 @@ print(json.dumps({"type": "turn.completed"}))
                     ]
                 )
 
+    def test_luna_max_worker_pins_fast_tier_and_requires_write_authority(self) -> None:
+        with mock.patch("sys.stdin", io.StringIO("Implement the dense bounded fix.")):
+            with self.assertRaisesRegex(SystemExit, "luna-max-worker requires --allow-writes"):
+                run_codex_agent.main(
+                    [
+                        "--role",
+                        "luna-max-worker",
+                        "--cwd",
+                        str(self.root),
+                        "--output-dir",
+                        str(self.output),
+                        "--codex",
+                        str(self.codex),
+                        "--dry-run",
+                    ]
+                )
+        with mock.patch("sys.stdin", io.StringIO("Implement the dense bounded fix.")):
+            with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                result = run_codex_agent.main(
+                    [
+                        "--role",
+                        "luna-max-worker",
+                        "--cwd",
+                        str(self.root),
+                        "--output-dir",
+                        str(self.output),
+                        "--codex",
+                        str(self.codex),
+                        "--allow-writes",
+                        "--allow-path",
+                        "src",
+                        "--dry-run",
+                    ]
+                )
+        self.assertEqual(result, 0)
+        rendered = stdout.getvalue()
+        self.assertIn('"reasoningEffort": "max"', rendered)
+        self.assertIn('"serviceTier": "fast"', rendered)
+        self.assertIn('service_tier=\\"fast\\"', rendered)
+        self.assertIn("features.fast_mode=true", rendered)
+
     def test_captures_delegate_outputs(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
             result = run_codex_agent.main(

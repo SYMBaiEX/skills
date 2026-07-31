@@ -36,7 +36,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(installed.returncode, 0, installed.stderr)
         checked = self.run_script("--check", str(self.root))
         self.assertEqual(checked.returncode, 0, checked.stderr)
-        self.assertEqual(len(list((self.root / ".codex" / "agents").glob("*.toml"))), 5)
+        self.assertEqual(len(list((self.root / ".codex" / "agents").glob("*.toml"))), 6)
         self.assertEqual(len(list((self.root / ".claude" / "agents").glob("*.md"))), 4)
         self.assertTrue((self.root / ".codex" / "hooks.json").exists())
 
@@ -48,7 +48,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(installed.returncode, 0, installed.stderr)
         checked = self.run_script("--check", "--global", env=env)
         self.assertEqual(checked.returncode, 0, checked.stderr)
-        self.assertEqual(len(list((Path(env["CODEX_HOME"]) / "agents").glob("*.toml"))), 5)
+        self.assertEqual(len(list((Path(env["CODEX_HOME"]) / "agents").glob("*.toml"))), 6)
         self.assertEqual(len(list((Path(env["CLAUDE_CONFIG_DIR"]) / "agents").glob("*.md"))), 4)
         self.assertFalse((Path(env["CODEX_HOME"]) / "hooks.json").exists())
 

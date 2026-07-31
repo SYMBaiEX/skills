@@ -99,6 +99,11 @@ def main() -> int:
     codex_runner = SKILLS / "gpt-engineer" / "scripts" / "run_codex_agent.py"
     if '"model": "gpt-5.6-sol"' not in codex_runner.read_text():
         fail(f"Codex fallback is not explicitly pinned to gpt-5.6-sol: {codex_runner}")
+    luna_max = SKILLS / "gpt-engineer" / "assets" / "codex" / "agents" / "luna-max-worker.toml"
+    luna_max_text = luna_max.read_text()
+    for required in ('model = "gpt-5.6-luna"', 'model_reasoning_effort = "max"', 'service_tier = "fast"'):
+        if required not in luna_max_text:
+            fail(f"Luna Max/Fast profile is missing {required!r}: {luna_max}")
 
     print(f"Validated {len(names)} skill directories: {', '.join(sorted(names))}")
     return 0

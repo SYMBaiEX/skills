@@ -2,7 +2,7 @@
   "hooks": {
     "SubagentStart": [
       {
-        "matcher": "^(sol_engineer|terra_explorer|terra_worker|luna_worker|luna_verifier)$",
+        "matcher": "^(sol_engineer|terra_explorer|terra_worker|luna_worker|luna_max_worker|luna_verifier)$",
         "hooks": [
           {
             "type": "command",

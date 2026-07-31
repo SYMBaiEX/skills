@@ -4,7 +4,7 @@ description: "Own a software-engineering outcome end to end with a strictly mode
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.4.0"
+  version: "1.5.0"
 ---
 
 # GPT Engineer
@@ -37,7 +37,7 @@ Spawn subagents when the user explicitly requests a fleet or when at least two i
 
 Run this routing preflight:
 
-1. Confirm that the intended profiles are installed in a directory the selected agent actually loads. Run `python3 scripts/audit_routing.py --cwd <repo> --parent-model <observed-parent-model> --json` when the parent model is observable; omit the last option only when it is not.
+1. Confirm that the intended profiles are installed in a directory the selected agent actually loads. Run `python3 scripts/audit_routing.py --cwd <repo> --parent-model <observed-parent-model> --json` when the parent model is observable; omit the last option only when it is not. If native Sol/Terra parents reject Luna, inspect the catalog mismatch and use the temporary Luna V2 compatibility procedure below only when its exact preconditions pass.
 2. Record every candidate profile's source, `name`, exact model, reasoning effort, and hash. A project profile with the same `name` can shadow a valid user profile; any conflicting candidate fails latest-only preflight.
 3. Inspect the active spawn schema for an `agent_type`, `model`, or equivalent selector. Profile files alone do not prove that a child used their model. In Codex, a custom file's model or effort wins when present; otherwise precedence is explicit spawn value, `[agents]` default, then parent value.
 4. Record the effective sandbox and approval behavior. Interactive parent overrides are reapplied to children and can override a custom agent's sandbox default. If a read-only lane cannot remain read-only, use the runner or keep it in the parent.
@@ -49,7 +49,7 @@ Run this routing preflight:
 
 Latest-only is the default for this skill. The allowed OpenAI routes are exactly
 `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`. Agent type names are not proof:
-select `sol_engineer`, `terra_explorer`, `terra_worker`, or `luna_verifier` only when
+select `sol_engineer`, `terra_explorer`, `terra_worker`, `luna_worker`, `luna_max_worker`, or `luna_verifier` only when
 their active configuration or the spawn request proves the exact model.
 
 Do not select generic built-in roles, model-less profiles, GPT-5, GPT-5.4, or inherited
@@ -65,9 +65,16 @@ When the bundled Codex profiles are installed and selectable, prefer:
 | `terra_explorer` | `gpt-5.6-terra`, medium reasoning | Read-heavy architecture tracing, documentation research, dependency and incomplete-code scans |
 | `terra_worker` | `gpt-5.6-terra`, medium reasoning | Bounded routine implementation with focused tests |
 | `luna_worker` | `gpt-5.6-luna`, low reasoning | Clear, repeatable, low-risk implementation with deterministic acceptance checks |
+| `luna_max_worker` | `gpt-5.6-luna`, max reasoning, Fast tier | Explicitly authorized dense but bounded execution when measured latency matters |
 | `luna_verifier` | `gpt-5.6-luna`, medium reasoning | High-volume test execution, diff hygiene, residual searches, and acceptance evidence |
 
 Use Sol for complex, open-ended engineering judgment, Terra as the everyday workhorse, and Luna for clear, repeatable or high-volume work. Start the parent at medium reasoning when the surface allows it. Raise effort only when the task's ambiguity or measured validation failures justify the extra time and usage. Keep high-stakes integration and final acceptance with Sol or the accountable orchestrator even when delegated.
+
+`luna_max_worker` is not the default Luna route. Max reasoning and the Fast service tier can both
+increase usage. Select it only when the user requests it or a representative benchmark shows that
+its time-to-accepted-change beats Luna low/medium or Terra for the bounded task. Native spawns must
+use `agent_type="luna_max_worker"` and `fork_turns="none"`; the profile, not an inherited parent,
+pins Luna, Max, and Fast. Do not use it for architecture, security judgment, or final acceptance.
 
 For an explicitly authorized Claude Code workflow, route to `gpt-engineer-lead` (Opus), `gpt-engineer-explorer` and `gpt-engineer-worker` (Sonnet), and `gpt-engineer-verifier` (Haiku). If `CLAUDE_CODE_SUBAGENT_MODEL` is set, report that it overrides every profile. Claude profiles cannot run GPT models and are never an automatic fallback from latest-only mode.
 
@@ -108,6 +115,36 @@ Writer execution happens in an isolated candidate copy and returns `candidate-ch
 applies edits to the original repository. The runner constrains the final response with
 `assets/codex/handoff.schema.json`. The main agent must inspect the result, validate the handoff,
 and integrate the candidate bundle before downstream verification.
+
+### Enable native Luna V2 routing only when required
+
+Codex CLI 0.144.x can expose Sol and Terra as Multi-Agent V2 while the stock Luna entry remains V1.
+That version mismatch prevents a V2 parent from selecting Luna even though Luna itself is available.
+Treat this as a temporary runtime compatibility issue, not as a reason to hand-edit the live cache.
+
+After installing the profiles, inspect and apply the managed shim explicitly:
+
+```bash
+python3 scripts/configure_luna_v2.py --apply --enable-fast-mode
+python3 scripts/configure_luna_v2.py --check --enable-fast-mode
+```
+
+The script fails closed unless the source catalog has the exact known state: Sol/Terra V2 and Luna
+V1. It copies the current catalog to `~/.codex/model-catalogs/`, changes only Luna's
+`multi_agent_version`, atomically sets the top-level `model_catalog_json`, preserves the rest of the
+user configuration, and creates a backup before changing it. Re-run `--apply` after a Codex update
+to refresh all upstream model metadata. Because Codex snapshots the configured catalog at process
+startup, completely restart Codex after applying, refreshing, or removing it.
+
+Remove the workaround as soon as the stock catalog reports Luna V2:
+
+```bash
+python3 scripts/configure_luna_v2.py --disable
+```
+
+Do not distribute a frozen catalog, patch `models_cache.json` in place, or claim native Luna routing
+until a fresh Codex process successfully selects the exact profile. If the shim's preconditions fail,
+use the model-pinned runner or keep the stage with the proven parent route.
 
 ## Run the engineering loop
 
@@ -156,7 +193,7 @@ Every child performs independent model and tool work. Before each wave, record t
 children, exact model and effort, expected decision value, and cancellation condition.
 
 - Prefer the smallest model and lowest effort that can satisfy the acceptance contract.
-- Use Luna low only for clear, repeatable work; use Terra medium for ordinary engineering; reserve Sol high for hard judgment.
+- Use Luna low only for clear, repeatable work; use Terra medium for ordinary engineering; reserve Sol high for hard judgment. Use Luna Max/Fast only as a measured, explicit latency optimization.
 - Do not inherit a high-effort parent into children, use full-history forks by default, duplicate reviewers, or saturate available capacity merely because slots exist.
 - Run independent reads concurrently. Serialize shared-state writers and integration.
 - After a prerequisite fails or a finding becomes invalid, cancel dependent work instead of waiting for a now-useless wave.
