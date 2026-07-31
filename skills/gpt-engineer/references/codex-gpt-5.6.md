@@ -43,8 +43,9 @@ public configuration contract and should not be hidden inside normal bootstrap.
 
 Use `scripts/configure_luna_v2.py` only after it validates that exact mismatch. The script derives a
 managed catalog from the current `~/.codex/models_cache.json`, changes only Luna's
-`multi_agent_version` to `v2`, and points the supported top-level `model_catalog_json` setting at the
-copy. It can also enable `features.fast_mode`; the `luna_max_worker` profile independently pins
+`multi_agent_version` to `v2`, materializes the required `supports_reasoning_summaries` cache default,
+validates the generated schema in a fresh Codex CLI process, and points the supported top-level
+`model_catalog_json` setting at the copy. It can also enable `features.fast_mode`; the `luna_max_worker` profile independently pins
 `service_tier = "fast"`. Native spawns should select `agent_type="luna_max_worker"` with
 `fork_turns="none"` so neither model nor history is inherited from the Sol orchestrator.
 

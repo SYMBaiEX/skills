@@ -132,7 +132,8 @@ python3 scripts/configure_luna_v2.py --check --enable-fast-mode
 The script fails closed unless the source catalog has the exact known state: Sol/Terra V2 and Luna
 V1. It copies the current catalog to `~/.codex/model-catalogs/`, changes only Luna's
 `multi_agent_version`, atomically sets the top-level `model_catalog_json`, preserves the rest of the
-user configuration, and creates a backup before changing it. Re-run `--apply` after a Codex update
+user configuration, creates a backup before changing it, materializes the cache field required by
+the custom-catalog schema, and asks a fresh Codex CLI process to parse the result before activation. Re-run `--apply` after a Codex update
 to refresh all upstream model metadata. Because Codex snapshots the configured catalog at process
 startup, completely restart Codex after applying, refreshing, or removing it.
 

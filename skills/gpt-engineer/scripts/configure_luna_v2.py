@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -52,11 +53,58 @@ def shim_required(source: dict[str, object]) -> bool:
 def build_shim(source: dict[str, object]) -> dict[str, object]:
     result = copy.deepcopy(source)
     model(result, LUNA)["multi_agent_version"] = "v2"
+    for item in result["models"]:
+        if isinstance(item, dict):
+            # Codex's cache serialization omits this required custom-catalog field.
+            item.setdefault("supports_reasoning_summaries", True)
     comparison = copy.deepcopy(result)
     model(comparison, LUNA)["multi_agent_version"] = "v1"
+    for source_item, comparison_item in zip(source["models"], comparison["models"]):
+        if isinstance(source_item, dict) and isinstance(comparison_item, dict):
+            if "supports_reasoning_summaries" not in source_item:
+                comparison_item.pop("supports_reasoning_summaries", None)
     if comparison != source:
-        raise SystemExit("Internal error: compatibility catalog changed fields other than Luna routing")
+        raise SystemExit("Internal error: compatibility catalog changed unexpected fields")
     return result
+
+
+def resolve_codex() -> str:
+    candidates = [shutil.which("codex")]
+    app_binary = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
+    if app_binary.is_file():
+        candidates.append(str(app_binary))
+    for candidate in candidates:
+        if candidate:
+            return candidate
+    raise SystemExit("Cannot validate custom catalog because the Codex executable was not found")
+
+
+def validate_catalog_with_codex(catalog: dict[str, object], codex_home: Path) -> None:
+    directory = codex_home / "model-catalogs"
+    directory.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=".luna-v2-validation.", suffix=".json", dir=directory)
+    try:
+        with os.fdopen(descriptor, "w") as handle:
+            json.dump(catalog, handle)
+        path_value = toml_string(temporary)
+        result = subprocess.run(
+            [resolve_codex(), "-c", f"model_catalog_json={path_value}", "debug", "models"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            detail = (result.stderr.strip() or result.stdout.strip()).splitlines()[-1:]
+            raise SystemExit(
+                "Codex rejected the generated compatibility catalog"
+                + (f": {detail[0]}" if detail else "")
+            )
+    except subprocess.TimeoutExpired as exc:
+        raise SystemExit("Timed out while Codex validated the compatibility catalog") from exc
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def toml_string(value: str) -> str:
@@ -136,7 +184,9 @@ def atomic_write(path: Path, content: str, mode: int | None = None) -> None:
 def backup_config(config: Path, codex_home: Path) -> Path | None:
     if not config.exists():
         return None
-    backup = codex_home / "backups" / f"config.toml.luna-v2.{time.strftime('%Y%m%d-%H%M%S')}.bak"
+    backup = codex_home / "backups" / (
+        f"config.toml.luna-v2.{time.strftime('%Y%m%d-%H%M%S')}.{time.time_ns()}.bak"
+    )
     backup.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(config, backup)
     return backup
@@ -183,7 +233,7 @@ def parsed_config(path: Path) -> dict[str, object]:
     return result
 
 
-def check(codex_home: Path, require_fast: bool) -> int:
+def check(codex_home: Path, require_fast: bool, validate_runtime: bool = True) -> int:
     source_path = codex_home / "models_cache.json"
     target_path = codex_home / MANAGED_CATALOG
     config_path = codex_home / "config.toml"
@@ -204,6 +254,8 @@ def check(codex_home: Path, require_fast: bool) -> int:
         violations.append("model_catalog_json does not point at the managed catalog")
     if require_fast and not bool(dict(config.get("features", {})).get("fast_mode")):
         violations.append("features.fast_mode is not enabled")
+    if not violations and validate_runtime:
+        validate_catalog_with_codex(target, codex_home)
     if violations:
         for violation in violations:
             print(f"error: {violation}", file=sys.stderr)
@@ -212,7 +264,7 @@ def check(codex_home: Path, require_fast: bool) -> int:
     return 0
 
 
-def apply(codex_home: Path, enable_fast: bool) -> int:
+def apply(codex_home: Path, enable_fast: bool, validate_runtime: bool = True) -> int:
     source_path = codex_home / "models_cache.json"
     target_path = codex_home / MANAGED_CATALOG
     config_path = codex_home / "config.toml"
@@ -221,6 +273,8 @@ def apply(codex_home: Path, enable_fast: bool) -> int:
         print("Stock catalog already routes Luna through Multi-Agent V2; no compatibility shim applied.")
         return 0
     shim = build_shim(source)
+    if validate_runtime:
+        validate_catalog_with_codex(shim, codex_home)
     original = config_path.read_text() if config_path.exists() else ""
     lines = original.splitlines(keepends=True)
     lines = replace_top_level(lines, "model_catalog_json", str(target_path))
