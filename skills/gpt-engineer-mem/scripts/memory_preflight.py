@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sqlite3
 import sys
 import urllib.error
@@ -114,8 +115,137 @@ def discover_plugins(codex_home: Path) -> list[dict[str, str]]:
     return plugins
 
 
+def read_json_object(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def codex_registration(codex_home: Path) -> dict[str, Any]:
+    config = codex_home / "config.toml"
+    entries: list[dict[str, Any]] = []
+    try:
+        text = config.read_text()
+    except OSError:
+        text = ""
+    section = re.compile(
+        r'^\[plugins\."(?P<name>claude-mem@[^"\n]+)"\]\s*\n'
+        r'(?P<body>.*?)(?=^\[|\Z)',
+        re.MULTILINE | re.DOTALL,
+    )
+    for match in section.finditer(text):
+        enabled_match = re.search(
+            r"^enabled\s*=\s*(true|false)\s*$", match.group("body"), re.MULTILINE
+        )
+        entries.append(
+            {
+                "name": match.group("name"),
+                "enabled": enabled_match is not None and enabled_match.group(1) == "true",
+            }
+        )
+    return {
+        "config": str(config),
+        "configured": any(entry["enabled"] for entry in entries),
+        "plugins": entries,
+    }
+
+
+def claude_registration(claude_config_dir: Path) -> dict[str, Any]:
+    settings_path = claude_config_dir / "settings.json"
+    installed_path = claude_config_dir / "plugins" / "installed_plugins.json"
+    settings = read_json_object(settings_path)
+    installed = read_json_object(installed_path)
+    enabled_plugins = settings.get("enabledPlugins")
+    installed_plugins = installed.get("plugins")
+    enabled_plugins = enabled_plugins if isinstance(enabled_plugins, dict) else {}
+    installed_plugins = installed_plugins if isinstance(installed_plugins, dict) else {}
+    names = sorted(
+        name
+        for name in set(enabled_plugins) | set(installed_plugins)
+        if name.startswith("claude-mem@")
+    )
+    entries: list[dict[str, Any]] = []
+    install_roots: list[str] = []
+    for name in names:
+        installs = installed_plugins.get(name)
+        installs = installs if isinstance(installs, list) else []
+        roots = sorted(
+            {
+                str(item.get("installPath"))
+                for item in installs
+                if isinstance(item, dict) and item.get("installPath")
+            }
+        )
+        install_roots.extend(roots)
+        entries.append(
+            {
+                "name": name,
+                "enabled": enabled_plugins.get(name) is True,
+                "installed": bool(roots),
+            }
+        )
+    return {
+        "config": str(settings_path),
+        "configured": any(entry["enabled"] and entry["installed"] for entry in entries),
+        "plugins": entries,
+        "install_roots": sorted(set(install_roots)),
+    }
+
+
+def mcp_registration_report(
+    plugins: list[dict[str, str]],
+    health: Any,
+    worker_mcp: Any,
+    codex: dict[str, Any],
+    claude: dict[str, Any],
+) -> dict[str, Any]:
+    roots = {Path(plugin["path"]) for plugin in plugins}
+    if isinstance(health, dict) and health.get("workerPath"):
+        roots.add(Path(str(health["workerPath"])).parent.parent)
+    roots.update(Path(path) for path in claude.get("install_roots", []))
+
+    manifests: list[dict[str, str]] = []
+    for root in sorted(roots):
+        for layout, candidate in (
+            ("root", root / ".mcp.json"),
+            ("nested-plugin", root / "plugin" / ".mcp.json"),
+        ):
+            if candidate.is_file():
+                manifests.append({"path": str(candidate), "layout": layout})
+
+    worker_toggle = worker_mcp.get("enabled") if isinstance(worker_mcp, dict) else None
+    clients_configured = bool(codex.get("configured") or claude.get("configured"))
+    if manifests and clients_configured:
+        effective = "registered"
+    elif manifests:
+        effective = "manifest-only"
+    else:
+        effective = "absent"
+    root_manifest = any(item["layout"] == "root" for item in manifests)
+    nested_manifest = any(item["layout"] == "nested-plugin" for item in manifests)
+    layout_false_negative = worker_toggle is False and root_manifest and not nested_manifest
+    notes: list[str] = []
+    if layout_false_negative:
+        notes.append(
+            "worker HTTP status checks nested plugin/.mcp.json, but this package uses root .mcp.json"
+        )
+    return {
+        "effective": effective,
+        "manifests": manifests,
+        "clients": {"codex": codex, "claude": claude},
+        "worker_toggle_enabled": worker_toggle,
+        "worker_status_layout_false_negative": layout_false_negative,
+        "notes": notes,
+    }
+
+
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     codex_home = Path(args.codex_home).expanduser()
+    claude_config_dir = Path(
+        getattr(args, "claude_config_dir", os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude"))
+    ).expanduser()
     data_dir = Path(args.data_dir).expanduser()
     health, health_error = get_json(args.url, "/api/health", args.timeout)
     readiness, readiness_error = get_json(args.url, "/api/readiness", args.timeout)
@@ -125,9 +255,18 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     )
     mcp, mcp_error = get_json(args.url, "/api/mcp/status", args.timeout)
 
+    plugins = discover_plugins(codex_home)
+    registration = mcp_registration_report(
+        plugins,
+        health,
+        mcp,
+        codex_registration(codex_home),
+        claude_registration(claude_config_dir),
+    )
     report: dict[str, Any] = {
         "read_only": True,
-        "plugins": discover_plugins(codex_home),
+        "plugins": plugins,
+        "mcp_registration": registration,
         "worker": {
             "url": args.url,
             "health": health,
@@ -163,8 +302,10 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     queue_depth = processing.get("queueDepth") if isinstance(processing, dict) else None
     if isinstance(queue_depth, int) and queue_depth > 0:
         warnings.append(f"worker queue depth is {queue_depth}; memory may be incomplete")
-    if isinstance(mcp, dict) and mcp.get("enabled") is False:
-        warnings.append("worker MCP status reports disabled; retrieval tools may be unavailable")
+    if registration["effective"] == "absent":
+        warnings.append("no Claude Mem MCP manifest was discovered")
+    elif registration["effective"] == "manifest-only":
+        warnings.append("MCP manifest exists, but no enabled Codex or Claude registration was found")
     counts = report["database"]["counts"]
     outbox = counts.get("sync_outbox", 0)
     if isinstance(outbox, int) and outbox > 1000:
@@ -182,6 +323,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--url", default=os.environ.get("CLAUDE_MEM_URL", DEFAULT_URL))
     parser.add_argument("--timeout", type=float, default=1.0)
     parser.add_argument("--codex-home", default=os.environ.get("CODEX_HOME", "~/.codex"))
+    parser.add_argument(
+        "--claude-config-dir",
+        default=os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude"),
+    )
     parser.add_argument("--data-dir", default=os.environ.get("CLAUDE_MEM_DATA_DIR", "~/.claude-mem"))
     return parser.parse_args(argv)
 

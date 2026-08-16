@@ -41,8 +41,10 @@ python3 <skill-root>/scripts/memory_preflight.py --json
 
 This may inspect installation metadata, worker health, queue state, and SQLite counts. It must not
 start, stop, restart, clean, vacuum, reconfigure, or repair the worker. A healthy endpoint alone is
-not proof of healthy processing; consider readiness, queue depth, dependency/provider state, active
-worker path, database size, and outbox counts together.
+not proof of healthy processing. The worker's `/api/mcp/status` is only a package-layout toggle and
+is not proof that client tools are disconnected; cross-check root and nested MCP manifests plus the
+Codex and Claude plugin registrations. Consider readiness, queue depth, dependency/provider state,
+active worker path, database size, and outbox counts together.
 
 If memory is absent, unhealthy, or incompatible, report that once and continue with the base
 engineering workflow. Memory is an optional accelerator, never a completion gate.

@@ -29,7 +29,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/readiness": {"status": "ready"},
             "/api/processing-status": {"queueDepth": 0},
             "/api/settings/dependency-health": {"status": "ok"},
-            "/api/mcp/status": {"ready": True},
+            "/api/mcp/status": {"enabled": False},
         }
         if self.path not in payloads:
             self.send_error(404)
@@ -65,6 +65,29 @@ class PreflightTests(unittest.TestCase):
             plugin = root / "codex/plugins/cache/claude-mem-local/claude-mem/13.15.0/.codex-plugin"
             plugin.mkdir(parents=True)
             (plugin / "plugin.json").write_text('{"version":"13.15.0"}')
+            (plugin.parent / ".mcp.json").write_text('{"mcpServers":{}}')
+            (root / "codex/config.toml").write_text(
+                '[plugins."claude-mem@thedotmack"]\n'
+                'enabled = false\n\n'
+                '[plugins."claude-mem@claude-mem-local"]\n'
+                'enabled = true\n'
+            )
+            claude = root / "claude"
+            (claude / "plugins").mkdir(parents=True)
+            (claude / "settings.json").write_text(
+                '{"enabledPlugins":{"claude-mem@thedotmack":true}}'
+            )
+            (claude / "plugins/installed_plugins.json").write_text(
+                json.dumps(
+                    {
+                        "plugins": {
+                            "claude-mem@thedotmack": [
+                                {"installPath": str(plugin.parent)}
+                            ]
+                        }
+                    }
+                )
+            )
             data = root / "data"
             data.mkdir()
             database = data / "claude-mem.db"
@@ -80,6 +103,7 @@ class PreflightTests(unittest.TestCase):
                 url=url,
                 timeout=1.0,
                 codex_home=str(root / "codex"),
+                claude_config_dir=str(claude),
                 data_dir=str(data),
             )
             report = PREFLIGHT.build_report(args)
@@ -87,6 +111,11 @@ class PreflightTests(unittest.TestCase):
             self.assertEqual(report["worker"]["processing"]["queueDepth"], 0)
             self.assertEqual(report["database"]["counts"]["sync_outbox"], 3)
             self.assertEqual(report["plugins"][0]["version"], "13.15.0")
+            self.assertEqual(report["mcp_registration"]["effective"], "registered")
+            self.assertTrue(
+                report["mcp_registration"]["worker_status_layout_false_negative"]
+            )
+            self.assertFalse(any("retrieval tools" in item for item in report["warnings"]))
             self.assertEqual(report["database"]["snapshot_mode"], "immutable-main-database")
             self.assertEqual(database.read_bytes(), before_bytes)
             self.assertEqual(sorted(path.name for path in data.iterdir()), before_files)
@@ -97,6 +126,7 @@ class PreflightTests(unittest.TestCase):
                 url="http://127.0.0.1:1",
                 timeout=0.05,
                 codex_home=str(Path(temp) / "codex"),
+                claude_config_dir=str(Path(temp) / "claude"),
                 data_dir=str(Path(temp) / "data"),
             )
             report = PREFLIGHT.build_report(args)

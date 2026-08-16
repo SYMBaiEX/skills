@@ -76,10 +76,16 @@ health.
 The read-only preflight may examine:
 
 - active version and worker path;
-- health/readiness/MCP status;
+- health/readiness, MCP manifests, worker toggle status, and client registrations;
 - queue depth and provider/dependency signals;
 - database/WAL size and immutable main-database snapshot counts;
 - sync outbox totals grouped by operation.
+
+Claude Mem 13.15.0's worker endpoint can report MCP disabled when a packaged client stores
+`.mcp.json` at the plugin root instead of `plugin/.mcp.json`. Treat that as a layout-specific toggle,
+not connection proof. Prefer the effective registration derived from the active manifest and the
+enabled Codex/Claude plugin entries; a newly installed MCP still requires a client restart and a new
+task before its tools appear.
 
 Do not administer the worker automatically. If health and queue signals disagree, or storage/outbox
 growth appears abnormal, continue engineering without memory and report a separate operational
