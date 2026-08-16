@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
 LATEST_ONLY = {
     "gpt-engineer",
+    "gpt-engineer-mem",
     "gpt-orchestration",
     "gpt-orchestration-auto",
     "gpt-orchestration-build",
@@ -19,6 +20,7 @@ LATEST_ONLY = {
 FLEET_LIFECYCLE = {
     "claude-multi-agent",
     "gpt-engineer",
+    "gpt-engineer-mem",
     "gpt-engineer-spark",
     "gpt-orchestration",
     "gpt-orchestration-auto",
@@ -87,6 +89,16 @@ def main() -> int:
             for required in ("explicitly requests spark", "not a gpt-5.6 latest-only route"):
                 if required not in text.lower():
                     fail(f"Spark opt-in contract missing {required!r}: {path}")
+        if name == "gpt-engineer-mem":
+            lowered = text.lower()
+            for required in (
+                "search` → `timeline`",
+                "memory is an optional accelerator",
+                "do not directly write to",
+                "shared mcp services",
+            ):
+                if required not in lowered:
+                    fail(f"GPT Engineer Mem contract missing {required!r}: {path}")
         if name in FLEET_LIFECYCLE:
             lowered = text.lower()
             for required in ("teardown", "shared mcp"):

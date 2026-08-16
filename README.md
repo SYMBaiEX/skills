@@ -8,6 +8,9 @@ work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
 - [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: strict
   GPT-5.6 Sol/Terra/Luna research, implementation, integration, verification, bounded goal
   persistence, and task-owned resource teardown.
+- [`skills/gpt-engineer-mem/`](skills/gpt-engineer-mem/) — the memory-aware GPT engineer: bounded
+  Claude Mem/Codex recall, live freshness checks, GPT-5.6 Sol/Terra/Luna delivery, and read-only
+  memory-service diagnostics.
 - [`skills/gpt-engineer-spark/`](skills/gpt-engineer-spark/) — keep a capable lead in control while
   a model-pinned GPT-5.3-Codex-Spark fleet handles dependency-aware exploration, isolated candidate
   edits, and checks.
@@ -32,6 +35,7 @@ a folder with a `SKILL.md` (metadata + instructions) plus optional `scripts/`, `
 ```bash
 npx skills add SYMBaiEX/skills                         # interactive: pick agent + skill
 npx skills add SYMBaiEX/skills --skill gpt-engineer -y
+npx skills add SYMBaiEX/skills --skill gpt-engineer-mem -y
 npx skills add SYMBaiEX/skills --skill gpt-engineer-spark -y
 npx skills add SYMBaiEX/skills --skill claude-multi-agent -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration -y
@@ -47,6 +51,17 @@ npx skills add https://github.com/SYMBaiEX/skills \
   --skill gpt-engineer --agent codex claude-code --global --yes
 python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --provider codex --upgrade --global
 python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --provider codex --check --global
+```
+
+Install the memory-aware variant alongside the base engineer. It reuses the base profile setup when
+available, remains usable as a standalone orchestration contract, and never configures or restarts
+Claude Mem automatically:
+
+```bash
+npx skills add https://github.com/SYMBaiEX/skills \
+  --skill gpt-engineer gpt-engineer-mem \
+  --agent codex claude-code --global --yes
+python3 ~/.agents/skills/gpt-engineer-mem/scripts/memory_preflight.py --json
 ```
 
 The profile bootstrap is deliberately separate from skills.sh. It never edits provider configuration;

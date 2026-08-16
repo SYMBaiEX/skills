@@ -1,0 +1,4 @@
+interface:
+  display_name: "GPT Engineer Mem"
+  short_description: "Memory-aware GPT-5.6 engineering workflows"
+  default_prompt: "Use $gpt-engineer-mem to recall relevant prior work, verify it against the current codebase, and deliver this engineering outcome end to end."
