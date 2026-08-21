@@ -1,0 +1,4 @@
+interface:
+  display_name: "SYMBaiEX Research Jobs"
+  short_description: "Run bounded cited research and exports"
+  default_prompt: "Use $symbaiex-research-jobs to create and monitor a bounded, idempotent SYMBaiEX research or JSONL export job when synchronous evidence search is insufficient."

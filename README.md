@@ -24,6 +24,16 @@ work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
   finding list, or implementation plan and build every confirmed item through verified waves.
 - [`skills/gpt-orchestration-auto/`](skills/gpt-orchestration-auto/) — run a persistent `/goal`-style
   research, implementation, verification, and gap-closing loop until the outcome is complete.
+- [`skills/symbaiex-agent-enrollment/`](skills/symbaiex-agent-enrollment/) — enroll and operate a
+  user-directed SYMBaiEX agent with locally held Ed25519 credentials.
+- [`skills/symbaiex-evidence-search/`](skills/symbaiex-evidence-search/) — search bounded public
+  evidence and editorial records through the published REST or MCP contracts.
+- [`skills/symbaiex-claim-verification/`](skills/symbaiex-claim-verification/) — verify stored claims
+  against version-bound citations and inspect revision history.
+- [`skills/symbaiex-research-jobs/`](skills/symbaiex-research-jobs/) — create and monitor bounded
+  cited research and JSONL export jobs.
+- [`skills/symbaiex-webhooks/`](skills/symbaiex-webhooks/) — configure owner-scoped, HMAC-signed
+  evidence and usage event delivery.
 
 ## Install a skill
 
@@ -41,6 +51,16 @@ npx skills add SYMBaiEX/skills --skill claude-multi-agent -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration-build -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration-auto -y
+```
+
+Install the SYMBaiEX platform skills with Bun:
+
+```bash
+bunx skills add SYMBaiEX/skills --skill symbaiex-agent-enrollment -y
+bunx skills add SYMBaiEX/skills --skill symbaiex-evidence-search -y
+bunx skills add SYMBaiEX/skills --skill symbaiex-claim-verification -y
+bunx skills add SYMBaiEX/skills --skill symbaiex-research-jobs -y
+bunx skills add SYMBaiEX/skills --skill symbaiex-webhooks -y
 ```
 
 For the complete GPT Engineer workflow in Codex and Claude Code, install it globally, register the

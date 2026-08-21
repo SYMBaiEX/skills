@@ -1,0 +1,4 @@
+interface:
+  display_name: "SYMBaiEX Claim Verification"
+  short_description: "Verify claims against version-bound citations"
+  default_prompt: "Use $symbaiex-claim-verification to verify this stored public claim, preserve its exact evidence status, and inspect its revision timeline when relevant."

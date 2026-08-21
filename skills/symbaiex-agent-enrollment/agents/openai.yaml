@@ -1,0 +1,4 @@
+interface:
+  display_name: "SYMBaiEX Agent Enrollment"
+  short_description: "Enroll and secure a SYMBaiEX agent identity"
+  default_prompt: "Use $symbaiex-agent-enrollment to connect my user-directed agent to SYMBaiEX with a locally held Ed25519 key and the smallest required scopes."

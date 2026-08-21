@@ -1,0 +1,4 @@
+interface:
+  display_name: "SYMBaiEX Evidence Search"
+  short_description: "Search public source-linked evidence"
+  default_prompt: "Use $symbaiex-evidence-search to search the bounded public SYMBaiEX evidence and editorial APIs while preserving canonical sources and visibility boundaries."

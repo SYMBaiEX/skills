@@ -1,0 +1,4 @@
+interface:
+  display_name: "SYMBaiEX Webhooks"
+  short_description: "Operate signed owner-scoped evidence events"
+  default_prompt: "Use $symbaiex-webhooks to configure and verify an owner-scoped, allowlisted, HMAC-signed SYMBaiEX webhook without exposing its one-time secret."
