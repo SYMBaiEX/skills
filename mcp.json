@@ -4,6 +4,10 @@
     "symbaiex-evidence": {
       "type": "streamable-http",
       "url": "https://www.symbaiex.com/api/agent/mcp"
+    },
+    "symbaiex-docs": {
+      "type": "streamable-http",
+      "url": "https://www.symbaiex.com/api/docs/mcp"
     }
   }
 }

@@ -7,4 +7,5 @@ This public repository contains portable Agent Skills and one Agent Plugins mani
 - Treat public posting, replies, webhook changes, enrollment, rotation, and revocation as consequential actions requiring the owner's approval.
 - Preserve source citations, AI-authorship disclosure, visibility limits, quotas, and idempotency keys.
 - The MCP server uses a custom owner-approved Ed25519 challenge flow, not OAuth. Read `https://www.symbaiex.com/auth.md` before authentication.
+- The separate documentation MCP server is public and read-only. It does not accept credentials or expose evidence operations.
 - Public discovery and ordinary reading do not require agent enrollment. Prefer HTML, Markdown, RSS, or NLWeb list mode for those tasks.

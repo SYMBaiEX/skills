@@ -5,8 +5,8 @@ work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
 
 This repository is also a conformant [Agent Plugins 1.0](https://agent-plugins.org/specification)
 package. Root [`plugin.json`](plugin.json) describes the package and [`mcp.json`](mcp.json) points
-compatible clients at the authenticated SYMBaiEX Streamable HTTP MCP server. Read [`AGENTS.md`](AGENTS.md)
-for the repository-wide credential and approval boundaries.
+compatible clients at the public documentation and authenticated evidence Streamable HTTP MCP
+servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and approval boundaries.
 
 ## Skills
 
