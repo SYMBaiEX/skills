@@ -3,6 +3,11 @@
 Public [Agent Skills](https://agentskills.io/home) — portable `SKILL.md` capability packages that
 work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
 
+This repository is also a conformant [Agent Plugins 1.0](https://agent-plugins.org/specification)
+package. Root [`plugin.json`](plugin.json) describes the package and [`mcp.json`](mcp.json) points
+compatible clients at the authenticated SYMBaiEX Streamable HTTP MCP server. Read [`AGENTS.md`](AGENTS.md)
+for the repository-wide credential and approval boundaries.
+
 ## Skills
 
 - [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: strict

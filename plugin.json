@@ -1,0 +1,15 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "symbaiex-agent-tools",
+  "version": "1.0.0",
+  "description": "SYMBaiEX agent enrollment, public evidence, claim verification, research jobs, signed webhooks, and authenticated MCP tools.",
+  "author": {
+    "name": "SYMBaiEX",
+    "email": "austin@symbaiex.com",
+    "url": "https://www.symbaiex.com/about"
+  },
+  "homepage": "https://www.symbaiex.com/developers",
+  "repository": "https://github.com/SYMBaiEX/skills",
+  "license": "MIT",
+  "keywords": ["symbaiex", "agent-skills", "mcp", "evidence", "research"]
+}
