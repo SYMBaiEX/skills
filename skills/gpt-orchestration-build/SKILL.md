@@ -4,7 +4,7 @@ description: Turn an existing audit, finding list, issue set, review, failing-te
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.4.0"
+  version: "1.4.1"
 ---
 
 # GPT Orchestration Build
@@ -43,7 +43,7 @@ Order confirmed work by dependency and blast radius:
 5. cleanup, documentation, and generated artifacts;
 6. independent verification and residual-gap scan.
 
-Use the runtime's available concurrency, counting the orchestrator as a slot. Give one writer ownership of each file or tightly coupled subsystem. Latest-only is the default: use confirmed `sol_engineer` (`gpt-5.6-sol`) for hard integration, `terra_worker` (`gpt-5.6-terra`) for bounded implementation, `terra_explorer` for read-heavy gaps, and `luna_verifier` (`gpt-5.6-luna`) for mechanical checks. If the native spawn schema cannot prove an exact route and the sibling `gpt-engineer` skill is installed, use its guarded CLI runner. Otherwise never use a generic, inherited, model-less, GPT-5, GPT-5.4, Spark, or Claude substitute; keep the work with the exact-model parent or report the limitation.
+Use the runtime's available concurrency, counting the orchestrator as a slot. Give one writer ownership of each file or tightly coupled subsystem. Latest-only is the default: use confirmed `sol_engineer` (`gpt-5.6-sol`) for hard integration, `terra_worker` (`gpt-5.6-terra`) for bounded implementation, `terra_explorer` for read-heavy gaps, and `luna_verifier` (`gpt-5.6-luna`) for mechanical checks. Native custom agents are the interactive default; for a new programmatic controller, prefer the stable official Codex SDK where it covers the need and version-pin/feature-detect experimental app-server APIs. If neither can request the required route or prove isolation and the sibling `gpt-engineer` skill is installed, use its guarded CLI compatibility adapter with an explicit `--compatibility-reason`; it does not independently attest the provider's effective model. Otherwise never use a generic, inherited, model-less, GPT-5, GPT-5.4, Spark, or Claude substitute; keep work with a proven parent or report the limitation.
 
 Every writer contract must include exact paths, success criteria, prohibited side effects, required tests, baseline constraints, and expected handoff evidence. Keep overlapping work read-only.
 

@@ -83,6 +83,23 @@ class ConfigureLunaV2Tests(unittest.TestCase):
                 with self.assertRaisesRegex(SystemExit, "Codex rejected.*invalid catalog"):
                     configure_luna_v2.validate_catalog_with_codex(catalog(), self.home)
 
+    def test_cli_apply_requires_unsupported_override_acknowledgement(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "2"):
+            configure_luna_v2.main(
+                ["--apply", "--codex-home", str(self.home)]
+            )
+
+    def test_resolve_codex_prefers_newer_available_runtime(self) -> None:
+        old = Path(self.temp.name) / "old-codex"
+        new = Path(self.temp.name) / "new-codex"
+        old.write_text("#!/bin/sh\necho 'codex-cli 0.144.6'\n")
+        new.write_text("#!/bin/sh\necho 'codex-cli 0.151.0'\n")
+        old.chmod(0o755)
+        new.chmod(0o755)
+        self.assertEqual(
+            configure_luna_v2.resolve_codex([str(old), str(new)]), str(new)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

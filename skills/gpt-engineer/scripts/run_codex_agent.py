@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one model-pinned Codex delegate when native role routing is unavailable."""
+"""Run one guarded Codex CLI compatibility delegate when native/SDK routing is unavailable."""
 
 from __future__ import annotations
 
@@ -62,6 +62,12 @@ ROLES = {
         "write_capable": True,
     },
 }
+COMPATIBILITY_REASONS = (
+    "native-routing-unavailable",
+    "native-sandbox-unproven",
+    "headless-isolation-required",
+    "cross-provider-bridge",
+)
 
 
 def validate_json_schema(
@@ -597,6 +603,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--role", choices=tuple(ROLES), required=True)
     parser.add_argument(
+        "--compatibility-reason",
+        choices=COMPATIBILITY_REASONS,
+        default=os.environ.get("GPT_ENGINEER_CLI_ADAPTER_REASON") or None,
+        help=(
+            "Why the last-resort Codex CLI adapter is required. Normal interactive Codex "
+            "work must use native custom agents; new programmatic integrations should use "
+            "the Codex SDK/app-server. May also be set with GPT_ENGINEER_CLI_ADAPTER_REASON."
+        ),
+    )
+    parser.add_argument(
         "--stage-id", help="Stable stage identifier; defaults to the role"
     )
     parser.add_argument(
@@ -659,6 +675,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    if args.compatibility_reason not in COMPATIBILITY_REASONS:
+        parser.error(
+            "--compatibility-reason is required; use native Codex custom agents or the "
+            "official Codex SDK/app-server unless a documented compatibility condition applies"
+        )
     stage_id = args.stage_id or args.role
     if args.journal_attempt <= 0:
         parser.error("--journal-attempt must be positive")
@@ -724,9 +745,14 @@ def main(argv: list[str] | None = None) -> int:
         print(
             json.dumps(
                 {
+                    "executionSurface": "codex-cli-compatibility-adapter",
+                    "compatibilityReason": args.compatibility_reason,
                     "role": args.role,
                     "stageId": stage_id,
                     "model": profile["model"],
+                    "requestedModel": profile["model"],
+                    "effectiveModel": None,
+                    "routeAttestation": "requested-only",
                     "reasoningEffort": profile["effort"],
                     "serviceTier": profile.get("service_tier", "default"),
                     "profileSha256": profile_sha256,
@@ -1145,6 +1171,8 @@ def main(argv: list[str] | None = None) -> int:
         else "failed"
     )
     envelope = {
+        "executionSurface": "codex-cli-compatibility-adapter",
+        "compatibilityReason": args.compatibility_reason,
         "runId": journal.run_id if journal is not None else None,
         "laneId": lane_id,
         "attempt": attempt,
@@ -1158,6 +1186,8 @@ def main(argv: list[str] | None = None) -> int:
         "acceptanceContractHash": args.acceptance_contract_hash,
         "remainingRouteContext": route_context or None,
         "requestedModel": profile["model"],
+        "effectiveModel": None,
+        "routeAttestation": "requested-only",
         "requestedReasoningEffort": profile["effort"],
         "profileSha256": profile_sha256,
         "codexVersion": codex_version_text,
@@ -1172,6 +1202,7 @@ def main(argv: list[str] | None = None) -> int:
             "explicitReasoningConfig": True,
             "ignoredUserConfig": True,
             "recursiveDelegationDisabled": True,
+            "providerEffectiveModelAttested": False,
         },
         "lifecycle": {
             "attempt": attempt,

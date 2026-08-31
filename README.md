@@ -14,7 +14,9 @@ servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and ap
   GPT-5.6 Sol/Terra/Luna research, layered engineering standards, adaptive one/three/six-lane fleets
   with an opt-in qualified eight-reader team mode, isolated implementation, integration,
   verification, private resumable run journals, content-addressed gate reuse, outcome-based fleet
-  tuning, bounded goal persistence, and task-owned resource teardown.
+  tuning, bounded goal persistence, and task-owned resource teardown. Native Codex custom agents are
+  the interactive default; the official Codex SDK/app-server is the programmatic path, and the
+  Python `codex exec` driver is a guarded compatibility adapter rather than the normal scheduler.
 - [`skills/gpt-engineer-mem/`](skills/gpt-engineer-mem/) — the memory-aware GPT engineer: bounded
   Claude Mem/Codex recall, live freshness checks, GPT-5.6 Sol/Terra/Luna delivery, and read-only
   memory-service diagnostics.
@@ -78,6 +80,7 @@ npx skills add https://github.com/SYMBaiEX/skills \
   --skill gpt-engineer --agent codex claude-code --global --yes
 python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --provider codex --upgrade --global
 python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --provider codex --check --global
+python3 ~/.agents/skills/gpt-engineer/scripts/audit_routing.py --cwd /path/to/repo --runtime --json
 ```
 
 Install the memory-aware variant alongside the base engineer. It reuses the base profile setup when
@@ -95,6 +98,10 @@ The profile bootstrap is deliberately separate from skills.sh. It never edits pr
 `--upgrade` replaces only bundled agent-profile destinations. Use `--provider all --upgrade` only
 when Claude profiles are explicitly wanted. For project-local profiles and conservative Codex hooks,
 replace `--global` with `/path/to/repository`.
+
+Do not activate a copied Luna model catalog as routine setup. Custom catalogs freeze upstream model
+metadata and the runtime audit rejects stale or unattested overrides. Prefer stock native routing;
+use the guarded CLI adapter when native Luna is temporarily unavailable.
 
 Long GPT Engineer runs use private state outside the checkout by default. Inspect or resume that
 state with `run_journal.py`; opt a repository into a local `.engineer` control directory only with an

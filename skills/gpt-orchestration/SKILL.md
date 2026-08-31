@@ -4,7 +4,7 @@ description: Coordinate hierarchical coding-agent fleets for repository-wide aud
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.4.0"
+  version: "1.4.1"
 ---
 
 # GPT Orchestration
@@ -18,7 +18,7 @@ Treat findings as inputs to action, not the end product. When the user authorize
 1. Inspect the available collaboration tool schemas, custom agent types, and current agent tree before promising a topology.
 2. Check for confirmed Codex custom agents that bind a type to a model, or an explicit model field on the spawn API. A custom agent type is real routing only when its configuration or current runtime confirms the model.
 3. Latest-only is the default. Allow exactly `gpt-5.6-sol` for ambiguous integration and hard engineering, `gpt-5.6-terra` for exploration and bounded implementation, and `gpt-5.6-luna` for high-volume mechanical verification.
-4. If native selection is unavailable and the sibling `gpt-engineer` skill is installed, use its guarded `scripts/run_codex_agent.py` fallback for explicitly model-pinned delegates. Otherwise do not spawn a generic, inherited, model-less, GPT-5, GPT-5.4, Spark, or Claude fallback; keep work with the exact-model parent or report the blocker.
+4. Native Codex custom agents are the normal interactive path. For a new programmatic controller, prefer the stable official Codex SDK where it covers the need, request model and sandbox per thread, and version-pin/feature-detect experimental app-server APIs. If neither path can request the required route or prove isolation and the sibling `gpt-engineer` skill is installed, use its guarded `scripts/run_codex_agent.py` compatibility adapter with an explicit `--compatibility-reason`; it does not independently attest the provider's effective model. Otherwise do not spawn a generic, inherited, model-less, GPT-5, GPT-5.4, Spark, or Claude fallback; keep work with a proven parent or report the blocker.
 5. When the user explicitly requests subagents or a fleet, do not silently remain single-agent. Spawn useful bounded agents or report the concrete runtime limitation.
 6. Treat the orchestrator as one occupied concurrency slot. Compute each wave from the currently exposed capacity and active-agent count. Keep spawn depth at one unless deeper delegation is necessary and explicitly bounded.
 

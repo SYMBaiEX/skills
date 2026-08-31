@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install or remove the temporary Luna Multi-Agent V2 catalog compatibility shim."""
+"""Manage the unsupported, last-resort Luna Multi-Agent V2 catalog override."""
 
 from __future__ import annotations
 
@@ -68,14 +68,30 @@ def build_shim(source: dict[str, object]) -> dict[str, object]:
     return result
 
 
-def resolve_codex() -> str:
-    candidates = [shutil.which("codex")]
-    app_binary = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
-    if app_binary.is_file():
-        candidates.append(str(app_binary))
-    for candidate in candidates:
-        if candidate:
-            return candidate
+def resolve_codex(candidates: list[str | None] | None = None) -> str:
+    if candidates is None:
+        candidates = [shutil.which("codex")]
+        app_binary = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
+        if app_binary.is_file():
+            candidates.append(str(app_binary))
+    ranked: list[tuple[tuple[int, ...], str]] = []
+    for candidate in dict.fromkeys(value for value in candidates if value):
+        try:
+            result = subprocess.run(
+                [candidate, "--version"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        rendered = result.stdout.strip() or result.stderr.strip()
+        match = re.search(r"(\d+(?:\.\d+)+)", rendered)
+        version = tuple(int(part) for part in match.group(1).split(".")) if match else ()
+        ranked.append((version, candidate))
+    if ranked:
+        return max(ranked, key=lambda item: item[0])[1]
     raise SystemExit("Cannot validate custom catalog because the Codex executable was not found")
 
 
@@ -259,6 +275,12 @@ def check(codex_home: Path, require_fast: bool, validate_runtime: bool = True) -
     if violations:
         for violation in violations:
             print(f"error: {violation}", file=sys.stderr)
+        if "managed catalog is stale or changes fields beyond Luna routing" in violations:
+            print(
+                "error: disable the override before restart; do not refresh it from an older "
+                "runtime cache",
+                file=sys.stderr,
+            )
         return 1
     print("Luna Multi-Agent V2 compatibility shim is current and active.")
     return 0
@@ -318,10 +340,22 @@ def main(argv: list[str] | None = None) -> int:
     action.add_argument("--disable", action="store_true")
     parser.add_argument("--codex-home", default=os.environ.get("CODEX_HOME", "~/.codex"))
     parser.add_argument("--enable-fast-mode", action="store_true")
+    parser.add_argument(
+        "--acknowledge-unsupported-catalog-override",
+        action="store_true",
+        help="Required with --apply because custom model catalogs freeze upstream metadata",
+    )
     args = parser.parse_args(argv)
     codex_home = Path(args.codex_home).expanduser().resolve()
     if args.apply:
+        if not args.acknowledge_unsupported_catalog_override:
+            parser.error(
+                "--apply requires --acknowledge-unsupported-catalog-override; prefer stock "
+                "native routing or run_codex_agent.py as an explicit compatibility adapter"
+            )
         return apply(codex_home, args.enable_fast_mode)
+    if args.acknowledge_unsupported_catalog_override:
+        parser.error("--acknowledge-unsupported-catalog-override is valid only with --apply")
     if args.check:
         return check(codex_home, args.enable_fast_mode)
     if args.enable_fast_mode:

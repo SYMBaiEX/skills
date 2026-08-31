@@ -97,6 +97,11 @@ def main() -> int:
                 "--routes-attested",
                 "--lanes-independent",
                 "--paired-comparison",
+                "native 5.6 custom agents for normal interactive fleets",
+                "codex sdk/app-server",
+                "--compatibility-reason",
+                "audit_routing.py --cwd <repo> --runtime",
+                "do not spend a separate synthetic model turn merely to test routing",
             ):
                 if required not in text.lower():
                     fail(f"GPT Engineer fast-path contract missing {required!r}: {path}")
@@ -124,8 +129,18 @@ def main() -> int:
     if 'model = "gpt-5.6-sol"' not in sol_profile.read_text():
         fail(f"Sol profile is not explicitly pinned to gpt-5.6-sol: {sol_profile}")
     codex_runner = SKILLS / "gpt-engineer" / "scripts" / "run_codex_agent.py"
-    if '"model": "gpt-5.6-sol"' not in codex_runner.read_text():
-        fail(f"Codex fallback is not explicitly pinned to gpt-5.6-sol: {codex_runner}")
+    codex_runner_text = codex_runner.read_text()
+    if '"model": "gpt-5.6-sol"' not in codex_runner_text:
+        fail(f"Codex compatibility adapter is not explicitly pinned to gpt-5.6-sol: {codex_runner}")
+    for required in (
+        "--compatibility-reason",
+        "codex-cli-compatibility-adapter",
+        "native-routing-unavailable",
+        '"routeAttestation": "requested-only"',
+        '"providerEffectiveModelAttested": False',
+    ):
+        if required not in codex_runner_text:
+            fail(f"Codex compatibility adapter is missing {required!r}: {codex_runner}")
     fleet_planner = SKILLS / "gpt-engineer" / "scripts" / "plan_fleet.py"
     if not fleet_planner.is_file():
         fail(f"GPT Engineer adaptive fleet planner is missing: {fleet_planner}")

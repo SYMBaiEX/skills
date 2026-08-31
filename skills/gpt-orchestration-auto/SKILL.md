@@ -4,7 +4,7 @@ description: Autonomously pursue a sustained engineering outcome through repeate
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.4.0"
+  version: "1.4.1"
 ---
 
 # GPT Orchestration Auto
@@ -60,7 +60,7 @@ Inspect the live agent tree and tool schema before choosing a topology. Count th
 - Latest-only is the default. Use confirmed `sol_engineer` / `gpt-5.6-sol` routing for ambiguous architecture, hard implementation, and integration.
 - Use confirmed `terra_explorer` and `terra_worker` / `gpt-5.6-terra` routing for read-heavy research and bounded routine implementation.
 - Use confirmed `luna_verifier` / `gpt-5.6-luna` routing for high-volume mechanical verification and residual scans.
-- Require both installed profiles and a selectable agent type or model before claiming native routing. If native selection is unavailable and the sibling `gpt-engineer` skill is installed, use its guarded Codex CLI fallback. Otherwise never use generic, inherited, model-less, GPT-5, GPT-5.4, Spark, or Claude substitutes; keep work with the exact-model parent or record the blocker.
+- Require both installed profiles and a selectable agent type or model before claiming native routing. Native custom agents are the interactive default; for a new programmatic controller, prefer the stable official Codex SDK where it covers the need and version-pin/feature-detect experimental app-server APIs. If neither can request the required route or prove isolation and the sibling `gpt-engineer` skill is installed, use its guarded CLI compatibility adapter with an explicit `--compatibility-reason`; it does not independently attest the provider's effective model. Otherwise never use generic, inherited, model-less, GPT-5, GPT-5.4, Spark, or Claude substitutes; keep work with a proven parent or record the blocker.
 - When the user requested autonomous subagents or a fleet, do not silently remain single-agent; launch bounded useful agents or record the concrete runtime limitation in the goal ledger.
 - Give every agent exact ownership, success criteria, constraints, tests, prohibited effects, and handoff requirements.
 - Keep one writer per file or tightly coupled subsystem.

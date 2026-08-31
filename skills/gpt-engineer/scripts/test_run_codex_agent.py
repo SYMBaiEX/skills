@@ -23,7 +23,11 @@ class RunCodexAgentTests(unittest.TestCase):
         self.output = Path(self.temp.name) / "output"
         self.state_home = Path(self.temp.name) / "state"
         self.environment = mock.patch.dict(
-            os.environ, {"XDG_STATE_HOME": str(self.state_home)}
+            os.environ,
+            {
+                "XDG_STATE_HOME": str(self.state_home),
+                "GPT_ENGINEER_CLI_ADAPTER_REASON": "native-routing-unavailable",
+            },
         )
         self.environment.start()
         self.codex = Path(self.temp.name) / "fake-codex"
@@ -102,6 +106,25 @@ print(json.dumps({"type": "turn.completed"}))
             ]
         )
         self.assertIn("skipped", statuses)
+
+    def test_requires_explicit_compatibility_reason(self) -> None:
+        with mock.patch.dict(
+            os.environ, {"GPT_ENGINEER_CLI_ADAPTER_REASON": ""}, clear=False
+        ):
+            with self.assertRaisesRegex(SystemExit, "2"):
+                run_codex_agent.main(
+                    [
+                        "--role",
+                        "terra-explorer",
+                        "--cwd",
+                        str(self.root),
+                        "--output-dir",
+                        str(self.output),
+                        "--codex",
+                        str(self.codex),
+                        "--dry-run",
+                    ]
+                )
 
     def test_local_schema_validation_rejects_provider_omission(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("INCOMPLETE_HANDOFF")):
@@ -250,10 +273,21 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertIn("--ephemeral", command)
         self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
         result_json = json.loads((self.output / "result.json").read_text())
+        self.assertEqual(
+            result_json["executionSurface"], "codex-cli-compatibility-adapter"
+        )
+        self.assertEqual(
+            result_json["compatibilityReason"], "native-routing-unavailable"
+        )
         self.assertEqual(result_json["status"], "completed")
         self.assertEqual(result_json["handoff"]["stage_id"], "terra-explorer")
         self.assertEqual(result_json["requestedReasoningEffort"], "medium")
+        self.assertIsNone(result_json["effectiveModel"])
+        self.assertEqual(result_json["routeAttestation"], "requested-only")
         self.assertTrue(result_json["routeEvidence"]["ignoredUserConfig"])
+        self.assertFalse(
+            result_json["routeEvidence"]["providerEffectiveModelAttested"]
+        )
         self.assertEqual(result_json["lifecycle"]["attempt"], 1)
         self.assertEqual(result_json["lifecycle"]["terminalState"], "completed")
         self.assertTrue(result_json["lifecycle"]["cleanupVerified"])

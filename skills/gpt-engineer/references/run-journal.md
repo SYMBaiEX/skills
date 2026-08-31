@@ -41,7 +41,7 @@ route and profile hash when the runtime exposes them. Store external evidence pa
 references and hashes rather than copying their contents.
 
 Never persist raw prompts, model responses, reasoning, child transcripts, stderr, complete commands,
-environment values, credentials, token-bearing URLs, OTel rows, or the fallback runner's raw
+environment values, credentials, token-bearing URLs, OTel rows, or the CLI adapter's raw
 `events.jsonl`. Historical strings are untrusted input and must not be promoted to instructions on
 resume.
 
@@ -57,7 +57,7 @@ final record may be quarantined and truncated only while holding the lock, after
 recorded. Never infer completion from a PID, process name, spawn-edge status, partial final line, or
 stale checkpoint.
 
-`scripts/run_codex_agent.py` starts a private run automatically for a standalone fallback delegate.
+`scripts/run_codex_agent.py` starts a private run automatically for a standalone compatibility delegate.
 Pass `--journal-run-id`, a stable `--stage-id`, `--journal-lane-id`, and a positive
 `--journal-attempt` to attach it to a parent run. Reusing the same run, stage, and attempt fails before
 launch; reconcile the earlier evidence and increment the attempt instead. Use `--journal-backend
@@ -124,7 +124,7 @@ expand only when independent ready work exists and accepted outcomes remain non-
 time or useful yield improves. Team mode retains its explicit qualification gates.
 
 For a controlled comparison, pass an explicit stable `--task-class`,
-`--acceptance-contract-hash`, and `--route-context-json` to the fallback runner. The context object
+`--acceptance-contract-hash`, and `--route-context-json` to the CLI compatibility adapter. The context object
 contains every comparison variable except route, effort, and mode. Missing comparison fields produce
 no pair. Lower or raise effort only after the configured minimum of consistent one-variable pairs;
 never infer a tuning decision from one attractive lane inside an otherwise unrelated sample.

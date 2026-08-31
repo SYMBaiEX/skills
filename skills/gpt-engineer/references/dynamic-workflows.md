@@ -7,9 +7,12 @@ state, or more than one provider.
 
 | Surface | Use it for | Limit |
 | --- | --- | --- |
-| Native Codex subagents | A few evidence-driven shards with direct lead supervision | Runtime may not expose a model selector |
-| Model-pinned Codex runner | Exact Sol/Terra/Luna routing with external evidence | At most two readers; candidate writers are serialized |
-| Responses API Multi-agent beta | One-model hosted fan-out in an API application | Subagents share the request model; not a mixed Sol/Terra/Luna router |
+| Native Codex custom agents | Normal interactive Sol/Terra/Luna fleets with direct lead supervision | Children inherit live parent permission overrides; use compact context packets |
+| Codex SDK or app-server | New programmatic/headless controllers, durable thread resume, requested per-thread model/sandbox, and isolated writers | Prefer the stable SDK; version-pin app-server and feature-detect experimental APIs; keep policy, idempotency, cleanup reconciliation, and release receipts in the application |
+| Codex CLI compatibility adapter | Last-resort explicit model request, cross-provider bridging, or isolated candidate evidence when native/SDK paths are unavailable | Does not attest the provider's effective route; requires a recorded reason, at most two readers, and serialized candidate writers |
+| Responses API Multi-agent beta | Independent hosted fan-out in an API application | Beta docs do not establish heterogeneous child model/tool control or filesystem isolation |
+| Agents SDK with Codex as MCP | A broader application where a manager retains ownership and Codex is one coding specialist | Do not rebuild ordinary Codex-native delegation or treat traces as release proof |
+| Responses Programmatic Tool Calling | Deterministic API-side fan-out, filtering, joining, ranking, and validation | Generated JavaScript has no direct host access but can invoke eligible mutation tools; allowlist carefully |
 | GPT Engineer Spark fleet | Explicitly requested fast, bounded exploration, candidate edits, and verification | Opt-in older model; Spark never owns architecture or final acceptance |
 | Claude dynamic workflow | Explicitly authorized repeatable high-fanout audits, migrations, cross-checking, and bounded loops | Opt-in separate provider; same-session resume |
 
@@ -30,8 +33,33 @@ models, and a Codex child cannot prove a Claude phase completed. Record every st
 - decision unblocked, maximum output, cancellation condition, and handoff schema;
 - evidence directory, result status, changed paths, violations, and final disposition.
 
-Never silently reroute a failed stage to another provider or model. A fallback must be explicitly
-authorized in the stage contract and recorded as a new attempt.
+Never silently reroute a failed stage to another provider or model. A compatibility path must be
+explicitly authorized in the stage contract and recorded as a new attempt.
+
+## Prefer native coordination over wrapper orchestration
+
+Current Codex releases already spawn, steer, wait for, and close custom subagents. Use that native
+surface for ordinary interactive engineering. A custom wrapper around `codex exec` adds process and
+context overhead and loses native thread semantics, so it is not the default merely because it can
+pin a model.
+
+For a new unattended controller, prefer the stable official TypeScript Codex SDK or Python
+`openai-codex` client where it covers the need instead of adding more subprocess parsing. Persist
+thread and turn IDs, requested route, effective route only when exported, sandbox and worktree,
+prompt/acceptance hashes, terminal state, and final checks. Version-pin app-server and feature-detect
+experimental lifecycle or terminal APIs. The controller must still verify descendants terminated
+and must not repeat completed side effects.
+
+Responses Multi-agent is complementary: one GPT-5.6 request can coordinate hosted children, but the
+current beta documentation does not establish per-child heterogeneous model/tool control or
+filesystem isolation. Use it for independent read/tool work only when those missing controls are not
+required. Do not use it as evidence of Sol/Terra/Luna routing or as the sole scheduler for shared
+mutable repository writes.
+
+Programmatic Tool Calling runs generated JavaScript without direct Node, filesystem, network,
+subprocess, package, or persistent-state access. It can still invoke eligible tools such as patch or
+shell surfaces. Exclude mutation tools from unapproved stages and use direct, approval-aware calls
+for authorized repository writes.
 
 ## Build the graph from evidence
 

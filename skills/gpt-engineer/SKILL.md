@@ -4,7 +4,7 @@ description: "Own a software-engineering outcome end to end with a strictly mode
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.8.0"
+  version: "1.9.0"
 ---
 
 # GPT Engineer
@@ -62,20 +62,27 @@ Spawn subagents when the user explicitly requests a fleet or when at least two i
 
 Run this routing preflight:
 
-1. Confirm that the intended profiles are installed in a directory the selected agent actually loads. Run `python3 scripts/audit_routing.py --cwd <repo> --parent-model <observed-parent-model> --json` when the parent model is observable; omit the last option only when it is not. If native Sol/Terra parents reject Luna, inspect the catalog mismatch and use the temporary Luna V2 compatibility procedure below only when its exact preconditions pass.
+1. Confirm that the intended profiles are installed in a directory the selected agent actually loads. Run `python3 scripts/audit_routing.py --cwd <repo> --runtime --parent-model <observed-parent-model> --json` when the parent model is observable; omit only `--parent-model` when it is not. The runtime audit selects the newest available Codex binary, verifies that its active config enables multi-agent support, reports PATH/app version skew, and fails on stale or unverified model-catalog overrides.
 2. Record every candidate profile's source, `name`, exact model, reasoning effort, and hash. A project profile with the same `name` can shadow a valid user profile; any conflicting candidate fails latest-only preflight.
 3. Inspect the active spawn schema for an `agent_type`, `model`, or equivalent selector. Profile files alone do not prove that a child used their model. In Codex, a custom file's model or effort wins when present; otherwise precedence is explicit spawn value, `[agents]` default, then parent value. Select one of the six allowed agent types explicitly; methodology skills do not authorize their generic agent roles.
-4. Record the effective sandbox and approval behavior. Interactive parent overrides are reapplied to children and can override a custom agent's sandbox default. If a read-only lane cannot remain read-only, use the runner or keep it in the parent.
+4. Record the effective sandbox and approval behavior. Interactive parent overrides are reapplied to children and can override a custom agent's sandbox default. If a read-only lane cannot remain read-only, keep it in the parent or use a separately sandboxed Codex SDK/app-server thread; use the CLI compatibility adapter only when those surfaces are unavailable.
 5. Prefer native subagents when the runtime can select the exact profile. Use `fork_turns="none"` or the smallest useful positive fork for model-overridden children. Use a full-history fork only when inherited model and effort are acceptable and the complete history is necessary.
-6. When exact Codex routing is unavailable natively, use `scripts/run_codex_agent.py` for explicit model-pinned delegates. Run no more than two read-only delegates concurrently, never overlap a writer with another delegate in the same repository, and inspect every result envelope and structured handoff.
-7. If neither exact native routing nor the model-pinned runner is available, do not spawn a generic, inherited, behavioral, or fixed legacy agent. Continue only when the parent is proven to use an allowed exact model; otherwise report the routing blocker. Never silently substitute a model.
+6. For a new programmatic or headless controller, prefer the stable official Codex SDK where it covers the need: request model and sandbox per thread, retain thread and turn IDs, stream lifecycle events, cancel on deadlines, and reconcile cleanup. Version-pin the app-server protocol and feature-detect experimental lifecycle or terminal APIs. Keep retries, idempotency, worktree allocation, authorization, and release evidence in the application control plane. Treat the model as requested—not independently attested—unless the runtime exports effective route metadata.
+7. Use `scripts/run_codex_agent.py` only as the guarded Codex CLI compatibility adapter when native model selection is unavailable, a native sandbox cannot be proven, isolated headless execution is required, or an explicitly authorized cross-provider bridge needs Codex. It explicitly requests a pinned model but does not independently attest the provider's effective route. Record `--compatibility-reason`; run no more than two read-only adapters concurrently, never overlap a writer with another delegate in the same repository, and inspect every result envelope and structured handoff.
+8. If none of the native, SDK/app-server, compatibility-adapter, or proven-parent paths can request the required model without substitution, report the routing blocker. Never silently substitute a generic, inherited, behavioral, old, Spark, or Claude model.
+
+Do not spend a separate synthetic model turn merely to test routing. Run the local preflight, then
+make the first useful bounded stage the route canary and inspect metadata immediately. Stop it if the
+route is wrong or unknown under a strict attestation requirement. A model echoing a requested token
+without exported child metadata is not proof that a child ran.
 
 ### Enforce latest-only routing
 
 Latest-only is the default for this skill. The allowed OpenAI routes are exactly
 `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`. Agent type names are not proof:
 select `sol_engineer`, `terra_explorer`, `terra_worker`, `luna_worker`, `luna_max_worker`, or `luna_verifier` only when
-their active configuration or the spawn request proves the exact model.
+their active configuration or spawn request proves the requested model. Call it effective only when
+the runtime exports matching execution metadata.
 
 Do not select generic built-in roles, model-less profiles, GPT-5, GPT-5.4, or inherited
 children. `gpt-5.3-codex-spark` is an explicit speed-specialist route, not a latest-only
@@ -134,8 +141,9 @@ once, recompute the DAG, and dispatch only newly ready work.
 
 ### Choose the workflow surface dynamically
 
-Use native 5.6 subagents for a few lead-supervised shards and the model-pinned runner when exact
-Codex routing is otherwise unavailable. Prefer Terra and Luna—not Spark—for fast latest-only work.
+Use native 5.6 custom agents for normal interactive fleets. Use Codex SDK/app-server threads for a
+programmatic controller or per-worker isolation, and the model-pinned CLI compatibility adapter only
+when neither native selection nor the official SDK surface can satisfy the stage. Prefer Terra and Luna—not Spark—for fast latest-only work.
 Use the Spark fleet or Claude workflow runtime only after explicit user selection or authorization
 to leave latest-only mode. Keep cross-provider sequencing in this outer lead.
 
@@ -145,18 +153,19 @@ overlapping writers. Candidate patches remain incomplete until the main agent re
 integrates them; any later file change invalidates prior verification.
 
 Immediately after spawning, inspect the agent tree or available runtime metadata. Record agent type,
-effective model and effort, handle, start time, and lane. Interrupt an observed generic, unknown,
+requested model and effort, effective route metadata when exported, handle, start time, and lane. Interrupt an observed generic, unknown,
 GPT-5, GPT-5.4, or Spark route in latest-only mode. When metadata is exported, validate it with
 `scripts/audit_routing.py --observed-route <agent_type>=<model>:<effort>`; a passing profile preflight
 alone is not runtime attestation.
 
-### Use the Codex CLI fallback safely
+### Use the Codex CLI compatibility adapter only as a last resort
 
 Pass the task through stdin and keep evidence outside the repository:
 
 ```bash
 python3 scripts/run_codex_agent.py \
   --role terra-explorer \
+  --compatibility-reason native-routing-unavailable \
   --stage-id architecture-map \
   --cwd /path/to/repo \
   --output-dir /tmp/gpt-engineer/architecture \
@@ -165,50 +174,52 @@ Trace the requested execution path. Return evidence only; do not edit.
 PROMPT
 ```
 
-Writer roles require `--allow-writes` and at least one repository-relative `--allow-path`. Explicitly review and list any permitted pre-existing dirty path with `--allow-dirty-path`. The runner pins the role's model, disables recursive delegation and network access, uses a repository lock, refuses output inside the worktree, captures JSONL and the final message, and fails closed on incomplete events or scope violations. Never add bypass-permissions flags.
+Writer roles require `--allow-writes` and at least one repository-relative `--allow-path`. Explicitly review and list any permitted pre-existing dirty path with `--allow-dirty-path`. The runner explicitly requests the role's model, disables recursive delegation and network access, uses a repository lock, refuses output inside the worktree, captures JSONL and the final message, and fails closed on incomplete events or scope violations. Never add bypass-permissions flags.
 Writer execution happens in an isolated candidate copy and returns `candidate-changes/`,
 `candidate.patch`, deletion metadata, a structured `handoff`, and route evidence; it never
 applies edits to the original repository. The runner constrains the final response with
 `assets/codex/handoff.schema.json`. The main agent must inspect the result, validate the handoff,
 and integrate the candidate bundle before downstream verification.
 
-The fallback runner starts a private journal by default. Attach lanes from the same fleet with one
+The adapter starts a private journal by default. Attach lanes from the same fleet with one
 `--journal-run-id` plus stable stage, lane, and attempt IDs; never reuse an attempt. For a measured
 route or effort comparison, also provide the unchanged task class, acceptance-contract hash, and
 non-route comparison context described in `references/run-journal.md`. The runner records only
 normalized lifecycle and evidence hashes, and publishes `result.json` atomically after its journal
 handoff.
 
-### Enable native Luna V2 routing only when required
+### Quarantine custom Luna catalog overrides
 
-Codex CLI 0.144.x can expose Sol and Terra as Multi-Agent V2 while the stock Luna entry remains V1.
-That version mismatch prevents a V2 parent from selecting Luna even though Luna itself is available.
-Treat this as a temporary runtime compatibility issue, not as a reason to hand-edit the live cache.
+Some Codex builds can expose Sol and Terra as Multi-Agent V2 while a cached Luna entry remains V1.
+That mismatch can prevent a V2 parent from selecting Luna even though Luna itself is available.
+Treat it as a runtime compatibility defect, not part of the normal GPT Engineer architecture.
 
-After installing the profiles, inspect and apply the managed shim explicitly:
+Never apply or refresh an override merely because Luna selection failed. First update or select the
+newest supported Codex runtime, remove stale overrides, restart, and test a native `luna_worker`
+route. A configured catalog freezes all upstream model metadata, so `audit_routing.py --runtime`
+fails when the managed copy is stale and cannot attest arbitrary custom catalogs.
 
-```bash
-python3 scripts/configure_luna_v2.py --apply --enable-fast-mode
-python3 scripts/configure_luna_v2.py --check --enable-fast-mode
-```
-
-The script fails closed unless the source catalog has the exact known state: Sol/Terra V2 and Luna
-V1. It copies the current catalog to `~/.codex/model-catalogs/`, changes only Luna's
-`multi_agent_version`, atomically sets the top-level `model_catalog_json`, preserves the rest of the
-user configuration, creates a backup before changing it, materializes the cache field required by
-the custom-catalog schema, and asks a fresh Codex CLI process to parse the result before activation. Re-run `--apply` after a Codex update
-to refresh all upstream model metadata. Because Codex snapshots the configured catalog at process
-startup, completely restart Codex after applying, refreshing, or removing it.
-
-Remove the workaround as soon as the stock catalog reports Luna V2:
+Remove the managed override when it is stale or when the stock catalog reports Luna V2:
 
 ```bash
 python3 scripts/configure_luna_v2.py --disable
 ```
 
-Do not distribute a frozen catalog, patch `models_cache.json` in place, or claim native Luna routing
-until a fresh Codex process successfully selects the exact profile. If the shim's preconditions fail,
-use the model-pinned runner or keep the stage with the proven parent route.
+Prefer the explicit-model-request CLI adapter while native Luna is blocked. Only an owner who explicitly accepts
+the unsupported frozen-catalog risk may apply the temporary override, and only after the script
+confirms the exact Sol/Terra V2 plus Luna V1 mismatch in a cache produced by the runtime being used:
+
+```bash
+python3 scripts/configure_luna_v2.py --apply \
+  --acknowledge-unsupported-catalog-override \
+  --enable-fast-mode
+python3 scripts/configure_luna_v2.py --check --enable-fast-mode
+```
+
+The script derives the copy from the current cache, changes only Luna routing plus the required cache
+default, validates it with the newest available Codex executable, backs up config, and requires a full
+restart. Never distribute a frozen catalog, patch `models_cache.json` in place, or claim native Luna
+routing until a fresh process successfully selects the exact profile.
 
 ## Run the engineering loop
 
@@ -267,7 +278,7 @@ decision.
 ## Control usage and latency
 
 Every child performs independent model and tool work. Before each wave, record the number of
-children, exact model and effort, expected decision value, and cancellation condition.
+children, requested model and effort, effective route when exported, expected decision value, and cancellation condition.
 
 - Prefer the smallest model and lowest effort that can satisfy the acceptance contract.
 - Use Luna low only for clear, repeatable work; use Terra medium for ordinary engineering; reserve Sol high for hard judgment. Use Luna Max/Fast only as a measured, explicit latency optimization.
@@ -290,7 +301,9 @@ report is advisory and never authorizes automatic route, effort, Team-mode, or e
 ## Use tools deliberately
 
 - Prefer direct tool calls when each result changes the next engineering decision, approval is involved, or native artifacts and citations must be preserved.
-- Use programmatic tool orchestration only when the runtime exposes it and a bounded stage benefits from deterministic filtering, joining, deduplication, validation, or aggregation. Define allowed tools, output schema, concurrency, retry, and stop limits.
+- Use Responses Programmatic Tool Calling only when an API-backed bounded stage benefits from deterministic filtering, joining, deduplication, validation, or aggregation. Its generated JavaScript has no direct filesystem, network, subprocess, package, or persistent-state access, but it can invoke eligible mutation tools. Exclude `apply_patch` and shell tools from unapproved stages; use direct, approval-aware calls for authorized writes. Define allowed tools, output schema, concurrency, retry, and stop limits.
+- Use Responses Multi-agent beta only for independent hosted fan-out. Its current beta documentation does not establish heterogeneous child model/tool control or filesystem isolation, so never use it as proof of mixed Sol/Terra/Luna routing or as the sole production scheduler for a write workflow.
+- Use Agents SDK manager-style agents when an application needs typed handoffs, state, and tracing across broader specialists. Run Codex as MCP when coding is one specialist inside that application; do not rebuild normal Codex-native subagent coordination in an application wrapper.
 - Pair skills with MCP or connectors only for external systems actually required by the workflow.
 - Use Computer Use or browser tooling for user-facing QA when available and authorized; preserve screenshots or exact reproduction evidence.
 - Inspect smoke, release, migration, and integration scripts before running them. Never let a command silently default to production.

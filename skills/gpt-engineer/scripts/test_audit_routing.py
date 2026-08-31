@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 import unittest
@@ -24,6 +25,26 @@ class AuditRoutingTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temp.cleanup()
+
+    def fake_codex(self, name: str, version: str, features_ok: bool = True) -> Path:
+        executable = Path(self.temp.name) / name
+        feature_body = (
+            'print("multi_agent stable true")\nprint("fast_mode stable true")'
+            if features_ok
+            else 'print("invalid config", file=sys.stderr)\nraise SystemExit(1)'
+        )
+        executable.write_text(
+            "#!/usr/bin/env python3\n"
+            "import sys\n"
+            f"VERSION = {version!r}\n"
+            "if sys.argv[1:] == ['--version']:\n"
+            "    print(VERSION)\n"
+            "elif sys.argv[1:] == ['features', 'list']:\n"
+            + "\n".join(f"    {line}" for line in feature_body.splitlines())
+            + "\nelse:\n    raise SystemExit(2)\n"
+        )
+        executable.chmod(0o755)
+        return executable
 
     def test_valid_profiles_and_parent_pass(self) -> None:
         result = audit_routing.audit(self.root, self.home, "gpt-5.6-sol")
@@ -96,6 +117,46 @@ class AuditRoutingTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "failed")
         self.assertTrue(any("invalid observed route" in item for item in result["violations"]))
+
+    def test_runtime_selects_newest_valid_codex_and_reports_path_skew(self) -> None:
+        old = self.fake_codex("old-codex", "codex-cli 0.144.6", features_ok=False)
+        new = self.fake_codex("new-codex", "codex-cli 0.151.0")
+        result = audit_routing.audit_runtime(
+            self.home,
+            candidates=[("path", str(old)), ("chatgpt-app", str(new))],
+        )
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(result["selected"]["path"], str(new.resolve()))
+        self.assertTrue(any("PATH Codex" in item for item in result["warnings"]))
+        self.assertTrue(any("rejects the active config" in item for item in result["warnings"]))
+
+    def test_runtime_rejects_stale_managed_catalog(self) -> None:
+        current = self.fake_codex("current-codex", "codex-cli 0.151.0")
+        source = {
+            "client_version": "0.151.0",
+            "models": [
+                {"slug": "gpt-5.6-sol", "multi_agent_version": "v2"},
+                {"slug": "gpt-5.6-terra", "multi_agent_version": "v2"},
+                {"slug": "gpt-5.6-luna", "multi_agent_version": "v1"},
+            ],
+        }
+        target = json.loads(json.dumps(source))
+        target["client_version"] = "0.146.0"
+        target["models"][2]["multi_agent_version"] = "v2"
+        managed = self.home / audit_routing.MANAGED_CATALOG
+        managed.parent.mkdir(parents=True)
+        (self.home / "models_cache.json").write_text(json.dumps(source))
+        managed.write_text(json.dumps(target))
+        (self.home / "config.toml").write_text(
+            f'model_catalog_json = "{managed}"\n'
+        )
+        result = audit_routing.audit_runtime(
+            self.home,
+            candidates=[("path", str(current))],
+        )
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["catalog"]["status"], "stale")
+        self.assertTrue(any("stale" in item for item in result["violations"]))
 
 
 if __name__ == "__main__":
