@@ -26,6 +26,89 @@ class PlanFleetTests(unittest.TestCase):
         )
         self.assertEqual(plan.active_children, 3)
 
+    def test_qualified_team_read_wave_can_use_eight(self) -> None:
+        plan = plan_fleet.plan_fleet(
+            mode="team",
+            runtime_child_cap=8,
+            ready_reads=9,
+            ready_writers=0,
+            team_qualified=True,
+            routes_attested=True,
+            lanes_independent=True,
+            paired_comparison=True,
+        )
+        self.assertEqual((plan.active_children, plan.read_slots), (8, 8))
+        self.assertEqual(plan.deferred_reads, 1)
+
+    def test_team_mode_fails_closed_without_qualification(self) -> None:
+        with self.assertRaisesRegex(ValueError, "explicit qualification"):
+            plan_fleet.plan_fleet(
+                mode="team", runtime_child_cap=8, ready_reads=8, ready_writers=0
+            )
+
+    def test_team_mode_rejects_writers_and_small_shards(self) -> None:
+        with self.assertRaisesRegex(ValueError, "read-only"):
+            plan_fleet.plan_fleet(
+                mode="team",
+                runtime_child_cap=8,
+                ready_reads=7,
+                ready_writers=1,
+                team_qualified=True,
+                routes_attested=True,
+                lanes_independent=True,
+                paired_comparison=True,
+            )
+        with self.assertRaisesRegex(ValueError, "at least seven"):
+            plan_fleet.plan_fleet(
+                mode="team",
+                runtime_child_cap=8,
+                ready_reads=6,
+                ready_writers=0,
+                team_qualified=True,
+                routes_attested=True,
+                lanes_independent=True,
+                paired_comparison=True,
+            )
+
+    def test_team_mode_requires_each_admission_attestation(self) -> None:
+        base = {
+            "mode": "team",
+            "runtime_child_cap": 8,
+            "ready_reads": 8,
+            "ready_writers": 0,
+            "team_qualified": True,
+            "routes_attested": True,
+            "lanes_independent": True,
+            "paired_comparison": True,
+        }
+        for key, message in (
+            ("routes_attested", "route attestation"),
+            ("lanes_independent", "decision-bearing lanes"),
+            ("paired_comparison", "paired outcome comparison"),
+        ):
+            kwargs = {**base, key: False}
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(ValueError, message):
+                    plan_fleet.plan_fleet(**kwargs)
+
+    def test_team_mode_rejects_pressure_failures_and_insufficient_capacity(self) -> None:
+        base = {
+            "mode": "team",
+            "runtime_child_cap": 8,
+            "ready_reads": 8,
+            "ready_writers": 0,
+            "team_qualified": True,
+            "routes_attested": True,
+            "lanes_independent": True,
+            "paired_comparison": True,
+        }
+        with self.assertRaisesRegex(ValueError, "resource pressure"):
+            plan_fleet.plan_fleet(**base, resource_pressure=True)
+        with self.assertRaisesRegex(ValueError, "below 20%"):
+            plan_fleet.plan_fleet(**base, previous_failure_rate=0.20)
+        with self.assertRaisesRegex(ValueError, "live capacity"):
+            plan_fleet.plan_fleet(**{**base, "runtime_child_cap": 6})
+
     def test_shared_writer_is_serialized_with_two_readers(self) -> None:
         plan = plan_fleet.plan_fleet(
             mode="broad", runtime_child_cap=6, ready_reads=8, ready_writers=3

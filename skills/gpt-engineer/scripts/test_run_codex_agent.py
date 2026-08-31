@@ -45,12 +45,20 @@ handoff = {
     "stage_id": stage_id,
     "status": "completed",
     "summary": "delegate complete",
+    "requirement_ids": [],
+    "gate_results": [],
+    "docs_disposition": {
+        "status": "not_applicable",
+        "detail": "No documentation gate was assigned."
+    },
     "evidence": [],
     "changed_paths": [],
     "checks": [],
     "blockers": [],
     "next_action": "Return to the parent.",
 }
+if "INCOMPLETE_HANDOFF" in prompt:
+    handoff.pop("gate_results")
 output.write_text(json.dumps(handoff) + "\\n")
 cwd = pathlib.Path(args[args.index("--cd") + 1])
 if "WRITE_ALLOWED" in prompt:
@@ -73,6 +81,42 @@ print(json.dumps({"type": "turn.completed"}))
 
     def tearDown(self) -> None:
         self.temp.cleanup()
+
+    def test_handoff_schema_requires_engineering_evidence_fields(self) -> None:
+        schema = json.loads(run_codex_agent.HANDOFF_SCHEMA.read_text())
+        required = set(schema["required"])
+        self.assertTrue(
+            {"requirement_ids", "gate_results", "docs_disposition"}.issubset(required)
+        )
+        statuses = set(
+            schema["properties"]["gate_results"]["items"]["properties"]["status"][
+                "enum"
+            ]
+        )
+        self.assertIn("skipped", statuses)
+
+    def test_local_schema_validation_rejects_provider_omission(self) -> None:
+        with mock.patch("sys.stdin", io.StringIO("INCOMPLETE_HANDOFF")):
+            result = run_codex_agent.main(
+                [
+                    "--role",
+                    "terra-explorer",
+                    "--cwd",
+                    str(self.root),
+                    "--output-dir",
+                    str(self.output),
+                    "--codex",
+                    str(self.codex),
+                ]
+            )
+        self.assertEqual(result, 1)
+        envelope = json.loads((self.output / "result.json").read_text())
+        self.assertTrue(
+            any(
+                "missing required property 'gate_results'" in violation
+                for violation in envelope["violations"]
+            )
+        )
 
     def test_dry_run_pins_luna_and_read_only_sandbox(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Verify the repository.")):

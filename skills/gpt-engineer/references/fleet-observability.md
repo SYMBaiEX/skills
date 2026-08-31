@@ -91,6 +91,8 @@ or test strategy. Compare accepted outcome, evidence completeness, wall time, no
 output, retries, and command failures. A larger fleet is an improvement only when independent ready
 work exists and the final acceptance contract still passes.
 
-Use a Broad read ceiling of six as an experiment, not a permanent conclusion. Shrink immediately on
+Use a Broad read ceiling of six as the default experiment, not a permanent conclusion. A qualified
+Team read wave may compare seven or eight lanes against Broad, but it must measure accepted findings,
+wall time, failures, context, and rework and return to Broad without a clear gain. Shrink immediately on
 resource pressure, repeated transient failures, queueing, or low marginal findings. Keep shared
 writers at one and isolated writers at two until measurements prove a safer higher value.

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -88,6 +89,10 @@ def main() -> int:
                 "explicitly",
                 "scripts/plan_fleet.py",
                 "six for a broad read-heavy wave",
+                "--team-qualified",
+                "--routes-attested",
+                "--lanes-independent",
+                "--paired-comparison",
             ):
                 if required not in text.lower():
                     fail(f"GPT Engineer fast-path contract missing {required!r}: {path}")
@@ -123,6 +128,27 @@ def main() -> int:
     fleet_auditor = SKILLS / "gpt-engineer" / "scripts" / "audit_fleet.py"
     if not fleet_auditor.is_file():
         fail(f"GPT Engineer fleet auditor is missing: {fleet_auditor}")
+    engineering_standards = (
+        SKILLS / "gpt-engineer" / "references" / "engineering-standards.md"
+    )
+    if not engineering_standards.is_file():
+        fail(f"GPT Engineer standards reference is missing: {engineering_standards}")
+    handoff_schema = (
+        SKILLS / "gpt-engineer" / "assets" / "codex" / "handoff.schema.json"
+    )
+    schema = json.loads(handoff_schema.read_text())
+    required_handoff = {
+        "requirement_ids",
+        "gate_results",
+        "docs_disposition",
+    }
+    if not required_handoff.issubset(set(schema.get("required", []))):
+        fail(f"GPT Engineer handoff evidence fields are not required: {handoff_schema}")
+    gate_statuses = set(
+        schema["properties"]["gate_results"]["items"]["properties"]["status"]["enum"]
+    )
+    if "skipped" not in gate_statuses:
+        fail(f"GPT Engineer gate results cannot report skipped checks: {handoff_schema}")
     luna_max = SKILLS / "gpt-engineer" / "assets" / "codex" / "agents" / "luna-max-worker.toml"
     luna_max_text = luna_max.read_text()
     for required in ('model = "gpt-5.6-luna"', 'model_reasoning_effort = "max"', 'service_tier = "fast"'):

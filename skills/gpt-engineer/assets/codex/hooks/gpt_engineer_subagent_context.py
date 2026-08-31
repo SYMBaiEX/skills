@@ -10,7 +10,8 @@ def main() -> int:
         f"Before {agent_type} starts: read every applicable AGENTS.md file; capture git status; "
         "treat existing changes as user-owned; stay inside assigned paths; avoid external side effects; "
         "and return a bounded handoff with stage status, file:symbol evidence, changed files, "
-        "verification commands, blockers, and one next action."
+        "verification commands with pass/fail/skip/not-run truth, relevant requirement and gate IDs, "
+        "blockers, documentation disposition when assigned, and one next action."
     )
     json.dump(
         {

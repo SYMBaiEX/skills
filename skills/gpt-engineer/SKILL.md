@@ -4,7 +4,7 @@ description: "Own a software-engineering outcome end to end with a strictly mode
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.6.0"
+  version: "1.7.0"
 ---
 
 # GPT Engineer
@@ -16,6 +16,9 @@ Read [the dynamic workflow routing reference](references/dynamic-workflows.md) w
 adaptive fan-out, a repeatable DAG, resumable execution, or more than one provider.
 Read [the fleet observability reference](references/fleet-observability.md) before tuning a long run,
 interpreting Codex OTel or thread databases, or comparing latency, context, and route efficiency.
+Read [the engineering standards reference](references/engineering-standards.md) for Broad or Team
+work, release readiness, or changes that touch security, persisted data, external SDKs, production
+behavior, or user journeys. Load only the applicable gates into each child contract.
 
 ## Establish the engineering contract
 
@@ -24,6 +27,18 @@ interpreting Codex OTel or thread databases, or comparing latency, context, and 
 3. Treat every pre-existing change as user-owned. Never reset, checkout, stash, delete, reformat, or overwrite unrelated work.
 4. Separate local implementation authority from deployment, push, merge, production, messaging, purchasing, and credential authority.
 5. If the user requests a durable goal and native goal tooling exists, use it according to the runtime contract. Otherwise keep an equivalent goal ledger; never fake goal persistence.
+
+### Apply standards without replacing judgment
+
+Use three layers: repository instructions and CI as the local source of truth, a small universal
+definition of done, and conditional gates selected from the change's impact map. Repository rules
+may strengthen the baseline. They do not turn a skipped or mislabeled check into evidence.
+
+For broad or multi-agent work, give each acceptance criterion a stable requirement ID. Record which
+execution, data, API, trust, dependency, user, and operational boundaries can change. Select only
+the relevant quality gates, assign an owner and proof, and mark every requirement and gate as
+passed, failed, blocked, or not applicable with a reason. Children receive only their requirement
+and gate IDs; the lead owns the complete matrix.
 
 ## Make delegation real
 
@@ -34,6 +49,7 @@ Choose the smallest graph that can prove the outcome:
 - **Fast:** for a known isolated path, keep the work in the main thread, use one exact Luna worker for a clear mechanical change with deterministic checks, or use one Terra worker when ordinary engineering judgment is still required.
 - **Standard:** for at least two independent shards, use a small Terra research/build wave and one Luna verification pass.
 - **Broad:** for repository-scale uncertainty, use bounded parallel exploration, dependency-ordered writers, integration, and repository-wide acceptance.
+- **Team:** for an explicit engineering-team or whole-product audit with at least seven independent read-only lanes, permit an opt-in seven- or eight-child discovery or final-review wave after route, independence, and host-pressure qualification. Build waves still use Broad limits.
 
 Spawn subagents when the user explicitly requests a fleet or when at least two independent workstreams materially benefit from delegation. Use an explorer before broad implementation and an independent verifier after broad or multi-writer work. Do not add orchestration stages to a trivial or tightly coupled change.
 
@@ -90,6 +106,15 @@ Six is a ceiling, not a quota. Use it only when at least six bounded, independen
 the user explicitly requests a large fleet. Start fewer when evidence, host capacity, or task shape is
 uncertain.
 
+Team mode may use at most eight read-only children when at least seven independent, decision-bearing
+lanes are ready, every route is attested, no resource pressure is present, and a representative
+comparison is planned or already supports the expansion. Invoke `scripts/plan_fleet.py --mode team
+--team-qualified --routes-attested --lanes-independent --paired-comparison`; every admission flag is
+required and resource pressure, a high prior failure rate, writers, or insufficient live capacity
+cause the planner to fail closed. Eight is an experimental
+capacity ceiling, not the new default. Return to Broad when accepted findings per lane, latency,
+failure rate, or host pressure does not improve.
+
 Keep shared-checkout writing to one child. Permit at most two simultaneous writers only when their
 paths and candidate worktrees are disjoint; mix them with at most two read-only lanes, for a four-child
 write-wave ceiling. Default to one delegation level. Do not spawn a shard unless its result unblocks a
@@ -97,7 +122,7 @@ named downstream decision. Reuse an existing agent with a follow-up for the same
 of duplicating it, and interrupt stale work when a failed prerequisite invalidates the task.
 
 Spawn every ready member of a wave before waiting, then use one completion barrier. Do not turn a
-six-lane discovery problem into repeated one- or two-agent micro-waves. After results arrive, integrate
+broad discovery problem into repeated one- or two-agent micro-waves. After results arrive, integrate
 once, recompute the DAG, and dispatch only newly ready work.
 
 ### Choose the workflow surface dynamically
@@ -176,11 +201,11 @@ use the model-pinned runner or keep the stage with the proven parent route.
 Run one complete cycle, then repeat only for a confirmed residual gap:
 
 1. **Research:** Map architecture, execution paths, data boundaries, SDK usage, dependencies, user journeys, incomplete behavior, existing tests, and operational constraints. Verify unstable claims with primary sources.
-2. **Synthesize:** Maintain a finding ledger with stable ID, evidence, impact, confidence, affected paths, dependencies, owner, acceptance test, and final disposition.
+2. **Synthesize:** Maintain a finding ledger with stable ID, requirement IDs, applicable quality gates, evidence, impact, confidence, affected paths, dependencies, owner, acceptance test, documentation disposition, and final disposition.
 3. **Plan:** Order confirmed findings by dependency and blast radius. Assign one writer per file or tightly coupled subsystem.
 4. **Build:** Implement in non-overlapping waves. Inspect each diff immediately and run focused tests before dependent work starts.
 5. **Integrate:** Reconcile schemas, shared types, SDKs, generated files, lockfiles, runtime contracts, and user-facing behavior.
-6. **Verify:** Run diff hygiene, static analysis, type checks, tests, production build, and safe runtime or browser validation as applicable.
+6. **Verify:** Run the applicable repository and impact gates. Inspect what named scripts actually execute; record pass, fail, skip, and not-run counts. A zero exit code with a required skipped suite is not a pass. Include safe runtime, browser, migration, performance, security, or rollback evidence when the impact map requires it.
 7. **Gap scan:** Compare the integrated result with the objective, original findings, visible product paths, failure behavior, and incomplete-code markers. Start another cycle for every remaining confirmed gap.
 
 Do not stop after research when building is authorized. Do not stop after code changes when acceptance evidence is missing.
@@ -198,11 +223,12 @@ Give every subagent:
 - exact paths or subsystem ownership;
 - read-only or write authority;
 - applicable repository instructions and dirty-state constraints;
+- relevant requirement IDs and applicable quality-gate IDs;
 - expected commands and evidence;
 - prohibited files and external effects;
 - the downstream decision its result must unblock;
 - a stop condition and bounded output budget;
-- required return: stage ID, status, bounded summary, route evidence, `file:symbol` evidence, changed files, checks with passed/failed/not-run state, blockers, and one next action.
+- required return: stage ID, status, bounded summary, route evidence, applicable requirement and gate results, documentation disposition, `file:symbol` evidence, changed files, checks with passed/failed/skipped/not-run/not-applicable/blocked state, blockers, and one next action.
 
 Send a compact context packet, not the parent transcript: objective, constraints, owned paths,
 relevant finding IDs, the minimum evidence needed, and the downstream decision. Use
@@ -285,4 +311,8 @@ removing the candidate worktree. Verify no recorded child remains afterward. Nev
 binary name: classify a process by its recorded parent and cwd first, so shared MCP servers and other
 tasks remain untouched.
 
-Finish only when every acceptance criterion has evidence, repository-wide gates pass or have a concrete external-only limitation, the final diff preserves user work, and no safe required in-scope action remains. Report the outcome first, then finding dispositions, verification, model-routing reality, external-only checks, and residual risks.
+Finish only when every requirement and applicable quality gate has evidence or a concrete blocker,
+required skips are not misreported as passes, documentation has an explicit disposition,
+repository-wide gates pass or have a concrete external-only limitation, the final diff preserves
+user work, and no safe required in-scope action remains. Report the outcome first, then finding and
+gate dispositions, verification, model-routing reality, external-only checks, and residual risks.

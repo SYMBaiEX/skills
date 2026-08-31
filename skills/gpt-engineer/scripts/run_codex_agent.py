@@ -63,6 +63,70 @@ ROLES = {
 }
 
 
+def validate_json_schema(
+    value: object,
+    schema: dict[str, object],
+    path: str = "$",
+) -> list[str]:
+    """Validate the strict JSON Schema subset used by the handoff contract."""
+
+    errors: list[str] = []
+    expected_type = schema.get("type")
+    type_checks = {
+        "object": lambda item: isinstance(item, dict),
+        "array": lambda item: isinstance(item, list),
+        "string": lambda item: isinstance(item, str),
+        "integer": lambda item: isinstance(item, int) and not isinstance(item, bool),
+        "number": lambda item: isinstance(item, (int, float)) and not isinstance(item, bool),
+        "boolean": lambda item: isinstance(item, bool),
+        "null": lambda item: item is None,
+    }
+    if isinstance(expected_type, str):
+        check = type_checks.get(expected_type)
+        if check is None:
+            return [f"{path}: unsupported schema type {expected_type!r}"]
+        if not check(value):
+            return [f"{path}: expected {expected_type}"]
+
+    enum = schema.get("enum")
+    if isinstance(enum, list) and value not in enum:
+        errors.append(f"{path}: value {value!r} is not in the allowed enum")
+
+    if isinstance(value, str):
+        minimum = schema.get("minLength")
+        maximum = schema.get("maxLength")
+        if isinstance(minimum, int) and len(value) < minimum:
+            errors.append(f"{path}: string is shorter than {minimum}")
+        if isinstance(maximum, int) and len(value) > maximum:
+            errors.append(f"{path}: string is longer than {maximum}")
+
+    if isinstance(value, list):
+        maximum = schema.get("maxItems")
+        if isinstance(maximum, int) and len(value) > maximum:
+            errors.append(f"{path}: array has more than {maximum} items")
+        item_schema = schema.get("items")
+        if isinstance(item_schema, dict):
+            for index, item in enumerate(value):
+                errors.extend(validate_json_schema(item, item_schema, f"{path}[{index}]"))
+
+    if isinstance(value, dict):
+        properties = schema.get("properties")
+        known = properties if isinstance(properties, dict) else {}
+        required = schema.get("required")
+        if isinstance(required, list):
+            for key in required:
+                if isinstance(key, str) and key not in value:
+                    errors.append(f"{path}: missing required property {key!r}")
+        if schema.get("additionalProperties") is False:
+            for key in value:
+                if key not in known:
+                    errors.append(f"{path}: unexpected property {key!r}")
+        for key, child_schema in known.items():
+            if key in value and isinstance(child_schema, dict):
+                errors.extend(validate_json_schema(value[key], child_schema, f"{path}.{key}"))
+    return errors
+
+
 def role_instructions(role: str) -> str:
     path = SKILL_ROOT / "assets" / "codex" / "agents" / str(ROLES[role]["profile"])
     match = re.search(r'developer_instructions\s*=\s*"""(.*?)"""', path.read_text(), re.S)
@@ -627,8 +691,9 @@ def main(argv: list[str] | None = None) -> int:
             + prompt.strip()
             + "\n\nReturn only the JSON handoff required by the configured output schema. "
             + f"Set stage_id to {stage_id!r}. Keep the summary bounded, cite file:symbol or "
-            + "file:line evidence, distinguish passed/failed/not-run checks, and name one "
-            + "concrete next action.\n"
+            + "file:line evidence, echo assigned requirement IDs, report applicable gate results, "
+            + "include a documentation disposition, distinguish passed/failed/skipped/not-run/"
+            + "not-applicable/blocked checks, and name one concrete next action.\n"
             + "\n"
         )
         if len(delegated_prompt) > args.max_prompt_chars:
@@ -735,6 +800,11 @@ def main(argv: list[str] | None = None) -> int:
                 violations.append("delegate handoff is not a JSON object")
             else:
                 handoff = parsed_handoff
+                schema = json.loads(HANDOFF_SCHEMA.read_text())
+                violations.extend(
+                    f"delegate handoff schema violation: {item}"
+                    for item in validate_json_schema(handoff, schema)
+                )
                 if handoff.get("stage_id") != stage_id:
                     violations.append(
                         "delegate handoff stage_id does not match requested stage: "

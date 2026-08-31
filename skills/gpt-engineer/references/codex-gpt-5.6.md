@@ -14,7 +14,7 @@ GPT-5.6 supports `none`, `low`, `medium`, `high`, `xhigh`, and `max` in the API.
 
 Current Codex releases load user agents from `~/.codex/agents/*.toml` and project agents from `.codex/agents/*.toml`. Required fields are `name`, `description`, and `developer_instructions`; model, reasoning effort, sandbox, MCP servers, and skill config are optional overrides.
 
-`agents.max_concurrent_threads_per_session` caps spawned threads and excludes the primary thread. The live collaboration tool may instead report total active-agent capacity, so inspect the active contract rather than assuming a fixed number. Current official Codex examples show `max_concurrent_threads_per_session = 6` and a six-lane PR review, but they do not prescribe a universal optimum. GPT Engineer therefore uses one/three/six Fast, Standard, and Broad read ceilings, while keeping shared writers serialized and isolated write waves at two writers plus at most two readers. More agents and nesting increase tokens, latency, local resource use, and repeated fan-out risk.
+`agents.max_concurrent_threads_per_session` caps spawned threads and excludes the primary thread. The live collaboration tool may instead report total active-agent capacity, so inspect the active contract rather than assuming a fixed number. Current official Codex examples include six- and eight-thread project caps plus a six-lane PR review, but they do not prescribe a universal optimum. GPT Engineer therefore uses one/three/six Fast, Standard, and Broad read ceilings plus an explicitly qualified, read-only Team ceiling of eight. Shared writers remain serialized and isolated write waves remain capped at two writers plus at most two readers. More agents and nesting increase tokens, latency, local resource use, and repeated fan-out risk.
 
 Subagents are enabled in current Codex releases and can be requested directly or by applicable `AGENTS.md` or skill instructions. Each child performs independent model and tool work, so a fleet consumes more usage than a comparable single-agent run. ChatGPT Work can also run parallel hosted subagent workflows where available.
 
@@ -74,15 +74,15 @@ An optional default guard for model-less children is:
 ```toml
 [agents]
 enabled = true
-max_concurrent_threads_per_session = 6
+max_concurrent_threads_per_session = 8
 default_subagent_model = "gpt-5.6-terra"
 default_subagent_reasoning_effort = "medium"
 ```
 
 This is not a latest-only enforcement boundary: an explicitly selected custom profile can still
-override those defaults. The value `6` is a Broad read ceiling, not a requirement to fill every
-slot; lower it on constrained hosts. The bootstrap intentionally does not rewrite user or project
-config.
+override those defaults. A user may set the capacity ceiling to `8` while GPT Engineer keeps Broad
+at six and unlocks the last two slots only for a qualified Team read wave. Lower it on constrained
+hosts. The bootstrap intentionally does not rewrite user or project config.
 
 ## Claude Code agents
 
@@ -96,7 +96,7 @@ Codex loads hooks from `hooks.json` or inline config. Useful engineering events 
 
 The bundled setup uses:
 
-- `SubagentStart` to inject repository-safety and evidence requirements into the five bundled agent types.
+- `SubagentStart` to inject repository-safety and evidence requirements into the six bundled agent types.
 - `PreToolUse` to deny a small set of destructive Git commands and force pushes.
 
 Do not install a default `Stop` continuation hook. A generic auto-continue hook can create expensive loops and cannot decide whether new authority is required. Native goal state or the skill's explicit goal ledger is the safer persistence mechanism.

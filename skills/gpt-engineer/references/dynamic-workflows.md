@@ -58,26 +58,37 @@ write isolation, recent failures, and local resource pressure:
 | Fast | 1 | Known isolated task or one deterministic check |
 | Standard | 3 | Two or three independent reads, or one writer plus focused support |
 | Broad read | 6 | Four to six bounded exploration, triage, test, or summarization lanes |
+| Team read | 8, opt-in | Seven or eight qualified logical-specialist lanes for whole-product discovery or final review |
 | Write wave | 3 shared / 4 isolated | One shared-checkout writer, or two disjoint candidate writers, plus at most two readers |
 
-The Broad ceiling aligns with the current official Codex examples, which show both a six-point
-parallel review and a project configuration with six spawned threads. It is not an OpenAI claim
-that six is optimal for every task. Use all six only when six results can unblock named downstream
-decisions. Never manufacture shards to fill capacity.
+Current official Codex examples show a six-point parallel review, one project with a six-thread cap,
+and another with an eight-thread cap. They are examples, not an OpenAI claim that either number is
+optimal. Broad remains the default. Team is a read-only experiment that requires at least seven
+independent decision-bearing lanes, exact route attestation, no host pressure, and a paired outcome
+comparison. Never manufacture shards to fill capacity.
 
 Use the deterministic planner when topology is not obvious:
 
 ```bash
 python3 scripts/plan_fleet.py \
-  --mode broad \
-  --runtime-child-cap 6 \
+  --mode team \
+  --team-qualified \
+  --routes-attested \
+  --lanes-independent \
+  --paired-comparison \
+  --runtime-child-cap 8 \
   --ready-reads 8 \
   --ready-writers 0 \
   --json
 ```
 
+Team mode rejects writers and fails closed unless every admission flag is present; it also rejects
+resource pressure, high prior failure, and live capacity below seven. Plan every build wave in Broad
+mode. Qualification means the lead has applied the criteria in
+[`engineering-standards.md`](engineering-standards.md), not merely that eight slots are configured.
 Use `--writers-isolated` only when writers have disjoint path ownership and candidate worktrees.
-Use `--resource-pressure` or the previous wave's failure rate to shrink the plan. A configured
+Use `--resource-pressure` or the previous wave's failure rate to shrink Fast, Standard, or Broad;
+either condition disqualifies Team. A configured
 Codex child cap excludes the primary thread, but the primary still belongs in the usage and
 coordination budget.
 

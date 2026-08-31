@@ -6,6 +6,9 @@
     "stage_id",
     "status",
     "summary",
+    "requirement_ids",
+    "gate_results",
+    "docs_disposition",
     "evidence",
     "changed_paths",
     "checks",
@@ -26,6 +29,56 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 2400
+    },
+    "requirement_ids": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      }
+    },
+    "gate_results": {
+      "type": "array",
+      "maxItems": 24,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "detail"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "status": {
+            "type": "string",
+            "enum": ["passed", "failed", "skipped", "not_run", "not_applicable", "blocked"]
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      }
+    },
+    "docs_disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "detail"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["updated", "not_applicable", "blocked"]
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      }
     },
     "evidence": {
       "type": "array",
@@ -72,7 +125,7 @@
           },
           "status": {
             "type": "string",
-            "enum": ["passed", "failed", "not_run"]
+            "enum": ["passed", "failed", "skipped", "not_run", "not_applicable", "blocked"]
           },
           "detail": {
             "type": "string",

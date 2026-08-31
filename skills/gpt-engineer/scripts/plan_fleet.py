@@ -8,7 +8,7 @@ import json
 from dataclasses import asdict, dataclass
 
 
-MODE_CEILINGS = {"fast": 1, "standard": 3, "broad": 6}
+MODE_CEILINGS = {"fast": 1, "standard": 3, "broad": 6, "team": 8}
 
 
 @dataclass(frozen=True)
@@ -16,6 +16,10 @@ class FleetPlan:
     mode: str
     runtime_child_cap: int
     policy_ceiling: int
+    team_qualified: bool
+    routes_attested: bool
+    lanes_independent: bool
+    paired_comparison: bool
     read_slots: int
     writer_slots: int
     active_children: int
@@ -31,6 +35,10 @@ def plan_fleet(
     ready_reads: int,
     ready_writers: int,
     writers_isolated: bool = False,
+    team_qualified: bool = False,
+    routes_attested: bool = False,
+    lanes_independent: bool = False,
+    paired_comparison: bool = False,
     resource_pressure: bool = False,
     previous_failure_rate: float = 0.0,
 ) -> FleetPlan:
@@ -45,6 +53,27 @@ def plan_fleet(
             raise ValueError(f"{name} must be non-negative")
     if not 0.0 <= previous_failure_rate <= 1.0:
         raise ValueError("previous_failure_rate must be between 0 and 1")
+    if mode == "team":
+        if not team_qualified:
+            raise ValueError("team mode requires explicit qualification")
+        if not routes_attested:
+            raise ValueError("team mode requires exact route attestation")
+        if not lanes_independent:
+            raise ValueError("team mode requires independent decision-bearing lanes")
+        if not paired_comparison:
+            raise ValueError("team mode requires a paired outcome comparison")
+        if ready_writers:
+            raise ValueError("team mode is read-only; plan writers in a broad wave")
+        if ready_reads < 7:
+            raise ValueError("team mode requires at least seven independent ready reads")
+        if runtime_child_cap < 7:
+            raise ValueError("team mode requires live capacity for at least seven children")
+        if resource_pressure:
+            raise ValueError("team mode is unavailable under resource pressure; use broad mode")
+        if previous_failure_rate >= 0.20:
+            raise ValueError(
+                "team mode requires a previous failure rate below 20%; use broad mode"
+            )
 
     reasons: list[str] = []
     policy_ceiling = min(runtime_child_cap, MODE_CEILINGS[mode])
@@ -77,11 +106,17 @@ def plan_fleet(
         reasons.append("no ready work or no live child capacity")
     if mode == "broad" and not ready_writers and active_children == 6:
         reasons.append("six independent read lanes fill the Broad ceiling")
+    if mode == "team" and active_children >= 7:
+        reasons.append("qualified read-only lanes use the experimental Team ceiling")
 
     return FleetPlan(
         mode=mode,
         runtime_child_cap=runtime_child_cap,
         policy_ceiling=policy_ceiling,
+        team_qualified=team_qualified,
+        routes_attested=routes_attested,
+        lanes_independent=lanes_independent,
+        paired_comparison=paired_comparison,
         read_slots=read_slots,
         writer_slots=writer_slots,
         active_children=active_children,
@@ -98,6 +133,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ready-reads", type=int, default=0)
     parser.add_argument("--ready-writers", type=int, default=0)
     parser.add_argument("--writers-isolated", action="store_true")
+    parser.add_argument("--team-qualified", action="store_true")
+    parser.add_argument("--routes-attested", action="store_true")
+    parser.add_argument("--lanes-independent", action="store_true")
+    parser.add_argument("--paired-comparison", action="store_true")
     parser.add_argument("--resource-pressure", action="store_true")
     parser.add_argument("--previous-failure-rate", type=float, default=0.0)
     parser.add_argument("--json", action="store_true")
@@ -109,6 +148,10 @@ def main(argv: list[str] | None = None) -> int:
             ready_reads=args.ready_reads,
             ready_writers=args.ready_writers,
             writers_isolated=args.writers_isolated,
+            team_qualified=args.team_qualified,
+            routes_attested=args.routes_attested,
+            lanes_independent=args.lanes_independent,
+            paired_comparison=args.paired_comparison,
             resource_pressure=args.resource_pressure,
             previous_failure_rate=args.previous_failure_rate,
         )
