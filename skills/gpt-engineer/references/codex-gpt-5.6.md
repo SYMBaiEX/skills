@@ -14,11 +14,11 @@ GPT-5.6 supports `none`, `low`, `medium`, `high`, `xhigh`, and `max` in the API.
 
 Current Codex releases load user agents from `~/.codex/agents/*.toml` and project agents from `.codex/agents/*.toml`. Required fields are `name`, `description`, and `developer_instructions`; model, reasoning effort, sandbox, MCP servers, and skill config are optional overrides.
 
-`agents.max_concurrent_threads_per_session` caps spawned threads and excludes the primary thread. The live collaboration tool may instead report total active-agent capacity, so inspect the active contract rather than assuming a fixed number. Default GPT Engineer waves to at most three active children and depth one. More agents and nesting increase tokens, latency, local resource use, and repeated fan-out risk.
+`agents.max_concurrent_threads_per_session` caps spawned threads and excludes the primary thread. The live collaboration tool may instead report total active-agent capacity, so inspect the active contract rather than assuming a fixed number. Current official Codex examples show `max_concurrent_threads_per_session = 6` and a six-lane PR review, but they do not prescribe a universal optimum. GPT Engineer therefore uses one/three/six Fast, Standard, and Broad read ceilings, while keeping shared writers serialized and isolated write waves at two writers plus at most two readers. More agents and nesting increase tokens, latency, local resource use, and repeated fan-out risk.
 
 Subagents are enabled in current Codex releases and can be requested directly or by applicable `AGENTS.md` or skill instructions. Each child performs independent model and tool work, so a fleet consumes more usage than a comparable single-agent run. ChatGPT Work can also run parallel hosted subagent workflows where available.
 
-Agent files are configuration, not proof of selection. Record the effective profile source, `name`, exact model, effort, and file hash. A project-scoped profile with the same `name` can shadow a user profile. When a custom file specifies model or effort, that value wins; otherwise Codex resolves explicit spawn value, the corresponding `[agents]` default, then the parent value. If a spawn changes only the model, that model's default effort applies.
+Agent files are configuration, not proof of selection. Record the effective profile source, `name`, exact model, effort, and file hash. A project-scoped profile with the same `name` can shadow a user profile. When a custom file specifies model or effort, that value wins; otherwise Codex resolves explicit spawn value, the corresponding `[agents]` default, then the parent value. If a spawn changes only the model, that model's default effort applies. Immediately inspect the spawned agent metadata when the client exposes it; interrupt a generic, unknown, or disallowed route rather than discovering leakage after a long run.
 
 Inspect the current spawn tool for an agent-type or model selector. When that selector is unavailable, use the bundled `run_codex_agent.py` wrapper to pin `codex exec --model`. In latest-only mode, never use a generic or inherited child as a fallback. Use `scripts/audit_routing.py` to fail closed on missing or conflicting Sol, Terra, or Luna profiles.
 
@@ -64,7 +64,7 @@ When the stock Luna entry becomes V2, run `python3 scripts/configure_luna_v2.py 
 and return to the upstream catalog.
 
 Primary references: [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents),
-[Codex configuration](https://developers.openai.com/codex/config-reference),
+[Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference),
 [Luna V1/V2 mismatch report](https://github.com/openai/codex/issues/34301),
 [custom catalog startup caching](https://github.com/openai/codex/issues/35129), and
 [Multi-Agent V2 routing limitations](https://github.com/openai/codex/issues/32705).
@@ -74,13 +74,15 @@ An optional default guard for model-less children is:
 ```toml
 [agents]
 enabled = true
-max_concurrent_threads_per_session = 3
+max_concurrent_threads_per_session = 6
 default_subagent_model = "gpt-5.6-terra"
 default_subagent_reasoning_effort = "medium"
 ```
 
 This is not a latest-only enforcement boundary: an explicitly selected custom profile can still
-override those defaults. The bootstrap intentionally does not rewrite user or project config.
+override those defaults. The value `6` is a Broad read ceiling, not a requirement to fill every
+slot; lower it on constrained hosts. The bootstrap intentionally does not rewrite user or project
+config.
 
 ## Claude Code agents
 
@@ -99,22 +101,44 @@ The bundled setup uses:
 
 Do not install a default `Stop` continuation hook. A generic auto-continue hook can create expensive loops and cannot decide whether new authority is required. Native goal state or the skill's explicit goal ledger is the safer persistence mechanism.
 
-Current Codex command hooks are the enforceable hook path; prompt and agent hook handlers may be parsed but skipped. `PreToolUse` interception is incomplete and is not a complete enforcement boundary. Hooks supplement sandboxing, permissions, repository instructions, review, and human authority; they do not replace them.
+`SubagentStart` can add developer context, but official Codex documentation states that
+`continue: false` does not stop the child from starting. It cannot enforce latest-only routing.
+`SubagentStop` can request a focused continuation and exposes the child transcript path, but the
+transcript format is not stable; do not install a generic auto-continue loop. `PreCompact` and
+`PostCompact` can observe compaction, but should not dump prior history back into the prompt.
+
+Command hooks can deny supported intercepted calls, but `PreToolUse` coverage is incomplete and is
+not a complete enforcement boundary. Hooks supplement sandboxing, permissions, repository
+instructions, runtime route attestation, review, and human authority; they do not replace them.
 
 Live parent sandbox and approval overrides, including interactive permission changes and `--yolo`,
 are reapplied when Codex spawns a child. They can override a custom agent's sandbox default. Record
 effective permissions before delegation; use the explicit runner or the parent when a native
 read-only lane cannot remain read-only.
 
+## Prompt and context efficiency
+
+GPT-5.6 guidance recommends lean prompts: state each rule once, expose only relevant tools, and
+measure context as a session grows. Keep stable outcome, authority, and acceptance criteria with the
+lead; send children only a compact delta packet. Put raw logs and matrices in evidence artifacts,
+not handoff prose. Use persisted reasoning across turns only while goals and assumptions remain
+stable; start a fresh stage or use current-turn context when earlier reasoning is irrelevant.
+
+Programmatic Tool Calling belongs to the Responses API, not the local Codex subagent contract. Use
+it only in an API-backed bounded stage for deterministic filtering, joining, deduplication,
+aggregation, or validation. Define eligible tools, output schema, concurrency, retry, and stop
+limits. Keep direct calls when each result changes engineering judgment, approval is involved, or
+citations and native artifacts must survive.
+
 ## Official sources
 
-- GPT-5.6 model guidance: https://developers.openai.com/api/docs/guides/model-guidance?model=gpt-5.6
-- GPT-5.6 prompt guidance: https://developers.openai.com/api/docs/guides/prompt-guidance-gpt-5p6
+- GPT-5.6 model and prompt guidance: https://developers.openai.com/api/docs/guides/latest-model
 - Sol model: https://developers.openai.com/api/docs/models/gpt-5.6-sol
 - Terra model: https://developers.openai.com/api/docs/models/gpt-5.6-terra
 - Luna model: https://developers.openai.com/api/docs/models/gpt-5.6-luna
 - Codex subagents: https://learn.chatgpt.com/docs/agent-configuration/subagents
 - Codex hooks: https://learn.chatgpt.com/docs/hooks
+- Codex configuration reference: https://learn.chatgpt.com/docs/config-file/config-reference
 - Codex customization: https://learn.chatgpt.com/docs/customization/overview
 - Claude Code subagents: https://code.claude.com/docs/en/sub-agents
 - Claude Code model configuration: https://code.claude.com/docs/en/model-config

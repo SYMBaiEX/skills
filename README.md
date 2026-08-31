@@ -11,8 +11,9 @@ servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and ap
 ## Skills
 
 - [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: strict
-  GPT-5.6 Sol/Terra/Luna research, implementation, integration, verification, bounded goal
-  persistence, and task-owned resource teardown.
+  GPT-5.6 Sol/Terra/Luna research, adaptive one/three/six-lane read fleets, isolated implementation,
+  integration, verification, OTel-informed tuning, bounded goal persistence, and task-owned resource
+  teardown.
 - [`skills/gpt-engineer-mem/`](skills/gpt-engineer-mem/) — the memory-aware GPT engineer: bounded
   Claude Mem/Codex recall, live freshness checks, GPT-5.6 Sol/Terra/Luna delivery, and read-only
   memory-service diagnostics.

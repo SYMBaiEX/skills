@@ -52,7 +52,12 @@ def profile_candidates(cwd: Path, codex_home: Path) -> list[tuple[str, Path]]:
     return candidates
 
 
-def audit(cwd: Path, codex_home: Path, parent_model: str | None) -> dict[str, object]:
+def audit(
+    cwd: Path,
+    codex_home: Path,
+    parent_model: str | None,
+    observed_routes: list[str] | None = None,
+) -> dict[str, object]:
     violations: list[str] = []
     if parent_model and parent_model not in ALLOWED_PARENT_MODELS:
         violations.append(f"parent model is outside latest-only routing: {parent_model}")
@@ -89,6 +94,39 @@ def audit(cwd: Path, codex_home: Path, parent_model: str | None) -> dict[str, ob
         if not matches:
             violations.append(f"missing installed custom agent profile: {name}")
 
+    observed: list[dict[str, object]] = []
+    for declaration in observed_routes or []:
+        if "=" not in declaration:
+            violations.append(
+                f"invalid observed route {declaration!r}; expected agent_type=model[:effort]"
+            )
+            continue
+        name, route = (part.strip() for part in declaration.split("=", 1))
+        model, separator, effort = route.partition(":")
+        expected = EXPECTED.get(name)
+        valid = expected is not None and model == expected[0] and (
+            not separator or effort == expected[1]
+        )
+        observed.append(
+            {
+                "agentType": name,
+                "model": model,
+                "reasoningEffort": effort if separator else None,
+                "valid": valid,
+            }
+        )
+        if expected is None:
+            violations.append(f"observed unsupported agent type in latest-only mode: {name}")
+        elif model != expected[0]:
+            violations.append(
+                f"observed route for {name} used {model or '(missing)'}; expected {expected[0]}"
+            )
+        elif separator and effort != expected[1]:
+            violations.append(
+                f"observed route for {name} used effort {effort or '(missing)'}; "
+                f"expected {expected[1]}"
+            )
+
     return {
         "status": "passed" if not violations else "failed",
         "cwd": str(cwd),
@@ -96,6 +134,7 @@ def audit(cwd: Path, codex_home: Path, parent_model: str | None) -> dict[str, ob
         "parentModel": parent_model,
         "allowedParentModels": sorted(ALLOWED_PARENT_MODELS),
         "profiles": found,
+        "observedRoutes": observed,
         "violations": violations,
     }
 
@@ -105,6 +144,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cwd", default=".", help="Trusted repository root")
     parser.add_argument("--codex-home", help="Override CODEX_HOME")
     parser.add_argument("--parent-model", help="Observed parent model, when the runtime exposes it")
+    parser.add_argument(
+        "--observed-route",
+        action="append",
+        default=[],
+        metavar="AGENT_TYPE=MODEL[:EFFORT]",
+        help="Validate effective child metadata exported by the runtime; repeat for each child",
+    )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
     args = parser.parse_args(argv)
 
@@ -112,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     codex_home = Path(
         args.codex_home or os.environ.get("CODEX_HOME", "~/.codex")
     ).expanduser().resolve()
-    result = audit(cwd, codex_home, args.parent_model)
+    result = audit(cwd, codex_home, args.parent_model, args.observed_route)
     if args.json:
         print(json.dumps(result, indent=2))
     elif result["status"] == "passed":

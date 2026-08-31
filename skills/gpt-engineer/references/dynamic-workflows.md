@@ -40,7 +40,7 @@ Treat the first plan as provisional. After each barrier:
 1. validate returned evidence and reject unsupported findings;
 2. add, remove, split, or reorder downstream nodes based on the new facts;
 3. reject missing dependencies, cycles, and overlapping writer scopes;
-4. run ready read-only nodes concurrently within the live capacity;
+4. dispatch every independent ready read-only node in one wave within the adaptive limit;
 5. serialize candidate writers and stop at a main-agent integration gate;
 6. invalidate verification whenever the integrated files change;
 7. start another bounded gap-closing cycle only for confirmed residual work.
@@ -48,10 +48,54 @@ Treat the first plan as provisional. After each barrier:
 Dynamic does not mean unbounded. Persist the resolved graph, attempts, and completion barriers so a
 restart cannot reinterpret a partial run as complete.
 
-Default to no more than three active children and one delegation level. A configured Codex child
-cap excludes the primary thread, but the primary still belongs in the usage and coordination
-budget. Do not use a full-history fork when a smaller context packet is sufficient. Reuse a
-completed agent for a related follow-up instead of spawning a duplicate lane.
+## Size waves adaptively
+
+Treat configured and runtime capacity as ceilings. Compute a wave from independent ready work,
+write isolation, recent failures, and local resource pressure:
+
+| Mode | Normal child ceiling | Shape |
+| --- | ---: | --- |
+| Fast | 1 | Known isolated task or one deterministic check |
+| Standard | 3 | Two or three independent reads, or one writer plus focused support |
+| Broad read | 6 | Four to six bounded exploration, triage, test, or summarization lanes |
+| Write wave | 3 shared / 4 isolated | One shared-checkout writer, or two disjoint candidate writers, plus at most two readers |
+
+The Broad ceiling aligns with the current official Codex examples, which show both a six-point
+parallel review and a project configuration with six spawned threads. It is not an OpenAI claim
+that six is optimal for every task. Use all six only when six results can unblock named downstream
+decisions. Never manufacture shards to fill capacity.
+
+Use the deterministic planner when topology is not obvious:
+
+```bash
+python3 scripts/plan_fleet.py \
+  --mode broad \
+  --runtime-child-cap 6 \
+  --ready-reads 8 \
+  --ready-writers 0 \
+  --json
+```
+
+Use `--writers-isolated` only when writers have disjoint path ownership and candidate worktrees.
+Use `--resource-pressure` or the previous wave's failure rate to shrink the plan. A configured
+Codex child cap excludes the primary thread, but the primary still belongs in the usage and
+coordination budget.
+
+Dispatch the complete wave before waiting. Join at one barrier, validate the compact handoffs,
+integrate once, then recompute the ready set. Repeated micro-waves add parent turns and replay context
+without increasing useful concurrency. Reuse a completed agent for a related follow-up instead of
+spawning a duplicate lane, and do not use a full-history fork when a compact delta packet is enough.
+
+## Control long-running gates
+
+Give each long test, build, migration, or browser suite one owner and one live process handle. A
+client wait timeout is not a test failure. Inspect the existing process and last output before any
+retry; retry a classified transient transport or runner failure at most once. CPU- or I/O-bound
+commands do not become faster merely because more agents wait on duplicates.
+
+Run focused checks with the owning writer. Save broad independent review and repository-wide gates
+for the post-integration verification wave. A later source change invalidates only affected focused
+checks plus the final broad gate, not the entire discovery phase.
 
 ## Provider-specific completion
 
@@ -62,6 +106,10 @@ completed agent for a related follow-up instead of spawning a duplicate lane.
   triggering. Preserve `runId`, `scriptPath`, and `transcriptDir`. Resume only in the same session.
 - **All providers:** natural-language confidence is never a completion barrier. Required nodes,
   integration, and post-change checks need machine-readable success and direct evidence.
+
+At every barrier persist the stage attempts, route, start/end time, retries, active and ready counts,
+command failures, compactions, and token fields the runtime exposes. See
+[`fleet-observability.md`](fleet-observability.md) before comparing runs or changing a default.
 
 For Claude-specific script and permission semantics, read the installed
 `claude-multi-agent/references/WORKFLOWS.md` and the official

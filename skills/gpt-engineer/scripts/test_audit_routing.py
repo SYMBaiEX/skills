@@ -62,6 +62,41 @@ class AuditRoutingTests(unittest.TestCase):
             result["violations"],
         )
 
+    def test_matching_observed_route_passes(self) -> None:
+        result = audit_routing.audit(
+            self.root,
+            self.home,
+            "gpt-5.6-sol",
+            ["terra_explorer=gpt-5.6-terra:medium"],
+        )
+        self.assertEqual(result["status"], "passed")
+        self.assertTrue(result["observedRoutes"][0]["valid"])
+
+    def test_generic_or_old_observed_route_fails(self) -> None:
+        result = audit_routing.audit(
+            self.root,
+            self.home,
+            "gpt-5.6-sol",
+            [
+                "security-auditor=gpt-5.4:high",
+                "terra_worker=gpt-5.4:high",
+            ],
+        )
+        self.assertEqual(result["status"], "failed")
+        self.assertTrue(
+            any("unsupported agent type" in item for item in result["violations"])
+        )
+        self.assertTrue(
+            any("expected gpt-5.6-terra" in item for item in result["violations"])
+        )
+
+    def test_malformed_observed_route_fails(self) -> None:
+        result = audit_routing.audit(
+            self.root, self.home, "gpt-5.6-sol", ["terra_explorer"]
+        )
+        self.assertEqual(result["status"], "failed")
+        self.assertTrue(any("invalid observed route" in item for item in result["violations"]))
+
 
 if __name__ == "__main__":
     unittest.main()

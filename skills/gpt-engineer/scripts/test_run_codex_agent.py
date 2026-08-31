@@ -27,6 +27,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
 
 args = sys.argv[1:]
 if args == ["--version"]:
@@ -36,6 +37,8 @@ output = pathlib.Path(args[args.index("--output-last-message") + 1])
 output.parent.mkdir(parents=True, exist_ok=True)
 (output.parent / "args.json").write_text(json.dumps(args))
 prompt = sys.stdin.read()
+if "HANG" in prompt:
+    time.sleep(5)
 stage_match = re.search(r"Set stage_id to '([^']+)'", prompt)
 stage_id = stage_match.group(1) if stage_match else "unknown"
 handoff = {
@@ -61,6 +64,8 @@ if "WRITE_IGNORED" in prompt:
 if "COMMIT_CHANGE" in prompt:
     subprocess.run(["git", "add", "-A"], cwd=cwd, check=True)
     subprocess.run(["git", "-c", "user.name=Delegate", "-c", "user.email=delegate@example.com", "commit", "-qm", "delegate commit"], cwd=cwd, check=True)
+if "SPAM_STDOUT" in prompt:
+    print("x" * 4096)
 print(json.dumps({"type": "turn.completed"}))
 """
         )
@@ -193,6 +198,13 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertEqual(result_json["handoff"]["stage_id"], "terra-explorer")
         self.assertEqual(result_json["requestedReasoningEffort"], "medium")
         self.assertTrue(result_json["routeEvidence"]["ignoredUserConfig"])
+        self.assertEqual(result_json["lifecycle"]["attempt"], 1)
+        self.assertEqual(result_json["lifecycle"]["terminalState"], "completed")
+        self.assertTrue(result_json["lifecycle"]["cleanupVerified"])
+        self.assertTrue(result_json["lifecycle"]["completionEventObserved"])
+        self.assertGreaterEqual(result_json["lifecycle"]["durationMs"], 0)
+        self.assertRegex(result_json["lifecycle"]["startedAtUtc"], r"Z$")
+        self.assertRegex(result_json["lifecycle"]["finishedAtUtc"], r"Z$")
 
     def test_writer_accepts_only_explicit_path_scope(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("WRITE_ALLOWED")):
@@ -333,6 +345,71 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertEqual(envelope["status"], "failed")
         self.assertIsNone(envelope["exitCode"])
         self.assertIn("Failed to launch Codex delegate", envelope["launchError"])
+        self.assertEqual(envelope["lifecycle"]["terminalState"], "launch_failed")
+        self.assertTrue(envelope["lifecycle"]["cleanupVerified"])
+
+    def test_timeout_reaps_process_group_and_records_lifecycle(self) -> None:
+        with mock.patch("sys.stdin", io.StringIO("HANG")):
+            result = run_codex_agent.main(
+                [
+                    "--role",
+                    "terra-explorer",
+                    "--cwd",
+                    str(self.root),
+                    "--output-dir",
+                    str(self.output),
+                    "--codex",
+                    str(self.codex),
+                    "--timeout",
+                    "0",
+                ]
+            )
+        self.assertEqual(result, 124)
+        envelope = json.loads((self.output / "result.json").read_text())
+        self.assertEqual(envelope["lifecycle"]["terminalState"], "timed_out")
+        self.assertTrue(envelope["lifecycle"]["timedOut"])
+        self.assertTrue(envelope["lifecycle"]["cleanupVerified"])
+        self.assertFalse(envelope["lifecycle"]["completionEventObserved"])
+
+    def test_rejects_oversized_prompt_before_launch(self) -> None:
+        with mock.patch("sys.stdin", io.StringIO("01234567890")):
+            with self.assertRaisesRegex(SystemExit, "limit is 10"):
+                run_codex_agent.main(
+                    [
+                        "--role",
+                        "terra-explorer",
+                        "--cwd",
+                        str(self.root),
+                        "--output-dir",
+                        str(self.output),
+                        "--codex",
+                        str(self.codex),
+                        "--max-prompt-chars",
+                        "10",
+                    ]
+                )
+
+    def test_fails_closed_when_event_capture_is_truncated(self) -> None:
+        with mock.patch("sys.stdin", io.StringIO("SPAM_STDOUT")):
+            result = run_codex_agent.main(
+                [
+                    "--role",
+                    "terra-explorer",
+                    "--cwd",
+                    str(self.root),
+                    "--output-dir",
+                    str(self.output),
+                    "--codex",
+                    str(self.codex),
+                    "--max-events-bytes",
+                    "128",
+                ]
+            )
+        self.assertEqual(result, 1)
+        envelope = json.loads((self.output / "result.json").read_text())
+        self.assertTrue(envelope["lifecycle"]["eventsTruncated"])
+        self.assertGreater(envelope["lifecycle"]["eventsBytes"], 128)
+        self.assertTrue(any("events exceeded" in item for item in envelope["violations"]))
 
 
 if __name__ == "__main__":

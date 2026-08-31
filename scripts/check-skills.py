@@ -82,7 +82,13 @@ def main() -> int:
                 if forbidden in lowered:
                     fail(f"fail-open routing phrase remains {forbidden!r}: {path}")
         if name == "gpt-engineer":
-            for required in ("**fast:**", "delta-only", "explicitly"):
+            for required in (
+                "**fast:**",
+                "delta-only",
+                "explicitly",
+                "scripts/plan_fleet.py",
+                "six for a broad read-heavy wave",
+            ):
                 if required not in text.lower():
                     fail(f"GPT Engineer fast-path contract missing {required!r}: {path}")
         if name == "gpt-engineer-spark":
@@ -111,6 +117,12 @@ def main() -> int:
     codex_runner = SKILLS / "gpt-engineer" / "scripts" / "run_codex_agent.py"
     if '"model": "gpt-5.6-sol"' not in codex_runner.read_text():
         fail(f"Codex fallback is not explicitly pinned to gpt-5.6-sol: {codex_runner}")
+    fleet_planner = SKILLS / "gpt-engineer" / "scripts" / "plan_fleet.py"
+    if not fleet_planner.is_file():
+        fail(f"GPT Engineer adaptive fleet planner is missing: {fleet_planner}")
+    fleet_auditor = SKILLS / "gpt-engineer" / "scripts" / "audit_fleet.py"
+    if not fleet_auditor.is_file():
+        fail(f"GPT Engineer fleet auditor is missing: {fleet_auditor}")
     luna_max = SKILLS / "gpt-engineer" / "assets" / "codex" / "agents" / "luna-max-worker.toml"
     luna_max_text = luna_max.read_text()
     for required in ('model = "gpt-5.6-luna"', 'model_reasoning_effort = "max"', 'service_tier = "fast"'):

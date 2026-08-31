@@ -4,7 +4,7 @@ description: "Own a software-engineering outcome end to end with a strictly mode
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.5.0"
+  version: "1.6.0"
 ---
 
 # GPT Engineer
@@ -14,6 +14,8 @@ Act as the accountable lead engineer. Deliver verified software, not merely rese
 Read [the Codex and GPT-5.6 routing reference](references/codex-gpt-5.6.md) when model selection, Codex setup, hooks, or subagent topology affects the task.
 Read [the dynamic workflow routing reference](references/dynamic-workflows.md) when the task needs
 adaptive fan-out, a repeatable DAG, resumable execution, or more than one provider.
+Read [the fleet observability reference](references/fleet-observability.md) before tuning a long run,
+interpreting Codex OTel or thread databases, or comparing latency, context, and route efficiency.
 
 ## Establish the engineering contract
 
@@ -39,7 +41,7 @@ Run this routing preflight:
 
 1. Confirm that the intended profiles are installed in a directory the selected agent actually loads. Run `python3 scripts/audit_routing.py --cwd <repo> --parent-model <observed-parent-model> --json` when the parent model is observable; omit the last option only when it is not. If native Sol/Terra parents reject Luna, inspect the catalog mismatch and use the temporary Luna V2 compatibility procedure below only when its exact preconditions pass.
 2. Record every candidate profile's source, `name`, exact model, reasoning effort, and hash. A project profile with the same `name` can shadow a valid user profile; any conflicting candidate fails latest-only preflight.
-3. Inspect the active spawn schema for an `agent_type`, `model`, or equivalent selector. Profile files alone do not prove that a child used their model. In Codex, a custom file's model or effort wins when present; otherwise precedence is explicit spawn value, `[agents]` default, then parent value.
+3. Inspect the active spawn schema for an `agent_type`, `model`, or equivalent selector. Profile files alone do not prove that a child used their model. In Codex, a custom file's model or effort wins when present; otherwise precedence is explicit spawn value, `[agents]` default, then parent value. Select one of the six allowed agent types explicitly; methodology skills do not authorize their generic agent roles.
 4. Record the effective sandbox and approval behavior. Interactive parent overrides are reapplied to children and can override a custom agent's sandbox default. If a read-only lane cannot remain read-only, use the runner or keep it in the parent.
 5. Prefer native subagents when the runtime can select the exact profile. Use `fork_turns="none"` or the smallest useful positive fork for model-overridden children. Use a full-history fork only when inherited model and effort are acceptable and the complete history is necessary.
 6. When exact Codex routing is unavailable natively, use `scripts/run_codex_agent.py` for explicit model-pinned delegates. Run no more than two read-only delegates concurrently, never overlap a writer with another delegate in the same repository, and inspect every result envelope and structured handoff.
@@ -80,7 +82,23 @@ For an explicitly authorized Claude Code workflow, route to `gpt-engineer-lead` 
 
 Use the live child-thread capacity rather than assuming a fixed number. Codex's `agents.max_concurrent_threads_per_session` excludes the primary thread; a surfaced runtime capacity may describe total active agents instead, so follow the active tool's contract. Keep the primary in the cost and coordination budget even when it does not consume the configured child cap.
 
-Default to at most three active children and one level of delegation. Use fewer when the tasks are not independent. Do not spawn a shard unless its result can unblock a named downstream decision. Reuse an existing agent with a follow-up for the same lane, steer it instead of duplicating it, and interrupt stale work when a failed prerequisite invalidates the task. Prefer independent parallel reads over recursive fan-out or concurrent shared-state writes.
+Size each wave from ready-node independence, write isolation, live capacity, and recent failure or
+resource pressure. Use `scripts/plan_fleet.py` with the mode, live child cap, and ready read/write
+counts when the choice is not obvious.
+The normal ceilings are one child for Fast, three for Standard, and six for a Broad read-heavy wave.
+Six is a ceiling, not a quota. Use it only when at least six bounded, independent lanes are ready or
+the user explicitly requests a large fleet. Start fewer when evidence, host capacity, or task shape is
+uncertain.
+
+Keep shared-checkout writing to one child. Permit at most two simultaneous writers only when their
+paths and candidate worktrees are disjoint; mix them with at most two read-only lanes, for a four-child
+write-wave ceiling. Default to one delegation level. Do not spawn a shard unless its result unblocks a
+named downstream decision. Reuse an existing agent with a follow-up for the same lane, steer it instead
+of duplicating it, and interrupt stale work when a failed prerequisite invalidates the task.
+
+Spawn every ready member of a wave before waiting, then use one completion barrier. Do not turn a
+six-lane discovery problem into repeated one- or two-agent micro-waves. After results arrive, integrate
+once, recompute the DAG, and dispatch only newly ready work.
 
 ### Choose the workflow surface dynamically
 
@@ -93,6 +111,12 @@ After every research, build, integration, or verification barrier, recompute onl
 graph from validated evidence. Reject cycles, missing dependencies, silent model fallback, and
 overlapping writers. Candidate patches remain incomplete until the main agent reviews and
 integrates them; any later file change invalidates prior verification.
+
+Immediately after spawning, inspect the agent tree or available runtime metadata. Record agent type,
+effective model and effort, handle, start time, and lane. Interrupt an observed generic, unknown,
+GPT-5, GPT-5.4, or Spark route in latest-only mode. When metadata is exported, validate it with
+`scripts/audit_routing.py --observed-route <agent_type>=<model>:<effort>`; a passing profile preflight
+alone is not runtime attestation.
 
 ### Use the Codex CLI fallback safely
 
@@ -180,6 +204,13 @@ Give every subagent:
 - a stop condition and bounded output budget;
 - required return: stage ID, status, bounded summary, route evidence, `file:symbol` evidence, changed files, checks with passed/failed/not-run state, blockers, and one next action.
 
+Send a compact context packet, not the parent transcript: objective, constraints, owned paths,
+relevant finding IDs, the minimum evidence needed, and the downstream decision. Use
+`fork_turns="none"` by default and the smallest positive fork only when exact recent conversation is
+essential. Never use a full-history fork for a model override. Keep ordinary explorer and verifier
+handoffs near 400-800 words and put raw logs or large matrices in an evidence file outside the
+repository; writers report the diff rather than pasting it.
+
 Use explorers for noisy discovery, workers for isolated writes, and verifiers for independent checks. Never ask overlapping writers to fix anything they find across the repository.
 
 Treat a subagent response as a handoff, not completion. Normalize native-agent results to the same
@@ -199,6 +230,14 @@ children, exact model and effort, expected decision value, and cancellation cond
 - Run independent reads concurrently. Serialize shared-state writers and integration.
 - After a prerequisite fails or a finding becomes invalid, cancel dependent work instead of waiting for a now-useless wave.
 - Compare task success, latency, tool loops, and usage on representative runs before changing default effort or fleet size.
+- Batch one final independent verification wave after integration. Do not repeatedly launch broad reviewers between writes; use focused worker checks until the integration barrier.
+- Give one owner to a long test, build, browser, or migration command. Poll its existing handle with bounded waits; never rerun because a client wait timed out until process state and the last output are inspected. Retry a classified transient failure at most once.
+- At every barrier record wall time, active/ready/queued lanes, per-agent duration, route, retries, command failures, compactions, input/cached/non-cached/output tokens when exposed, and accepted findings per lane. Shrink on repeated failures or resource pressure; expand only when independent ready work remains.
+- Cached input still consumes context processing and can increase latency even when billing is discounted. Prefer delta-only prompts and restart a fresh stage when earlier reasoning is no longer relevant.
+
+After a long or unusually expensive run, use `scripts/audit_fleet.py` with an ISO-8601 start and the
+root thread ID for a repeatable retained-data snapshot before changing defaults. Keep its dispatch,
+projected-history, and OTel denominators separate.
 
 ## Use tools deliberately
 

@@ -16,6 +16,7 @@ import sys
 import tempfile
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 
@@ -397,7 +398,7 @@ def acquire_lock(cwd: Path, exclusive: bool, timeout: int):
             time.sleep(0.1)
 
 
-def stop_process_group(process: subprocess.Popen[str]) -> None:
+def stop_process_group(process: subprocess.Popen[bytes]) -> None:
     for sig, grace in ((signal.SIGINT, 2), (signal.SIGTERM, 2), (signal.SIGKILL, 0)):
         if process.poll() is not None:
             return
@@ -412,10 +413,45 @@ def stop_process_group(process: subprocess.Popen[str]) -> None:
                 continue
 
 
-def event_status(stdout: str) -> tuple[bool, str | None]:
+def close_process_pipes(process: subprocess.Popen[bytes]) -> None:
+    for stream in (process.stdin, process.stdout, process.stderr):
+        if stream is not None and not stream.closed:
+            stream.close()
+
+
+def capture_stream(
+    stream: object,
+    destination: Path,
+    maximum_bytes: int,
+    state: dict[str, object],
+) -> None:
+    total = 0
+    written = 0
+    try:
+        with destination.open("wb") as output:
+            while True:
+                chunk = stream.read(65536)  # type: ignore[attr-defined]
+                if not chunk:
+                    break
+                total += len(chunk)
+                if written < maximum_bytes:
+                    retained = chunk[: maximum_bytes - written]
+                    output.write(retained)
+                    written += len(retained)
+    except Exception as exc:  # pragma: no cover - defensive thread boundary
+        state["error"] = f"{type(exc).__name__}: {exc}"
+    finally:
+        state["totalBytes"] = total
+        state["retainedBytes"] = written
+        state["truncated"] = total > maximum_bytes
+
+
+def event_status(path: Path) -> tuple[bool, str | None]:
     completed = False
     failure: str | None = None
-    for line in stdout.splitlines():
+    if not path.exists():
+        return completed, failure
+    for line in path.read_text(errors="replace").splitlines():
         try:
             event = json.loads(line)
         except json.JSONDecodeError:
@@ -443,6 +479,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--timeout", type=int, default=1800)
     parser.add_argument("--lock-timeout", type=int, default=30)
+    parser.add_argument("--max-prompt-chars", type=int, default=24000)
+    parser.add_argument("--max-events-bytes", type=int, default=8 * 1024 * 1024)
+    parser.add_argument("--max-stderr-bytes", type=int, default=2 * 1024 * 1024)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     stage_id = args.stage_id or args.role
@@ -458,6 +497,13 @@ def main(argv: list[str] | None = None) -> int:
     prompt = Path(args.prompt_file).read_text() if args.prompt_file else sys.stdin.read()
     if not prompt.strip():
         raise SystemExit("Delegated prompt is empty")
+    if args.max_prompt_chars <= 0 or args.max_events_bytes <= 0 or args.max_stderr_bytes <= 0:
+        raise SystemExit("Prompt and output limits must be positive")
+    if len(prompt) > args.max_prompt_chars:
+        raise SystemExit(
+            f"Delegated prompt has {len(prompt)} characters; limit is {args.max_prompt_chars}. "
+            "Send a compact context packet or raise the limit explicitly."
+        )
     allow_paths = normalize_scope(args.allow_path)
     allow_dirty = normalize_scope(args.allow_dirty_path)
     profile = ROLES[args.role]
@@ -505,19 +551,25 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--output-dir must be new or empty to prevent stale delegate evidence")
     output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(output_dir, 0o700)
+    started_at = datetime.now(timezone.utc)
+    started_monotonic = time.monotonic()
     lock = acquire_lock(cwd, write_mode, args.lock_timeout)
-    process: subprocess.Popen[str] | None = None
-    stdout = ""
-    stderr = ""
+    process: subprocess.Popen[bytes] | None = None
     timed_out = False
     launch_error: str | None = None
     lifecycle_error: str | None = None
+    lifecycle_messages: list[str] = []
     baseline: dict[str, str] = {}
     after: dict[str, str] = {}
     candidate: Path | None = None
     candidate_baseline_commit: str | None = None
     candidate_head_commit: str | None = None
     final_message_path = output_dir / "last-message.txt"
+    events_path = output_dir / "events.jsonl"
+    stderr_path = output_dir / "stderr.log"
+    capture_threads: list[threading.Thread] = []
+    event_capture: dict[str, object] = {}
+    stderr_capture: dict[str, object] = {}
     lifecycle_signals = (signal.SIGTERM, signal.SIGHUP)
     previous_handlers = (
         {sig: signal.getsignal(sig) for sig in lifecycle_signals}
@@ -579,24 +631,46 @@ def main(argv: list[str] | None = None) -> int:
             + "concrete next action.\n"
             + "\n"
         )
+        if len(delegated_prompt) > args.max_prompt_chars:
+            raise SystemExit(
+                f"Complete delegated prompt has {len(delegated_prompt)} characters; limit is "
+                f"{args.max_prompt_chars}. Reduce the context packet or raise the limit explicitly."
+            )
         try:
             process = subprocess.Popen(
                 command,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
                 start_new_session=True,
             )
+            assert process.stdout is not None
+            assert process.stderr is not None
+            capture_threads = [
+                threading.Thread(
+                    target=capture_stream,
+                    args=(process.stdout, events_path, args.max_events_bytes, event_capture),
+                    daemon=True,
+                ),
+                threading.Thread(
+                    target=capture_stream,
+                    args=(process.stderr, stderr_path, args.max_stderr_bytes, stderr_capture),
+                    daemon=True,
+                ),
+            ]
+            for thread in capture_threads:
+                thread.start()
             try:
-                stdout, stderr = process.communicate(input=delegated_prompt, timeout=args.timeout)
+                assert process.stdin is not None
+                process.stdin.write(delegated_prompt.encode())
+                process.stdin.close()
+                process.wait(timeout=args.timeout)
             except subprocess.TimeoutExpired:
                 timed_out = True
                 stop_process_group(process)
-                stdout, stderr = process.communicate()
         except OSError as exc:
             launch_error = f"Failed to launch Codex delegate: {exc}"
-            stderr = launch_error
+            lifecycle_messages.append(launch_error)
         after = snapshot(cwd)
         if candidate is not None:
             candidate_head_commit = subprocess.run(
@@ -610,12 +684,14 @@ def main(argv: list[str] | None = None) -> int:
         if process is not None:
             stop_process_group(process)
         lifecycle_error = f"Delegate lifecycle interrupted: {type(exc).__name__}: {exc}"
-        stderr = (stderr + "\n" if stderr else "") + lifecycle_error
+        lifecycle_messages.append(lifecycle_error)
         try:
             after = snapshot(cwd)
         except Exception as snapshot_error:
             after = baseline
-            stderr += f"\nFailed to capture post-interruption snapshot: {snapshot_error}"
+            lifecycle_messages.append(
+                f"Failed to capture post-interruption snapshot: {snapshot_error}"
+            )
     except Exception:
         if candidate is not None:
             shutil.rmtree(candidate, ignore_errors=True)
@@ -624,14 +700,29 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         if process is not None:
             stop_process_group(process)
+            for thread in capture_threads:
+                thread.join(timeout=5)
+            if any(thread.is_alive() for thread in capture_threads):
+                lifecycle_error = lifecycle_error or "Delegate output capture did not terminate"
+                lifecycle_messages.append(lifecycle_error)
+            close_process_pipes(process)
         for sig, handler in previous_handlers.items():
             signal.signal(sig, handler)
         fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
         lock.close()
 
-    (output_dir / "events.jsonl").write_text(stdout)
-    (output_dir / "stderr.log").write_text(stderr + ("\nTimed out.\n" if timed_out else ""))
-    completed, failure = event_status(stdout)
+    if not events_path.exists():
+        events_path.write_text("")
+    if not stderr_path.exists():
+        stderr_path.write_text("")
+    if timed_out:
+        lifecycle_messages.append("Timed out.")
+    if lifecycle_messages:
+        with stderr_path.open("a") as stderr_output:
+            if stderr_path.stat().st_size:
+                stderr_output.write("\n")
+            stderr_output.write("\n".join(lifecycle_messages) + "\n")
+    completed, failure = event_status(events_path)
     final_message = final_message_path.read_text().strip() if final_message_path.exists() else ""
     if final_message:
         (output_dir / "last-message.txt").write_text(final_message + "\n")
@@ -651,6 +742,17 @@ def main(argv: list[str] | None = None) -> int:
                     )
         except json.JSONDecodeError as exc:
             violations.append(f"delegate handoff is not valid JSON: {exc}")
+    if event_capture.get("truncated"):
+        violations.append(
+            f"delegate events exceeded {args.max_events_bytes} bytes and were truncated"
+        )
+    if stderr_capture.get("truncated"):
+        violations.append(
+            f"delegate stderr exceeded {args.max_stderr_bytes} bytes and was truncated"
+        )
+    for label, capture in (("events", event_capture), ("stderr", stderr_capture)):
+        if capture.get("error"):
+            violations.append(f"{label} capture failed: {capture['error']}")
     original_changes = sorted(
         path for path in set(baseline) | set(after) if baseline.get(path) != after.get(path)
     )
@@ -700,6 +802,19 @@ def main(argv: list[str] | None = None) -> int:
         and bool(final_message)
         and not violations
     )
+    finished_at = datetime.now(timezone.utc)
+    cleanup_verified = process is None or process.poll() is not None
+    terminal_state = (
+        "timed_out"
+        if timed_out
+        else "interrupted"
+        if lifecycle_error
+        else "launch_failed"
+        if launch_error
+        else "completed"
+        if success
+        else "failed"
+    )
     envelope = {
         "role": args.role,
         "stageId": stage_id,
@@ -726,6 +841,28 @@ def main(argv: list[str] | None = None) -> int:
             "explicitReasoningConfig": True,
             "ignoredUserConfig": True,
             "recursiveDelegationDisabled": True,
+        },
+        "lifecycle": {
+            "attempt": 1,
+            "startedAtUtc": started_at.isoformat().replace("+00:00", "Z"),
+            "finishedAtUtc": finished_at.isoformat().replace("+00:00", "Z"),
+            "durationMs": round((time.monotonic() - started_monotonic) * 1000),
+            "processGroupId": process.pid if process is not None else None,
+            "lockMode": "exclusive" if write_mode else "shared",
+            "timedOut": timed_out,
+            "completionEventObserved": completed,
+            "failureEvent": failure,
+            "cleanupVerified": cleanup_verified,
+            "terminalState": terminal_state,
+            "inputPromptCharacters": len(prompt),
+            "delegatedPromptCharacters": len(delegated_prompt),
+            "maxPromptCharacters": args.max_prompt_chars,
+            "eventsBytes": event_capture.get("totalBytes", 0),
+            "eventsRetainedBytes": event_capture.get("retainedBytes", 0),
+            "eventsTruncated": bool(event_capture.get("truncated")),
+            "stderrBytes": stderr_capture.get("totalBytes", 0),
+            "stderrRetainedBytes": stderr_capture.get("retainedBytes", 0),
+            "stderrTruncated": bool(stderr_capture.get("truncated")),
         },
         "appliedToRepository": False if write_mode else None,
         "candidateChangesDirectory": changes_directory,
