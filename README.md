@@ -13,7 +13,8 @@ servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and ap
 - [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: strict
   GPT-5.6 Sol/Terra/Luna research, layered engineering standards, adaptive one/three/six-lane fleets
   with an opt-in qualified eight-reader team mode, isolated implementation, integration,
-  verification, OTel-informed tuning, bounded goal persistence, and task-owned resource teardown.
+  verification, private resumable run journals, content-addressed gate reuse, outcome-based fleet
+  tuning, bounded goal persistence, and task-owned resource teardown.
 - [`skills/gpt-engineer-mem/`](skills/gpt-engineer-mem/) — the memory-aware GPT engineer: bounded
   Claude Mem/Codex recall, live freshness checks, GPT-5.6 Sol/Terra/Luna delivery, and read-only
   memory-service diagnostics.
@@ -94,6 +95,19 @@ The profile bootstrap is deliberately separate from skills.sh. It never edits pr
 `--upgrade` replaces only bundled agent-profile destinations. Use `--provider all --upgrade` only
 when Claude profiles are explicitly wanted. For project-local profiles and conservative Codex hooks,
 replace `--global` with `/path/to/repository`.
+
+Long GPT Engineer runs use private state outside the checkout by default. Inspect or resume that
+state with `run_journal.py`; opt a repository into a local `.engineer` control directory only with an
+explicit init. Command evidence and fleet outcome analysis are separate, fail-closed tools:
+
+```bash
+python3 ~/.agents/skills/gpt-engineer/scripts/run_journal.py --help
+python3 ~/.agents/skills/gpt-engineer/scripts/cache_gates.py --help
+python3 ~/.agents/skills/gpt-engineer/scripts/join_fleet_outcomes.py --help
+```
+
+These tools store normalized lifecycle, requirement, gate, and outcome evidence—not raw prompts,
+responses, reasoning, child transcripts, stderr, or telemetry logs.
 
 Install and register the Codex-only Spark fleet separately:
 

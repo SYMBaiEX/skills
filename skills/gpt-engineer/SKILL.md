@@ -4,7 +4,7 @@ description: "Own a software-engineering outcome end to end with a strictly mode
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.7.0"
+  version: "1.8.0"
 ---
 
 # GPT Engineer
@@ -19,6 +19,8 @@ interpreting Codex OTel or thread databases, or comparing latency, context, and 
 Read [the engineering standards reference](references/engineering-standards.md) for Broad or Team
 work, release readiness, or changes that touch security, persisted data, external SDKs, production
 behavior, or user journeys. Load only the applicable gates into each child contract.
+Read [the durable run-state reference](references/run-journal.md) for a durable goal, multi-wave
+build, resume, command-evidence reuse, or outcome-based fleet tuning.
 
 ## Establish the engineering contract
 
@@ -27,6 +29,11 @@ behavior, or user journeys. Load only the applicable gates into each child contr
 3. Treat every pre-existing change as user-owned. Never reset, checkout, stash, delete, reformat, or overwrite unrelated work.
 4. Separate local implementation authority from deployment, push, merge, production, messaging, purchasing, and credential authority.
 5. If the user requests a durable goal and native goal tooling exists, use it according to the runtime contract. Otherwise keep an equivalent goal ledger; never fake goal persistence.
+
+For a durable or multi-wave run, start the private `scripts/run_journal.py` ledger and record stable
+requirement, finding, gate, stage, attempt, barrier, and route IDs. Repository-local `.engineer`
+state is explicit opt-in only. The journal stores compact orchestration facts and evidence hashes,
+never raw prompts, model responses, reasoning, transcripts, stderr, credentials, or OTel rows.
 
 ### Apply standards without replacing judgment
 
@@ -165,6 +172,13 @@ applies edits to the original repository. The runner constrains the final respon
 `assets/codex/handoff.schema.json`. The main agent must inspect the result, validate the handoff,
 and integrate the candidate bundle before downstream verification.
 
+The fallback runner starts a private journal by default. Attach lanes from the same fleet with one
+`--journal-run-id` plus stable stage, lane, and attempt IDs; never reuse an attempt. For a measured
+route or effort comparison, also provide the unchanged task class, acceptance-contract hash, and
+non-route comparison context described in `references/run-journal.md`. The runner records only
+normalized lifecycle and evidence hashes, and publishes `result.json` atomically after its journal
+handoff.
+
 ### Enable native Luna V2 routing only when required
 
 Codex CLI 0.144.x can expose Sol and Terra as Multi-Agent V2 while the stock Luna entry remains V1.
@@ -215,6 +229,11 @@ reuse the finding ledger and prior evidence, inspect only changed paths and conf
 rerun only checks invalidated by those changes. Do not restart repository-wide discovery or repeat a
 full gate merely because a loop exists.
 
+Use `scripts/cache_gates.py` to reuse command truth only when repository content, command argv,
+scope, allowlisted environment, and complete successful evidence still match. Use the persisted
+stage graph and gate scopes to derive the next ready wave deterministically. Unknown or global scope
+invalidates all gates; cache failures, timeouts, skips, truncation, and malformed state are misses.
+
 ## Write bounded agent contracts
 
 Give every subagent:
@@ -264,6 +283,9 @@ children, exact model and effort, expected decision value, and cancellation cond
 After a long or unusually expensive run, use `scripts/audit_fleet.py` with an ISO-8601 start and the
 root thread ID for a repeatable retained-data snapshot before changing defaults. Keep its dispatch,
 projected-history, and OTel denominators separate.
+Join completed journal and runner outcomes with `scripts/join_fleet_outcomes.py`; accept an adaptive
+fleet or effort recommendation only from sufficiently covered, comparable one-variable runs. The
+report is advisory and never authorizes automatic route, effort, Team-mode, or external changes.
 
 ## Use tools deliberately
 

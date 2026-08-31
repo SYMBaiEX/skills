@@ -88,6 +88,10 @@ def main() -> int:
                 "delta-only",
                 "explicitly",
                 "scripts/plan_fleet.py",
+                "scripts/run_journal.py",
+                "scripts/cache_gates.py",
+                "scripts/join_fleet_outcomes.py",
+                "references/run-journal.md",
                 "six for a broad read-heavy wave",
                 "--team-qualified",
                 "--routes-attested",
@@ -128,6 +132,15 @@ def main() -> int:
     fleet_auditor = SKILLS / "gpt-engineer" / "scripts" / "audit_fleet.py"
     if not fleet_auditor.is_file():
         fail(f"GPT Engineer fleet auditor is missing: {fleet_auditor}")
+    for relative in (
+        "scripts/run_journal.py",
+        "scripts/cache_gates.py",
+        "scripts/join_fleet_outcomes.py",
+        "references/run-journal.md",
+    ):
+        required_path = SKILLS / "gpt-engineer" / relative
+        if not required_path.is_file():
+            fail(f"GPT Engineer durable-state resource is missing: {required_path}")
     engineering_standards = (
         SKILLS / "gpt-engineer" / "references" / "engineering-standards.md"
     )

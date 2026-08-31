@@ -3,13 +3,15 @@ from __future__ import annotations
 
 import io
 import json
-import re
+import os
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
+import join_fleet_outcomes
 import run_codex_agent
 
 
@@ -19,6 +21,11 @@ class RunCodexAgentTests(unittest.TestCase):
         self.root = Path(self.temp.name) / "repo"
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)
         self.output = Path(self.temp.name) / "output"
+        self.state_home = Path(self.temp.name) / "state"
+        self.environment = mock.patch.dict(
+            os.environ, {"XDG_STATE_HOME": str(self.state_home)}
+        )
+        self.environment.start()
         self.codex = Path(self.temp.name) / "fake-codex"
         self.codex.write_text(
             """#!/usr/bin/env python3
@@ -80,6 +87,7 @@ print(json.dumps({"type": "turn.completed"}))
         self.codex.chmod(0o755)
 
     def tearDown(self) -> None:
+        self.environment.stop()
         self.temp.cleanup()
 
     def test_handoff_schema_requires_engineering_evidence_fields(self) -> None:
@@ -161,7 +169,9 @@ print(json.dumps({"type": "turn.completed"}))
 
     def test_luna_worker_is_low_effort_and_requires_write_authority(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Implement the mechanical fix.")):
-            with self.assertRaisesRegex(SystemExit, "luna-worker requires --allow-writes"):
+            with self.assertRaisesRegex(
+                SystemExit, "luna-worker requires --allow-writes"
+            ):
                 run_codex_agent.main(
                     [
                         "--role",
@@ -178,7 +188,9 @@ print(json.dumps({"type": "turn.completed"}))
 
     def test_luna_max_worker_pins_fast_tier_and_requires_write_authority(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Implement the dense bounded fix.")):
-            with self.assertRaisesRegex(SystemExit, "luna-max-worker requires --allow-writes"):
+            with self.assertRaisesRegex(
+                SystemExit, "luna-max-worker requires --allow-writes"
+            ):
                 run_codex_agent.main(
                     [
                         "--role",
@@ -249,6 +261,177 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertGreaterEqual(result_json["lifecycle"]["durationMs"], 0)
         self.assertRegex(result_json["lifecycle"]["startedAtUtc"], r"Z$")
         self.assertRegex(result_json["lifecycle"]["finishedAtUtc"], r"Z$")
+        self.assertIsNotNone(result_json["runId"])
+        self.assertEqual(result_json["journal"]["status"], "closed")
+        self.assertFalse((self.root / ".engineer").exists())
+        journal = run_codex_agent.run_journal.open_run(
+            self.root, result_json["runId"], state_home=str(self.state_home)
+        )
+        event_types = [
+            event["type"] for event in journal._journal._events(journal.run_dir)
+        ]
+        self.assertEqual(
+            event_types,
+            [
+                "run.started",
+                "stage.planned",
+                "dispatch.accepted",
+                "handoff.received",
+                "run.closed",
+            ],
+        )
+        handoff_event = next(
+            event
+            for event in journal._journal._events(journal.run_dir)
+            if event["type"] == "handoff.received"
+        )
+        self.assertLessEqual(
+            datetime.fromisoformat(
+                handoff_event["occurredAtUtc"].replace("Z", "+00:00")
+            ),
+            datetime.fromisoformat(
+                result_json["lifecycle"]["finishedAtUtc"].replace("Z", "+00:00")
+            ),
+        )
+        joined = join_fleet_outcomes.join(
+            journals=[str(journal.run_dir.parent)],
+            result_dirs=[str(self.output)],
+        )
+        self.assertEqual(joined["coverage"]["journalResult"], 1.0)
+        self.assertEqual(joined["denominators"]["projected"], 1)
+        self.assertFalse(any(self.output.glob(".result-*")))
+
+    def test_attaches_to_shared_run_without_closing_it(self) -> None:
+        shared = run_codex_agent.run_journal.start_run(
+            self.root,
+            state_home=str(self.state_home),
+            objective_summary="Shared fleet",
+        )
+        with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
+            result = run_codex_agent.main(
+                [
+                    "--role",
+                    "terra-explorer",
+                    "--stage-id",
+                    "map-api",
+                    "--cwd",
+                    str(self.root),
+                    "--output-dir",
+                    str(self.output),
+                    "--codex",
+                    str(self.codex),
+                    "--journal-run-id",
+                    shared.run_id,
+                    "--journal-lane-id",
+                    "lane-2",
+                    "--journal-attempt",
+                    "2",
+                    "--task-class",
+                    "architecture-map",
+                    "--acceptance-contract-hash",
+                    "contract-v1",
+                    "--route-context-json",
+                    '{"scope":"api"}',
+                ]
+            )
+        self.assertEqual(result, 0)
+        envelope = json.loads((self.output / "result.json").read_text())
+        self.assertEqual(envelope["runId"], shared.run_id)
+        self.assertEqual(envelope["laneId"], "lane-2")
+        self.assertEqual(envelope["attempt"], 2)
+        self.assertFalse(envelope["journal"]["ownedRun"])
+        self.assertFalse(shared.status()["closed"])
+        self.assertEqual(shared.status()["stages"]["map-api"]["status"], "completed")
+
+    def test_shared_run_refuses_duplicate_stage_attempt(self) -> None:
+        shared = run_codex_agent.run_journal.start_run(
+            self.root, state_home=str(self.state_home), objective_summary="Shared fleet"
+        )
+        shared.append(
+            "stage.planned",
+            stage_id="map-api",
+            attempt=1,
+            data={"stageId": "map-api", "dependencies": []},
+        )
+        shared.append(
+            "dispatch.accepted",
+            stage_id="map-api",
+            attempt=1,
+            data={
+                "stageId": "map-api",
+                "dispatchId": f"{shared.run_id}:map-api:1",
+                "status": "completed",
+            },
+        )
+        with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
+            with self.assertRaisesRegex(
+                SystemExit, "already contains this stage attempt"
+            ):
+                run_codex_agent.main(
+                    [
+                        "--role",
+                        "terra-explorer",
+                        "--stage-id",
+                        "map-api",
+                        "--cwd",
+                        str(self.root),
+                        "--output-dir",
+                        str(self.output),
+                        "--codex",
+                        str(self.codex),
+                        "--journal-run-id",
+                        shared.run_id,
+                    ]
+                )
+        self.assertFalse(self.output.joinpath("events.jsonl").exists())
+
+    def test_journal_failure_is_explicit_without_discarding_valid_handoff(self) -> None:
+        target = Path(self.temp.name) / "unsafe-target"
+        target.mkdir()
+        unsafe = Path(self.temp.name) / "unsafe-state"
+        unsafe.symlink_to(target)
+        with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
+            result = run_codex_agent.main(
+                [
+                    "--role",
+                    "terra-explorer",
+                    "--cwd",
+                    str(self.root),
+                    "--output-dir",
+                    str(self.output),
+                    "--codex",
+                    str(self.codex),
+                    "--journal-state-home",
+                    str(unsafe),
+                ]
+            )
+        self.assertEqual(result, 0)
+        envelope = json.loads((self.output / "result.json").read_text())
+        self.assertEqual(envelope["status"], "completed")
+        self.assertIsNone(envelope["runId"])
+        self.assertEqual(envelope["journal"]["status"], "error")
+        self.assertIn("JournalError", envelope["journalError"])
+
+    def test_journal_can_be_disabled_explicitly(self) -> None:
+        with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
+            result = run_codex_agent.main(
+                [
+                    "--role",
+                    "terra-explorer",
+                    "--cwd",
+                    str(self.root),
+                    "--output-dir",
+                    str(self.output),
+                    "--codex",
+                    str(self.codex),
+                    "--journal-backend",
+                    "off",
+                ]
+            )
+        self.assertEqual(result, 0)
+        envelope = json.loads((self.output / "result.json").read_text())
+        self.assertIsNone(envelope["runId"])
+        self.assertEqual(envelope["journal"]["status"], "off")
 
     def test_writer_accepts_only_explicit_path_scope(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("WRITE_ALLOWED")):
@@ -273,7 +456,9 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertFalse(envelope["appliedToRepository"])
         self.assertFalse((self.root / "src" / "generated.txt").exists())
         self.assertEqual(
-            (Path(envelope["candidateChangesDirectory"]) / "src" / "generated.txt").read_text(),
+            (
+                Path(envelope["candidateChangesDirectory"]) / "src" / "generated.txt"
+            ).read_text(),
             "allowed\n",
         )
         self.assertTrue(Path(envelope["candidatePatch"]).is_file())
@@ -298,7 +483,9 @@ print(json.dumps({"type": "turn.completed"}))
             )
         self.assertEqual(result, 1)
         envelope = json.loads((self.output / "result.json").read_text())
-        self.assertIn("out-of-scope candidate change: outside.txt", envelope["violations"])
+        self.assertIn(
+            "out-of-scope candidate change: outside.txt", envelope["violations"]
+        )
 
     def test_writer_commit_fails_closed_but_preserves_candidate_patch(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("WRITE_ALLOWED COMMIT_CHANGE")):
@@ -319,8 +506,12 @@ print(json.dumps({"type": "turn.completed"}))
             )
         self.assertEqual(result, 1)
         envelope = json.loads((self.output / "result.json").read_text())
-        self.assertIn("candidate delegate created one or more commits", envelope["violations"])
-        self.assertNotEqual(envelope["candidateBaselineCommit"], envelope["candidateHeadCommit"])
+        self.assertIn(
+            "candidate delegate created one or more commits", envelope["violations"]
+        )
+        self.assertNotEqual(
+            envelope["candidateBaselineCommit"], envelope["candidateHeadCommit"]
+        )
         self.assertIn("src/generated.txt", Path(envelope["candidatePatch"]).read_text())
 
     def test_writer_excludes_ignored_files_from_candidate_tracking(self) -> None:
@@ -453,7 +644,9 @@ print(json.dumps({"type": "turn.completed"}))
         envelope = json.loads((self.output / "result.json").read_text())
         self.assertTrue(envelope["lifecycle"]["eventsTruncated"])
         self.assertGreater(envelope["lifecycle"]["eventsBytes"], 128)
-        self.assertTrue(any("events exceeded" in item for item in envelope["violations"]))
+        self.assertTrue(
+            any("events exceeded" in item for item in envelope["violations"])
+        )
 
 
 if __name__ == "__main__":

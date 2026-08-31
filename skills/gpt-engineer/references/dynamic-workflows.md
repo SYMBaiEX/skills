@@ -48,6 +48,12 @@ Treat the first plan as provisional. After each barrier:
 Dynamic does not mean unbounded. Persist the resolved graph, attempts, and completion barriers so a
 restart cannot reinterpret a partial run as complete.
 
+For a durable run, use the private `scripts/run_journal.py` backend as the graph and barrier source
+of truth. Keep the lead as the only logical journal writer; children return structured handoffs and
+the lead normalizes them into events. An explicit repository-local `.engineer` backend is opt-in and
+must keep runtime data ignored. Read [`run-journal.md`](run-journal.md) before initializing it,
+resuming a run, or reusing command evidence.
+
 ## Size waves adaptively
 
 Treat configured and runtime capacity as ceilings. Compute a wave from independent ready work,
@@ -121,6 +127,8 @@ checks plus the final broad gate, not the entire discovery phase.
 At every barrier persist the stage attempts, route, start/end time, retries, active and ready counts,
 command failures, compactions, and token fields the runtime exposes. See
 [`fleet-observability.md`](fleet-observability.md) before comparing runs or changing a default.
+Use `scripts/join_fleet_outcomes.py` to join journal and runner results after representative runs;
+its recommendation is evidence for the lead, never an automatic configuration change.
 
 For Claude-specific script and permission semantics, read the installed
 `claude-multi-agent/references/WORKFLOWS.md` and the official

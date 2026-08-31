@@ -54,6 +54,12 @@ A command name is not evidence. Inspect aliases and workflow conditions. A typec
 does not prove linting; a zero exit code with required integration cases skipped does not prove the
 integration; a build does not prove a user journey.
 
+For a later delta-only cycle, reuse a prior command result only when `scripts/cache_gates.py` proves
+that repository content, command truth, normalized argv, scope, allowlisted environment, and the
+complete successful result still match. Any timeout, truncation, skip, failure, corruption, or
+unknown/global scope is a cache miss. Path-scoped invalidation may spare unrelated focused gates;
+the applicable final broad gate still runs after integration.
+
 ## Conditional quality gates
 
 | Gate | Activate when | Required proof |

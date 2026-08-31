@@ -35,6 +35,21 @@ command retries, compactions, or finding acceptance from the three SQLite summar
 its output with runner `result.json` lifecycle envelopes and targeted rollout analysis when those
 metrics matter.
 
+When the durable run journal is available, join normalized outcomes without copying raw logs:
+
+```bash
+python3 scripts/join_fleet_outcomes.py \
+  --journal "${XDG_STATE_HOME:-$HOME/.local/state}/gpt-engineer" \
+  --result-dir /path/to/external/runner-evidence \
+  --since 2026-08-30T00:00:00-05:00 \
+  --json
+```
+
+The joiner hashes identifiers by default, diagnoses ambiguous IDs and retention gaps, and keeps
+dispatch, route, result-envelope, projected, OTel-covered, and accepted-outcome denominators
+separate. It never treats a spawn edge or OTel row as an accepted engineering outcome. Read
+[`run-journal.md`](run-journal.md) for the journal, cache, resume, privacy, and retention contract.
+
 ## Keep denominators separate
 
 Use stable identities, not log-row counts:
@@ -90,6 +105,11 @@ Change one variable at a time on representative tasks: fleet ceiling, model, eff
 or test strategy. Compare accepted outcome, evidence completeness, wall time, non-cached input,
 output, retries, and command failures. A larger fleet is an improvement only when independent ready
 work exists and the final acceptance contract still passes.
+
+Require a sufficiently covered sample and comparable one-variable pairs before accepting
+`expand`, `lower-effort`, or `raise-effort`. Treat `insufficient-evidence` and `hold` literally. A
+recommendation never edits Codex configuration, changes the latest-only allowlist, enables Fast or
+Team mode, or authorizes a provider transition.
 
 Use a Broad read ceiling of six as the default experiment, not a permanent conclusion. A qualified
 Team read wave may compare seven or eight lanes against Broad, but it must measure accepted findings,
