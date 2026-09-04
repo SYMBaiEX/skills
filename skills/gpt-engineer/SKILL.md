@@ -4,7 +4,7 @@ description: "Own a software-engineering outcome end to end with a strictly mode
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.10.0"
+  version: "1.10.1"
 ---
 
 # GPT Engineer
@@ -63,7 +63,7 @@ Spawn subagents when the user explicitly requests a fleet or when at least two i
 Run this routing preflight:
 
 1. Confirm that the intended profiles are installed in a directory the selected agent actually loads. Run `python3 scripts/audit_routing.py --cwd <repo> --runtime --parent-model <observed-parent-model> --json` when the parent model is observable; omit only `--parent-model` when it is not. The runtime audit selects the newest available Codex binary, verifies that its active config enables multi-agent support, reports PATH/app version skew, and fails on stale or unverified model-catalog overrides.
-2. Record every candidate profile's source, `name`, exact model, reasoning effort, and hash. A project profile with the same `name` can shadow a valid user profile; any conflicting candidate fails latest-only preflight.
+2. Record every candidate profile's source, `name`, exact model, reasoning effort, and hash. A project profile with the same `name` can shadow a valid user profile; any conflicting candidate fails pinned-suite preflight.
 3. Inspect the active spawn schema for an `agent_type`, `model`, or equivalent selector. Profile files alone do not prove that a child used their model. In Codex, a custom file's model or effort wins when present; otherwise precedence is explicit spawn value, `[agents]` default, then parent value. Select one of the six allowed agent types explicitly; methodology skills do not authorize their generic agent roles.
 4. Record the effective sandbox and approval behavior. Interactive parent overrides are reapplied to children and can override a custom agent's sandbox default. If a read-only lane cannot remain read-only, keep it in the parent or use a separately sandboxed Codex SDK/app-server thread; use the CLI compatibility adapter only when those surfaces are unavailable.
 5. Prefer native subagents when the runtime can select the exact profile. Use `fork_turns="none"` or the smallest useful positive fork for model-overridden children. Use a full-history fork only when inherited model and effort are acceptable and the complete history is necessary.
@@ -81,18 +81,23 @@ make the first useful bounded stage the route canary and inspect metadata immedi
 route is wrong or unknown under a strict attestation requirement. A model echoing a requested token
 without exported child metadata is not proof that a child ran.
 
-### Enforce latest-only routing
+### Enforce the pinned GPT-5.6 suite
 
-Latest-only is the default for this skill. The allowed OpenAI routes are exactly
+The default for this skill is the deliberately pinned GPT-5.6 engineering suite. The allowed OpenAI routes are exactly
 `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`. Agent type names are not proof:
 select `sol_engineer`, `terra_explorer`, `terra_worker`, `luna_worker`, `luna_max_worker`, or `luna_verifier` only when
 their active configuration or spawn request proves the requested model. Call it effective only when
 the runtime exports matching execution metadata.
 
 Do not select generic built-in roles, model-less profiles, GPT-5, GPT-5.4, or inherited
-children. `gpt-5.3-codex-spark` is an explicit speed-specialist route, not a latest-only
+children. `gpt-5.3-codex-spark` is an explicit speed-specialist route, not a pinned-suite
 route. Claude is a separate provider. Use Spark or Claude only when the user explicitly
-invokes that skill/provider or authorizes leaving latest-only mode. Record that decision.
+invokes that skill/provider or authorizes leaving pinned-suite mode. Record that decision.
+
+Do not describe GPT-5.6 as the newest available model family without checking the current official
+model catalog. A newer general model does not silently replace this heterogeneous Sol/Terra/Luna
+contract. Treat any family migration as a separate, user-authorized design change with paired
+acceptance, latency, and usage evaluation.
 
 When the bundled Codex profiles are installed and selectable, prefer:
 
@@ -113,7 +118,7 @@ its time-to-accepted-change beats Luna low/medium or Terra for the bounded task.
 use `agent_type="luna_max_worker"` and `fork_turns="none"`; the profile, not an inherited parent,
 pins Luna, Max, and Fast. Do not use it for architecture, security judgment, or final acceptance.
 
-For an explicitly authorized Claude Code workflow, route to `gpt-engineer-lead` (Opus), `gpt-engineer-explorer` and `gpt-engineer-worker` (Sonnet), and `gpt-engineer-verifier` (Haiku). If `CLAUDE_CODE_SUBAGENT_MODEL` is set, report that it overrides every profile. Claude profiles cannot run GPT models and are never an automatic fallback from latest-only mode.
+For an explicitly authorized Claude Code workflow, route to `gpt-engineer-lead` (Opus), `gpt-engineer-explorer` and `gpt-engineer-worker` (Sonnet), and `gpt-engineer-verifier` (Haiku). If `CLAUDE_CODE_SUBAGENT_MODEL` is set, report that it overrides every profile. Claude profiles cannot run GPT models and are never an automatic fallback from pinned-suite mode.
 
 Use the live child-thread capacity rather than assuming a fixed number. Codex's `agents.max_concurrent_threads_per_session` excludes the primary thread; a surfaced runtime capacity may describe total active agents instead, so follow the active tool's contract. Keep the primary in the cost and coordination budget even when it does not consume the configured child cap.
 
@@ -148,9 +153,9 @@ once, recompute the DAG, and dispatch only newly ready work.
 
 Use native 5.6 custom agents for normal interactive fleets. Use Codex SDK/app-server threads for a
 programmatic controller or per-worker isolation, and the model-pinned CLI compatibility adapter only
-when neither native selection nor the official SDK surface can satisfy the stage. Prefer Terra and Luna—not Spark—for fast latest-only work.
+when neither native selection nor the official SDK surface can satisfy the stage. Prefer Terra and Luna—not Spark—for fast pinned-suite work.
 Use the Spark fleet or Claude workflow runtime only after explicit user selection or authorization
-to leave latest-only mode. Keep cross-provider sequencing in this outer lead.
+to leave pinned-suite mode. Keep cross-provider sequencing in this outer lead.
 
 After every research, build, integration, or verification barrier, recompute only the downstream
 graph from validated evidence. Reject cycles, missing dependencies, silent model fallback, and
@@ -159,7 +164,7 @@ integrates them; any later file change invalidates prior verification.
 
 Immediately after spawning, inspect the agent tree or available runtime metadata. Record agent type,
 requested model and effort, effective route metadata when exported, handle, start time, and lane. Interrupt an observed generic, unknown,
-GPT-5, GPT-5.4, or Spark route in latest-only mode. When metadata is exported, validate it with
+GPT-5, GPT-5.4, or Spark route in pinned-suite mode. When metadata is exported, validate it with
 `scripts/audit_routing.py --observed-route <agent_type>=<model>:<effort>`; a passing profile preflight
 alone is not runtime attestation.
 

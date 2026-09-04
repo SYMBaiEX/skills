@@ -25,7 +25,7 @@ normal interactive path. For a new programmatic controller, prefer the stable of
 where it covers the need, requesting model and sandbox per thread; version-pin app-server and
 feature-detect experimental APIs. The bundled `run_codex_agent.py` is only a guarded CLI
 compatibility adapter when native/SDK routing or isolation is unavailable; it requires a recorded
-compatibility reason and does not independently attest the provider's effective model. In latest-only mode, never use a generic or inherited child as a fallback. Use
+compatibility reason and does not independently attest the provider's effective model. In pinned-suite mode, never use a generic or inherited child as a fallback. Use
 `scripts/audit_routing.py --runtime` to fail closed on missing/conflicting profiles, an invalid active
 runtime, and stale or unattested custom catalogs.
 
@@ -36,7 +36,7 @@ route attestation is necessary. An echoed marker alone is not attestation.
 
 ## Strict and fast routing
 
-The default GPT Engineer route allows only `gpt-5.6-sol`, `gpt-5.6-terra`, and
+The default GPT Engineer route deliberately pins `gpt-5.6-sol`, `gpt-5.6-terra`, and
 `gpt-5.6-luna`. Spark and Claude remain explicit opt-in surfaces because they are not members of
 the GPT-5.6 family. If the required model cannot be requested without substitution, keep the work
 with a parent whose effective route is exported and allowed, or report the blocker. Configuration
@@ -100,7 +100,7 @@ default_subagent_model = "gpt-5.6-terra"
 default_subagent_reasoning_effort = "medium"
 ```
 
-This is not a latest-only enforcement boundary: an explicitly selected custom profile can still
+This is not a pinned-suite enforcement boundary: an explicitly selected custom profile can still
 override those defaults. A user may set the capacity ceiling to `8` while GPT Engineer keeps Broad
 at six and unlocks the last two slots only for a qualified Team read wave. Lower it on constrained
 hosts. The bootstrap intentionally does not rewrite user or project config.
@@ -125,7 +125,7 @@ The bundled setup uses:
 Do not install a default `Stop` continuation hook. A generic auto-continue hook can create expensive loops and cannot decide whether new authority is required. Native goal state or the skill's explicit goal ledger is the safer persistence mechanism.
 
 `SubagentStart` can add developer context, but official Codex documentation states that
-`continue: false` does not stop the child from starting. It cannot enforce latest-only routing.
+`continue: false` does not stop the child from starting. It cannot enforce pinned-suite routing.
 `SubagentStop` can request a focused continuation and exposes the child transcript path, but the
 transcript format is not stable; do not install a generic auto-continue loop. `PreCompact` and
 `PostCompact` can observe compaction, but should not dump prior history back into the prompt.

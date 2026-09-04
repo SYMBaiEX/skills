@@ -269,7 +269,7 @@ def audit(
     for row in rows:
         reasons = []
         if row["agent_role"] in CATALOG_ROLES and row["model"] not in ALLOWED_MODELS:
-            reasons.append("model outside GPT-5.6 latest-only allowlist")
+            reasons.append("model outside pinned GPT-5.6 allowlist")
         if (
             row["agent_role"] in HISTORICAL_ROLES
             and int(row["created_at"]) >= int(HISTORICAL_ROLE_RETIREMENT.timestamp())

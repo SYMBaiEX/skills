@@ -162,7 +162,7 @@ def managed_catalog_audit(codex_home: Path) -> tuple[dict[str, object], list[str
     configured_path = Path(configured).expanduser().resolve()
     if configured_path != managed:
         violations.append(
-            "an unverified custom model_catalog_json is active; latest-only routing cannot attest it"
+            "an unverified custom model_catalog_json is active; pinned-suite routing cannot attest it"
         )
         return result, violations, warnings
     source_path = codex_home / "models_cache.json"
@@ -280,7 +280,7 @@ def audit(
     violations: list[str] = []
     warnings: list[str] = []
     if parent_model and parent_model not in ALLOWED_PARENT_MODELS:
-        violations.append(f"parent model is outside latest-only routing: {parent_model}")
+        violations.append(f"parent model is outside pinned-suite routing: {parent_model}")
 
     found: dict[str, list[dict[str, object]]] = {name: [] for name in EXPECTED}
     for scope, path in profile_candidates(cwd, codex_home):
@@ -336,7 +336,7 @@ def audit(
             }
         )
         if expected is None:
-            violations.append(f"observed unsupported agent type in latest-only mode: {name}")
+            violations.append(f"observed unsupported agent type in pinned-suite mode: {name}")
         elif model != expected[0]:
             violations.append(
                 f"observed route for {name} used {model or '(missing)'}; expected {expected[0]}"
@@ -407,7 +407,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps(result, indent=2))
     elif result["status"] == "passed":
-        print("GPT Engineer routing profiles passed strict latest-only audit.")
+        print("GPT Engineer routing profiles passed strict pinned-suite audit.")
         for warning in result["warnings"]:
             print(f"warning: {warning}", file=sys.stderr)
     else:

@@ -116,7 +116,7 @@ work exists and the final acceptance contract still passes.
 
 Require a sufficiently covered sample and comparable one-variable pairs before accepting
 `expand`, `lower-effort`, or `raise-effort`. Treat `insufficient-evidence` and `hold` literally. A
-recommendation never edits Codex configuration, changes the latest-only allowlist, enables Fast or
+recommendation never edits Codex configuration, changes the pinned-suite allowlist, enables Fast or
 Team mode, or authorizes a provider transition.
 
 Use a Broad read ceiling of six as the default experiment, not a permanent conclusion. A qualified

@@ -70,7 +70,7 @@ class AuditRoutingTests(unittest.TestCase):
         result = audit_routing.audit(self.root, self.home, "gpt-5.4")
         self.assertEqual(result["status"], "failed")
         self.assertIn(
-            "parent model is outside latest-only routing: gpt-5.4",
+            "parent model is outside pinned-suite routing: gpt-5.4",
             result["violations"],
         )
 
