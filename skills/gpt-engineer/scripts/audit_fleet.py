@@ -13,19 +13,24 @@ from pathlib import Path
 
 
 ALLOWED_MODELS = {"gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"}
-ALLOWED_ROLES = {
+CURRENT_ROLES = {
     "sol_engineer",
     "terra_explorer",
     "terra_worker",
     "luna_worker",
     "luna_max_worker",
     "luna_verifier",
-    # Historical profile names retained so older exact-model runs remain auditable.
+}
+HISTORICAL_ROLES = {
     "gpt-engineer-lead",
     "gpt-engineer-explorer",
     "gpt-engineer-worker",
     "gpt-engineer-verifier",
 }
+CATALOG_ROLES = CURRENT_ROLES | HISTORICAL_ROLES
+# The native-first profile names shipped in this commit. Historical names stay
+# queryable for baselines but are not valid dispatch targets after this point.
+HISTORICAL_ROLE_RETIREMENT = datetime(2026, 8, 31, 7, 15, 45, tzinfo=timezone.utc)
 
 
 def parse_since(value: str | None) -> datetime:
@@ -39,6 +44,12 @@ def parse_since(value: str | None) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError("--since must include a timezone, such as Z or -05:00")
     return parsed.astimezone(timezone.utc)
+
+
+def parse_until(value: str | None) -> datetime:
+    if value is None:
+        return datetime.now(timezone.utc)
+    return parse_since(value)
 
 
 def utc_timestamp(value: int | None) -> str | None:
@@ -89,7 +100,7 @@ def coverage(connection: sqlite3.Connection, table: str, timestamp: str) -> dict
 
 
 def cohort_rows(
-    state: sqlite3.Connection, since_epoch: int, root_thread: str | None
+    state: sqlite3.Connection, since_epoch: int, until_epoch: int, root_thread: str | None
 ) -> list[sqlite3.Row]:
     if root_thread:
         query = """
@@ -104,10 +115,10 @@ def cohort_rows(
             FROM descendants d
             JOIN threads t ON t.id = d.id
             JOIN thread_spawn_edges e ON e.child_thread_id = t.id
-            WHERE t.created_at >= ?
+            WHERE t.created_at >= ? AND t.created_at < ?
             ORDER BY t.created_at, t.id
         """
-        return list(state.execute(query, (root_thread, since_epoch)))
+        return list(state.execute(query, (root_thread, since_epoch, until_epoch)))
     return list(
         state.execute(
             """
@@ -115,15 +126,20 @@ def cohort_rows(
                    e.parent_thread_id, e.status AS spawn_status
             FROM threads t
             JOIN thread_spawn_edges e ON e.child_thread_id = t.id
-            WHERE t.created_at >= ?
+            WHERE t.created_at >= ? AND t.created_at < ?
             ORDER BY t.created_at, t.id
             """,
-            (since_epoch,),
+            (since_epoch, until_epoch),
         )
     )
 
 
-def load_turns(history: sqlite3.Connection, thread_ids: list[str]) -> list[sqlite3.Row]:
+def load_turns(
+    history: sqlite3.Connection,
+    thread_ids: list[str],
+    since_epoch: int,
+    until_epoch: int,
+) -> list[sqlite3.Row]:
     if not thread_ids or not table_exists(history, "thread_turns"):
         return []
     history.execute("CREATE TEMP TABLE selected_threads(id TEXT PRIMARY KEY)")
@@ -133,16 +149,53 @@ def load_turns(history: sqlite3.Connection, thread_ids: list[str]) -> list[sqlit
             """
             SELECT t.thread_id, t.status, t.started_at, t.completed_at, t.duration_ms
             FROM thread_turns t JOIN selected_threads s ON s.id = t.thread_id
+            WHERE t.started_at >= ? AND t.started_at < ?
             ORDER BY t.started_at, t.thread_id
-            """
+            """,
+            (since_epoch, until_epoch),
         )
     )
+
+
+def summarize_turns(
+    turns: list[sqlite3.Row], thread_ids: set[str] | None = None
+) -> dict[str, object]:
+    selected = (
+        turns
+        if thread_ids is None
+        else [row for row in turns if str(row["thread_id"]) in thread_ids]
+    )
+    statuses = Counter(str(row["status"]) for row in selected)
+    completed = [
+        row
+        for row in selected
+        if row["status"] == "completed" and row["duration_ms"] is not None
+    ]
+    durations = [int(row["duration_ms"]) for row in completed]
+    intervals = [
+        (int(row["started_at"]), int(row["completed_at"]))
+        for row in completed
+        if row["started_at"] is not None and row["completed_at"] is not None
+    ]
+    return {
+        "projectedTurns": len(selected),
+        "projectedThreads": len({str(row["thread_id"]) for row in selected}),
+        "statusCounts": dict(statuses.most_common()),
+        "completedDurationMs": {
+            "p50": percentile(durations, 0.50),
+            "p90": percentile(durations, 0.90),
+            "p95": percentile(durations, 0.95),
+            "max": max(durations) if durations else None,
+        },
+        "peakCompletedTurnConcurrency": peak_concurrency(intervals),
+    }
 
 
 def audit(
     *,
     codex_home: Path,
     since: datetime,
+    until: datetime | None = None,
     root_thread: str | None = None,
 ) -> dict[str, object]:
     state_path = codex_home / "state_5.sqlite"
@@ -151,10 +204,15 @@ def audit(
     if not state_path.is_file():
         raise FileNotFoundError(f"missing Codex state database: {state_path}")
 
+    until = until or datetime.now(timezone.utc)
+    if until <= since:
+        raise ValueError("--until must be after --since")
     state = sqlite3.connect(f"file:{state_path}?mode=ro", uri=True)
     state.row_factory = sqlite3.Row
     try:
-        rows = cohort_rows(state, int(since.timestamp()), root_thread)
+        rows = cohort_rows(
+            state, int(since.timestamp()), int(until.timestamp()), root_thread
+        )
         state_coverage = coverage(state, "threads", "created_at")
     finally:
         state.close()
@@ -167,7 +225,12 @@ def audit(
         history.row_factory = sqlite3.Row
         try:
             history_coverage = coverage(history, "thread_turns", "started_at")
-            turns = load_turns(history, thread_ids)
+            turns = load_turns(
+                history,
+                thread_ids,
+                int(since.timestamp()),
+                int(until.timestamp()),
+            )
         finally:
             history.close()
 
@@ -187,9 +250,9 @@ def audit(
                     """
                     SELECT count(*), count(DISTINCT l.thread_id)
                     FROM logs l JOIN selected_threads s ON s.id = l.thread_id
-                    WHERE l.ts >= ?
+                    WHERE l.ts >= ? AND l.ts < ?
                     """,
-                    (int(since.timestamp()),),
+                    (int(since.timestamp()), int(until.timestamp())),
                 ).fetchone()
         finally:
             logs.close()
@@ -198,13 +261,20 @@ def audit(
     role_counts = Counter(str(row["agent_role"] or "(missing)") for row in rows)
     parent_counts = Counter(str(row["parent_thread_id"]) for row in rows)
     spawn_status_counts = Counter(str(row["spawn_status"]) for row in rows)
+    current_rows = [row for row in rows if row["agent_role"] in CURRENT_ROLES]
+    historical_rows = [row for row in rows if row["agent_role"] in HISTORICAL_ROLES]
+    unattributed_rows = [row for row in rows if row["agent_role"] not in CATALOG_ROLES]
+    catalog_rows = current_rows + historical_rows
     route_violations = []
     for row in rows:
         reasons = []
-        if row["model"] not in ALLOWED_MODELS:
+        if row["agent_role"] in CATALOG_ROLES and row["model"] not in ALLOWED_MODELS:
             reasons.append("model outside GPT-5.6 latest-only allowlist")
-        if row["agent_role"] not in ALLOWED_ROLES:
-            reasons.append("generic or unsupported agent role")
+        if (
+            row["agent_role"] in HISTORICAL_ROLES
+            and int(row["created_at"]) >= int(HISTORICAL_ROLE_RETIREMENT.timestamp())
+        ):
+            reasons.append("retired GPT Engineer profile used after native-first migration")
         if reasons:
             route_violations.append(
                 {
@@ -215,14 +285,18 @@ def audit(
                     "reasons": reasons,
                 }
             )
-    statuses = Counter(str(row["status"]) for row in turns)
-    completed = [row for row in turns if row["status"] == "completed" and row["duration_ms"] is not None]
-    durations = [int(row["duration_ms"]) for row in completed]
-    intervals = [
-        (int(row["started_at"]), int(row["completed_at"]))
-        for row in completed
-        if row["started_at"] is not None and row["completed_at"] is not None
-    ]
+    all_history = summarize_turns(turns)
+    history_by_cohort = {
+        "currentProfiles": summarize_turns(
+            turns, {str(row["id"]) for row in current_rows}
+        ),
+        "historicalProfiles": summarize_turns(
+            turns, {str(row["id"]) for row in historical_rows}
+        ),
+        "unattributed": summarize_turns(
+            turns, {str(row["id"]) for row in unattributed_rows}
+        ),
+    }
     warnings: list[str] = []
     since_epoch = int(since.timestamp())
     for label, item in (("OTel", logs_coverage), ("turn history", history_coverage)):
@@ -230,11 +304,16 @@ def audit(
         if minimum and datetime.fromisoformat(str(minimum).replace("Z", "+00:00")).timestamp() > since_epoch:
             warnings.append(f"{label} retention starts after the requested window")
     if route_violations:
-        warnings.append("one or more spawned children violated the latest-only role/model allowlist")
+        warnings.append("one or more GPT Engineer catalog children violated the active role/model contract")
+    if unattributed_rows:
+        warnings.append(
+            "spawned children outside the GPT Engineer catalog are unattributed; do not classify them as route violations without dispatch-source evidence"
+        )
 
     return {
         "schema": "gpt-engineer-fleet-audit/v1",
         "requestedSinceUtc": since.isoformat().replace("+00:00", "Z"),
+        "requestedUntilUtc": until.isoformat().replace("+00:00", "Z"),
         "rootThread": root_thread,
         "coverage": {
             "state": state_coverage,
@@ -243,25 +322,22 @@ def audit(
         },
         "fleet": {
             "spawnedChildren": len(rows),
-            "latestOnlyChildren": len(rows) - len(route_violations),
+            "catalogChildren": len(catalog_rows),
+            "currentProfileChildren": len(current_rows),
+            "historicalProfileChildren": len(historical_rows),
+            "unattributedChildren": len(unattributed_rows),
+            "latestOnlyChildren": sum(
+                row["agent_role"] in CURRENT_ROLES and row["model"] in ALLOWED_MODELS
+                for row in rows
+            ),
             "modelCounts": dict(model_counts.most_common()),
             "roleCounts": dict(role_counts.most_common()),
             "parentCounts": dict(parent_counts.most_common()),
             "spawnEdgeStatusCounts": dict(spawn_status_counts.most_common()),
             "routeViolations": route_violations,
         },
-        "history": {
-            "projectedTurns": len(turns),
-            "projectedThreads": len({str(row["thread_id"]) for row in turns}),
-            "statusCounts": dict(statuses.most_common()),
-            "completedDurationMs": {
-                "p50": percentile(durations, 0.50),
-                "p90": percentile(durations, 0.90),
-                "p95": percentile(durations, 0.95),
-                "max": max(durations) if durations else None,
-            },
-            "peakCompletedTurnConcurrency": peak_concurrency(intervals),
-        },
+        "history": all_history,
+        "historyByProfileCohort": history_by_cohort,
         "otelScope": {
             "rows": scoped_log_rows,
             "threads": scoped_log_threads,
@@ -280,6 +356,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--codex-home", default=os.environ.get("CODEX_HOME", "~/.codex"))
     parser.add_argument("--since", help="ISO-8601 start time; defaults to seven days ago")
+    parser.add_argument("--until", help="Exclusive ISO-8601 snapshot end; defaults to now")
     parser.add_argument("--root-thread", help="Limit the cohort to descendants of one root thread")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
@@ -287,6 +364,7 @@ def main(argv: list[str] | None = None) -> int:
         result = audit(
             codex_home=Path(args.codex_home).expanduser().resolve(),
             since=parse_since(args.since),
+            until=parse_until(args.until),
             root_thread=args.root_thread,
         )
     except (FileNotFoundError, ValueError) as exc:
@@ -297,7 +375,8 @@ def main(argv: list[str] | None = None) -> int:
         fleet = result["fleet"]
         history = result["history"]
         print(
-            f"{fleet['spawnedChildren']} children; {len(fleet['routeViolations'])} route violations; "
+            f"{fleet['spawnedChildren']} children; {fleet['catalogChildren']} GPT Engineer catalog children; "
+            f"{len(fleet['routeViolations'])} catalog route violations; "
             f"{history['projectedTurns']} projected turns; "
             f"peak concurrency {history['peakCompletedTurnConcurrency']}"
         )

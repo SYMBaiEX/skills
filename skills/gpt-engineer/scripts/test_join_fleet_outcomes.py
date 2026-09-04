@@ -77,6 +77,9 @@ class JoinFleetOutcomesTests(unittest.TestCase):
         self.assertEqual(actual["denominators"]["outcome-eligible"], 1)
         self.assertEqual(actual["denominators"]["verified"], 1)
         self.assertEqual(actual["metrics"][0]["durationMs"]["p50"], 10)
+        self.assertEqual(actual["journalLifecycle"]["runs"], 1)
+        self.assertEqual(actual["journalLifecycle"]["closedRuns"], 0)
+        self.assertEqual(actual["journalLifecycle"]["unclosedRuns"], 1)
 
     def test_real_run_journal_and_runner_envelope_join(self):
         repo = self.root / "repo"
@@ -428,6 +431,54 @@ class JoinFleetOutcomesTests(unittest.TestCase):
             subject.join(journals=[], result_dirs=[], min_complete_runs=0)
         with self.assertRaisesRegex(ValueError, "nonnegative"):
             subject.join(journals=[], result_dirs=[], min_comparable_pairs=-1)
+        with self.assertRaisesRegex(ValueError, "after --since"):
+            subject.join(
+                journals=[],
+                result_dirs=[],
+                since="2026-09-04T20:25:24Z",
+                snapshot_end="2026-09-04T20:25:24Z",
+            )
+
+    def test_snapshot_end_is_exclusive_for_journal_events(self):
+        event = {
+            "schema": subject.JOURNAL_SCHEMA,
+            "eventId": "edge",
+            "runId": "r",
+            "type": "run.started",
+            "occurredAtUtc": "2026-09-04T20:25:24Z",
+            "data": {},
+        }
+        self.journal.write_text(json.dumps(event) + "\n")
+        actual = subject.join(
+            journals=[str(self.root)],
+            result_dirs=[],
+            since="2026-09-04T20:25:23Z",
+            snapshot_end="2026-09-04T20:25:24Z",
+        )
+        self.assertEqual(actual["journalLifecycle"]["runs"], 0)
+
+    def test_bounded_window_rejects_undated_journal_events(self):
+        event = {
+            "schema": subject.JOURNAL_SCHEMA,
+            "eventId": "undated",
+            "runId": "r",
+            "type": "run.started",
+            "data": {},
+        }
+        self.journal.write_text(json.dumps(event) + "\n")
+        actual = subject.join(
+            journals=[str(self.root)],
+            result_dirs=[],
+            snapshot_end="2026-09-04T20:25:24Z",
+        )
+        self.assertEqual(actual["window"]["sinceUtc"], "2026-08-28T20:25:24Z")
+        self.assertEqual(actual["journalLifecycle"]["runs"], 0)
+        self.assertTrue(
+            any(
+                item["code"] == "missing-timestamp-in-bounded-window"
+                for item in actual["diagnostics"]
+            )
+        )
 
 
 if __name__ == "__main__":

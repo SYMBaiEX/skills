@@ -79,13 +79,59 @@ class AuditFleetTests(unittest.TestCase):
         )
         self.assertEqual(result["fleet"]["spawnedChildren"], 4)
         self.assertEqual(result["fleet"]["latestOnlyChildren"], 2)
-        self.assertEqual(result["fleet"]["routeViolations"][0]["model"], "gpt-5.4")
-        self.assertEqual(result["fleet"]["routeViolations"][1]["agentRole"], "worker")
+        self.assertEqual(result["fleet"]["catalogChildren"], 2)
+        self.assertEqual(result["fleet"]["currentProfileChildren"], 2)
+        self.assertEqual(result["fleet"]["historicalProfileChildren"], 0)
+        self.assertEqual(result["fleet"]["unattributedChildren"], 2)
+        self.assertEqual(result["fleet"]["routeViolations"], [])
         self.assertEqual(result["history"]["projectedTurns"], 2)
         self.assertEqual(result["history"]["peakCompletedTurnConcurrency"], 2)
+        self.assertEqual(
+            result["historyByProfileCohort"]["currentProfiles"]["projectedThreads"], 1
+        )
+        self.assertEqual(
+            result["historyByProfileCohort"]["unattributed"]["projectedThreads"], 1
+        )
         self.assertEqual(result["otelScope"], {"rows": 2, "threads": 2, "usageDeduplicated": False})
         self.assertEqual(result["fleet"]["spawnEdgeStatusCounts"], {"open": 4})
         self.assertTrue(any("not deduplicated" in item for item in result["limitations"]))
+        self.assertTrue(any("unattributed" in item for item in result["warnings"]))
+
+    def test_catalog_model_mismatch_is_a_route_violation(self) -> None:
+        state = sqlite3.connect(self.home / "state_5.sqlite")
+        state.execute(
+            "UPDATE threads SET model = 'gpt-5.4' WHERE id = 'a'"
+        )
+        state.commit()
+        state.close()
+        result = audit_fleet.audit(
+            codex_home=self.home,
+            since=datetime.fromtimestamp(100, timezone.utc),
+            root_thread="root",
+        )
+        self.assertEqual(len(result["fleet"]["routeViolations"]), 1)
+        self.assertEqual(result["fleet"]["routeViolations"][0]["model"], "gpt-5.4")
+
+    def test_historical_profile_is_auditable_but_retired_for_new_dispatch(self) -> None:
+        cutoff = int(audit_fleet.HISTORICAL_ROLE_RETIREMENT.timestamp())
+        state = sqlite3.connect(self.home / "state_5.sqlite")
+        state.execute(
+            "INSERT INTO threads VALUES (?,?,?,?,?)",
+            ("legacy", "gpt-engineer-worker", "gpt-5.6-terra", "medium", cutoff + 1),
+        )
+        state.execute(
+            "INSERT INTO thread_spawn_edges VALUES (?,?,?)", ("root", "legacy", "open")
+        )
+        state.commit()
+        state.close()
+        result = audit_fleet.audit(
+            codex_home=self.home,
+            since=datetime.fromtimestamp(100, timezone.utc),
+            root_thread="root",
+        )
+        self.assertEqual(result["fleet"]["historicalProfileChildren"], 1)
+        self.assertEqual(result["fleet"]["latestOnlyChildren"], 2)
+        self.assertIn("retired", result["fleet"]["routeViolations"][0]["reasons"][0])
 
     def test_global_cohort_respects_since(self) -> None:
         result = audit_fleet.audit(
@@ -100,6 +146,31 @@ class AuditFleetTests(unittest.TestCase):
     def test_since_requires_timezone(self) -> None:
         with self.assertRaisesRegex(ValueError, "include a timezone"):
             audit_fleet.parse_since("2026-08-30T12:00:00")
+
+    def test_until_is_exclusive(self) -> None:
+        history = sqlite3.connect(self.home / "thread_history_1.sqlite")
+        history.execute(
+            "INSERT INTO thread_turns VALUES (?,?,?,?,?)",
+            ("a", "completed", 130, 140, 10000),
+        )
+        history.commit()
+        history.close()
+        result = audit_fleet.audit(
+            codex_home=self.home,
+            since=datetime.fromtimestamp(100, timezone.utc),
+            until=datetime.fromtimestamp(130, timezone.utc),
+        )
+        self.assertEqual(result["fleet"]["spawnedChildren"], 2)
+        self.assertEqual(result["history"]["projectedTurns"], 2)
+        self.assertEqual(result["requestedUntilUtc"], "1970-01-01T00:02:10Z")
+
+    def test_until_must_follow_since(self) -> None:
+        with self.assertRaisesRegex(ValueError, "after --since"):
+            audit_fleet.audit(
+                codex_home=self.home,
+                since=datetime.fromtimestamp(100, timezone.utc),
+                until=datetime.fromtimestamp(100, timezone.utc),
+            )
 
 
 if __name__ == "__main__":

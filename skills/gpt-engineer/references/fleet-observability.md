@@ -24,11 +24,13 @@ For a repeatable route, latency, concurrency, and retention snapshot, run:
 ```bash
 python3 scripts/audit_fleet.py \
   --since 2026-08-30T00:00:00-05:00 \
+  --until 2026-09-04T15:25:24-05:00 \
   --root-thread <root-thread-id> \
   --json
 ```
 
-Omit `--root-thread` only when intentionally auditing every spawned child in the time window. The
+Use an explicit exclusive `--until` for a reproducible snapshot. Omit `--root-thread` only when
+intentionally auditing every spawned child in the time window. The
 script does not sum token attributes because the same cumulative usage can appear on many nested
 OTel rows; use a turn/request-deduplicated query for token analysis. It also cannot reconstruct
 command retries, compactions, or finding acceptance from the three SQLite summaries alone. Combine
@@ -64,6 +66,12 @@ Use stable identities, not log-row counts:
 Never silently merge these denominators. Missing history or OTel rows usually mean retention or
 projection gaps, not that a dispatch did no work. A spawn edge with status `open` is registry state,
 not proof that an operating-system process is still alive.
+
+Keep current GPT Engineer profiles, retired GPT Engineer profiles, and unattributed specialist
+children separate. A child outside the GPT Engineer profile catalog may come from another skill or
+an explicit specialist workflow; it is not a GPT Engineer route violation without a journal or
+dispatch identity linking it to this skill. Retired profile names remain useful for historical
+baselines but are violations when used for a new post-migration dispatch.
 
 ## Measure what changes decisions
 

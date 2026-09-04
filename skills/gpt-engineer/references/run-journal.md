@@ -72,6 +72,13 @@ Completion must fail closed while a required requirement, finding, quality gate,
 barrier is open. A completed run is immutable. Blocked and failed runs retain their explicit reason
 and may seed a new attempt; they are not silently reopened.
 
+Before the orchestrator returns its final answer, run `status` and close the journal on every exit
+path. A native lane must record its child/thread identity, requested profile, requested model and
+effort, `fork_turns`, terminal state, bounded handoff hash, and verification disposition. If the
+runtime does not export effective model or service tier, record `unavailable`; never replace it with
+the requested value. Native collaboration does not emit the compatibility adapter's `result.json`,
+so these terminal journal fields are required for later outcome joins.
+
 ## Reuse only current command truth
 
 Use `scripts/cache_gates.py` to fingerprint the repository and store normalized command evidence in

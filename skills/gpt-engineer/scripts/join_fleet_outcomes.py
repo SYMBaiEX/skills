@@ -11,7 +11,7 @@ import argparse
 import hashlib
 import json
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -252,7 +252,11 @@ def route_key(item: dict[str, Any]) -> tuple[str, str, str]:
 
 
 def load_journals(
-    paths: list[Path], since: datetime | None, end: datetime | None
+    paths: list[Path],
+    since: datetime | None,
+    end: datetime | None,
+    *,
+    require_timestamp: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, int], list[dict[str, Any]]]:
     events: list[dict[str, Any]] = []
     diagnostics: list[dict[str, Any]] = []
@@ -330,6 +334,19 @@ def load_journals(
                 counts["malformed"] += 1
                 continue
             stamp = event_timestamp(event)
+            if stamp is None and require_timestamp and not any(
+                k in event for k in ("timestamp", "timestampUtc", "occurredAtUtc")
+            ):
+                diagnostics.append(
+                    {
+                        "code": "missing-timestamp-in-bounded-window",
+                        "source": "journal",
+                        "line": number,
+                        "id": digest(str(journal)),
+                    }
+                )
+                counts["malformed"] += 1
+                continue
             if event_timestamp(event) is None and any(
                 k in event for k in ("timestamp", "timestampUtc", "occurredAtUtc")
             ):
@@ -343,7 +360,7 @@ def load_journals(
                 )
                 counts["malformed"] += 1
                 continue
-            if stamp and ((since and stamp < since) or (end and stamp > end)):
+            if stamp and ((since and stamp < since) or (end and stamp >= end)):
                 continue
             event_id = event.get("eventId")
             if not isinstance(event_id, str) or not event_id:
@@ -574,6 +591,7 @@ def recommendation(
 def audit_if_requested(
     codex_home: str | None,
     since: datetime | None,
+    snapshot_end: datetime | None,
     root_thread: str | None,
     diagnostics: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
@@ -582,9 +600,12 @@ def audit_if_requested(
     try:
         import audit_fleet
 
+        audit_until = snapshot_end or datetime.now(timezone.utc)
+        audit_since = since or (audit_until - timedelta(days=7))
         return audit_fleet.audit(
             codex_home=Path(codex_home).expanduser().resolve(),
-            since=since or datetime.now(timezone.utc),
+            since=audit_since,
+            until=audit_until,
             root_thread=root_thread,
         )
     except (ImportError, FileNotFoundError, ValueError):
@@ -633,12 +654,15 @@ def join(
     min_comparable_pairs: int = 3,
     include_identifiers: bool = False,
 ) -> dict[str, Any]:
+    explicit_window = since is not None or snapshot_end is not None
     since_dt, end_dt = (
         parse_time(since, "since"),
         parse_time(snapshot_end, "snapshot-end"),
     )
-    if since_dt and end_dt and since_dt > end_dt:
-        raise ValueError("--since must not be after --snapshot-end")
+    if end_dt is not None and since_dt is None:
+        since_dt = end_dt - timedelta(days=7)
+    if since_dt and end_dt and since_dt >= end_dt:
+        raise ValueError("--snapshot-end must be after --since")
     if min_complete_runs <= 0:
         raise ValueError("--min-complete-runs must be positive")
     if min_comparable_pairs < 0:
@@ -647,9 +671,62 @@ def join(
     journal_paths = discover(journals, "journal.jsonl")
     result_paths = discover(result_dirs, "result.json")
     events, journal_counts, journal_diags = load_journals(
-        journal_paths, since_dt, end_dt
+        journal_paths,
+        since_dt,
+        end_dt,
+        require_timestamp=explicit_window,
     )
     diagnostics.extend(journal_diags)
+    lifecycle_by_run: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {
+            "closed": None,
+            "dispatches": set(),
+            "handoffs": set(),
+            "barriersStarted": set(),
+            "barriersCompleted": set(),
+        }
+    )
+    for event in events:
+        run_id = get_value(event, "runId", "run_id")
+        if run_id in (None, ""):
+            continue
+        item = lifecycle_by_run[str(run_id)]
+        kind = event_kind(event)
+        data_id = get_value(event, "dispatchId", "dispatch_id")
+        stage_id = get_value(event, "stageId", "stage_id")
+        if kind == "dispatch.accepted" and data_id not in (None, ""):
+            item["dispatches"].add(str(data_id))
+        elif kind == "handoff.received" and data_id not in (None, ""):
+            item["handoffs"].add(str(data_id))
+        elif kind == "barrier.started" and stage_id not in (None, ""):
+            item["barriersStarted"].add(str(stage_id))
+        elif kind == "barrier.completed" and stage_id not in (None, ""):
+            item["barriersCompleted"].add(str(stage_id))
+        elif kind == "run.closed":
+            item["closed"] = str(get_value(event, "status") or "unknown")
+    close_status_counts = Counter(
+        str(item["closed"] or "missing") for item in lifecycle_by_run.values()
+    )
+    unclosed_run_ids = [
+        safe_id(run_id, include_identifiers)
+        for run_id, item in lifecycle_by_run.items()
+        if item["closed"] is None
+    ]
+    journal_lifecycle = {
+        "runs": len(lifecycle_by_run),
+        "closedRuns": sum(item["closed"] is not None for item in lifecycle_by_run.values()),
+        "closeStatusCounts": dict(close_status_counts.most_common()),
+        "unclosedRuns": len(unclosed_run_ids),
+        "unclosedRunIds": sorted(item for item in unclosed_run_ids if item is not None),
+        "dispatchesWithoutHandoff": sum(
+            len(item["dispatches"] - item["handoffs"])
+            for item in lifecycle_by_run.values()
+        ),
+        "openBarriers": sum(
+            len(item["barriersStarted"] - item["barriersCompleted"])
+            for item in lifecycle_by_run.values()
+        ),
+    }
     results, result_duplicates = load_results(result_paths, diagnostics)
     journal_by_id: dict[tuple[str, str, str, str], list[dict[str, Any]]] = defaultdict(
         list
@@ -865,7 +942,9 @@ def join(
                 "finalDeduplicatedTokens": final_tokens,
             }
         )
-    audit = audit_if_requested(codex_home, since_dt, root_thread, diagnostics)
+    audit = audit_if_requested(
+        codex_home, since_dt, end_dt, root_thread, diagnostics
+    )
     audit_projected = audit_otel = False
     if isinstance(audit, dict):
         history, otel_scope = audit.get("history"), audit.get("otelScope")
@@ -919,6 +998,7 @@ def join(
             "journalDuplicates": journal_counts.get("duplicates", 0),
             "resultDuplicates": result_duplicates,
         },
+        "journalLifecycle": journal_lifecycle if journal_available else None,
         "denominators": rendered_denominators,
         "coverage": {
             "journalResult": coverage,

@@ -4,7 +4,7 @@ description: "Own a software-engineering outcome end to end with a strictly mode
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.9.0"
+  version: "1.10.0"
 ---
 
 # GPT Engineer
@@ -70,6 +70,11 @@ Run this routing preflight:
 6. For a new programmatic or headless controller, prefer the stable official Codex SDK where it covers the need: request model and sandbox per thread, retain thread and turn IDs, stream lifecycle events, cancel on deadlines, and reconcile cleanup. Version-pin the app-server protocol and feature-detect experimental lifecycle or terminal APIs. Keep retries, idempotency, worktree allocation, authorization, and release evidence in the application control plane. Treat the model as requested—not independently attested—unless the runtime exports effective route metadata.
 7. Use `scripts/run_codex_agent.py` only as the guarded Codex CLI compatibility adapter when native model selection is unavailable, a native sandbox cannot be proven, isolated headless execution is required, or an explicitly authorized cross-provider bridge needs Codex. It explicitly requests a pinned model but does not independently attest the provider's effective route. Record `--compatibility-reason`; run no more than two read-only adapters concurrently, never overlap a writer with another delegate in the same repository, and inspect every result envelope and structured handoff.
 8. If none of the native, SDK/app-server, compatibility-adapter, or proven-parent paths can request the required model without substitution, report the routing blocker. Never silently substitute a generic, inherited, behavioral, old, Spark, or Claude model.
+
+The retired `gpt-engineer-lead`, `gpt-engineer-explorer`, `gpt-engineer-worker`, and
+`gpt-engineer-verifier` names are historical audit labels only. Never spawn them in a new run. Record
+the requested current profile and `fork_turns` value with the dispatch; a current profile without
+that evidence is configured-route evidence, not proof of bounded context or effective execution.
 
 Do not spend a separate synthetic model turn merely to test routing. Run the local preflight, then
 make the first useful bounded stage the route canary and inspect metadata immediately. Stop it if the
@@ -302,7 +307,7 @@ report is advisory and never authorizes automatic route, effort, Team-mode, or e
 
 - Prefer direct tool calls when each result changes the next engineering decision, approval is involved, or native artifacts and citations must be preserved.
 - Use Responses Programmatic Tool Calling only when an API-backed bounded stage benefits from deterministic filtering, joining, deduplication, validation, or aggregation. Its generated JavaScript has no direct filesystem, network, subprocess, package, or persistent-state access, but it can invoke eligible mutation tools. Exclude `apply_patch` and shell tools from unapproved stages; use direct, approval-aware calls for authorized writes. Define allowed tools, output schema, concurrency, retry, and stop limits.
-- Use Responses Multi-agent beta only for independent hosted fan-out. Its current beta documentation does not establish heterogeneous child model/tool control or filesystem isolation, so never use it as proof of mixed Sol/Terra/Luna routing or as the sole production scheduler for a write workflow.
+- Use Responses Multi-agent beta only for independent hosted fan-out. Its subagents share the request model and tools, so it cannot implement a heterogeneous Sol/Terra/Luna fleet inside one request. It also does not provide Codex worktree isolation. Never use it as proof of mixed-model routing or as the sole production scheduler for a shared-repository write workflow.
 - Use Agents SDK manager-style agents when an application needs typed handoffs, state, and tracing across broader specialists. Run Codex as MCP when coding is one specialist inside that application; do not rebuild normal Codex-native subagent coordination in an application wrapper.
 - Pair skills with MCP or connectors only for external systems actually required by the workflow.
 - Use Computer Use or browser tooling for user-facing QA when available and authorized; preserve screenshots or exact reproduction evidence.
@@ -345,6 +350,14 @@ only the recorded child process groups, then capture available evidence and cand
 removing the candidate worktree. Verify no recorded child remains afterward. Never kill processes by
 binary name: classify a process by its recorded parent and cwd first, so shared MCP servers and other
 tasks remain untouched.
+
+For a durable run, treat journal finalization as part of teardown. In a `finally`-equivalent path,
+record every terminal handoff or interruption, complete or block each open barrier, run
+`scripts/run_journal.py status`, and close the run explicitly. Do not report a completed run while
+its journal still has an open dispatch, barrier, requirement, or finding. Native task completion
+does not create a CLI-runner `result.json`; record the native child/thread identity, requested route,
+`fork_turns`, terminal state, bounded handoff hash, and verification disposition in the journal so
+later audits can join the execution without reading transcripts.
 
 Finish only when every requirement and applicable quality gate has evidence or a concrete blocker,
 required skips are not misreported as passes, documentation has an explicit disposition,
