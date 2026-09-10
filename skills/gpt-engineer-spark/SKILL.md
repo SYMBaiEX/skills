@@ -4,16 +4,16 @@ description: Lead end-to-end engineering work with a capable main agent and a pa
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.4.0"
+  version: "1.4.1"
 ---
 
 # GPT Engineer Spark
 
 Own the outcome as the main agent. Keep planning, architecture, conflict resolution, integration, security-sensitive judgment, and final acceptance in the main thread. Delegate small, explicit shards to `gpt-5.3-codex-spark` for speed.
 
-Spark is intentionally an older speed-specialist model, not a GPT-5.6 latest-only route. Activate
+Spark is intentionally an older speed-specialist model, not GPT Engineer's Astra-first default. Activate
 this skill only when the user explicitly requests Spark or authorizes that tradeoff. Never enter it
-automatically from GPT Engineer's latest-only mode.
+automatically from GPT Engineer's default or economy mode.
 
 Read [references/codex-spark.md](references/codex-spark.md) before claiming availability, performance, or route proof.
 When Spark participates in a larger adaptive graph, also read the installed GPT Engineer

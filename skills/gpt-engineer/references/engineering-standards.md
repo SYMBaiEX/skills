@@ -42,7 +42,7 @@ Every implemented requirement needs:
 
 - an evidence-backed final disposition;
 - the smallest complete design consistent with current architecture and supported platforms;
-- focused regression coverage at the lowest meaningful layer;
+- proportionate verification at the lowest meaningful layer, with regression tests when behavior warrants them;
 - inspected success, error, empty, retry, cancellation, and concurrency behavior when relevant;
 - integrated-diff review that includes user-owned changes in the chosen review scope;
 - passed, failed, skipped, and not-run results reported separately;
@@ -79,23 +79,24 @@ the gate blocked/not run and explain what would be needed.
 
 ## Logical engineering-team lanes
 
-These are task contracts, not additional model profiles. Reuse the six pinned GPT-5.6 profiles and
-give each lane one bounded lens:
+These are optional task lenses, not a requirement to spawn a team. One Astra agent can cover several
+lenses coherently. Delegate only independent work that reduces elapsed time or adds useful review:
 
 | Logical lane | Normal route | Output |
 | --- | --- | --- |
-| Requirements and product completeness | `terra_explorer` | Requirement map, incomplete journeys, stale promises, acceptance gaps |
-| Architecture and boundaries | `terra_explorer`; escalate consequential decisions to `sol_engineer` or the lead | Execution/data/API map, coupling and migration risks, decision options |
-| Correctness and compatibility | `terra_explorer` | Concrete defects, races, error paths, compatibility and regression risks |
-| Security and privacy | `terra_explorer`; Sol owns final high-risk judgment | Trust boundaries, abuse cases, auth/data/supply-chain findings, required proof |
-| SDKs, dependencies, and deprecations | `terra_explorer` | Primary-source version/API evidence, official SDK opportunities, drift and lockfile impact |
-| Tests and user journeys | `luna_verifier` | Gate inventory, actual pass/fail/skip counts, missing layers, runtime/browser evidence |
-| Performance, reliability, and observability | `terra_explorer` plus `luna_verifier` for bounded measurements | Baselines, hot paths, capacity/failure evidence, missing operational signals |
-| Operations, release, and documentation | `terra_explorer` or `luna_verifier` | CI/CD truth, configuration, rollback/canary/runbook and documentation dispositions |
+| Requirements and product completeness | Lead or `astra_explorer` | Requirement map, incomplete journeys, stale promises, acceptance gaps |
+| Architecture and boundaries | Lead or `astra_engineer` | Execution/data/API map, coupling and migration risks, decision options |
+| Correctness and compatibility | Lead or `astra_verifier` | Concrete defects, races, error paths, compatibility and regression risks |
+| Security and privacy | Lead or `astra_engineer` | Trust boundaries, abuse cases, auth/data/supply-chain findings, required proof |
+| SDKs, dependencies, and deprecations | Lead or `astra_explorer` | Primary-source version/API evidence, official SDK opportunities, drift and lockfile impact |
+| Tests and user journeys | Lead or `astra_verifier` | Gate inventory, actual pass/fail/skip counts, missing layers, runtime/browser evidence |
+| Performance, reliability, and observability | Lead or a bounded Astra lane | Baselines, hot paths, capacity/failure evidence, missing operational signals |
+| Operations, release, and documentation | Lead or `astra_explorer` | CI/CD truth, configuration, rollback/canary/runbook and documentation dispositions |
 
 Combine lanes when the repository is small. Split them by subsystem when the codebase is large. The
 lead deduplicates findings before any build wave and keeps architecture, security acceptance,
-integration, and final completion judgment accountable to Sol or the primary orchestrator.
+integration, and final completion judgment accountable to the Astra lead. Explicit economy mode may
+route bounded task lenses to the retained Terra/Luna profiles; it does not transfer final acceptance.
 
 ## Qualify an eight-reader Team wave
 
@@ -103,7 +104,7 @@ Broad remains the default six-reader ceiling. Use Team mode only when:
 
 - at least seven bounded read-only lanes are independently ready;
 - every lane unblocks a named downstream decision and has non-overlapping evidence ownership;
-- exact Sol/Terra/Luna route attestation passes;
+- exact selected-suite route attestation passes;
 - the host shows no resource pressure and the previous comparable wave did not show high failure;
 - the wave is a discovery or post-integration review barrier, never a shared-write wave;
 - a paired comparison will measure accepted findings, wall time, failures, context, and rework.
@@ -139,7 +140,7 @@ ledger. Change defaults only when repeated evaluations show a benefit.
 
 ## Official sources
 
-- GPT-5.6 model and prompt guidance: https://developers.openai.com/api/docs/guides/latest-model
+- Astra model and prompt guidance: https://developers.openai.com/api/docs/guides/latest-model
 - Codex subagents and custom agents: https://learn.chatgpt.com/docs/agent-configuration/subagents
 - Codex instruction layering: https://learn.chatgpt.com/docs/agent-configuration/agents-md
 - Codex code review: https://learn.chatgpt.com/docs/code-review

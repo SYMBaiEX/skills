@@ -114,7 +114,7 @@ print(json.dumps({"type": "turn.completed"}))
             with self.assertRaisesRegex(SystemExit, "2"):
                 run_codex_agent.main(
                     [
-                        "--role",
+                        "--suite", "economy", "--role",
                         "terra-explorer",
                         "--cwd",
                         str(self.root),
@@ -130,7 +130,7 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("INCOMPLETE_HANDOFF")):
             result = run_codex_agent.main(
                 [
-                    "--role",
+                    "--suite", "economy", "--role",
                     "terra-explorer",
                     "--cwd",
                     str(self.root),
@@ -154,7 +154,7 @@ print(json.dumps({"type": "turn.completed"}))
             with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
                 result = run_codex_agent.main(
                     [
-                        "--role",
+                        "--suite", "economy", "--role",
                         "luna-verifier",
                         "--cwd",
                         str(self.root),
@@ -173,12 +173,26 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertNotIn("dangerously-bypass", rendered)
         self.assertIn("--output-schema", rendered)
 
+    def test_default_dry_run_pins_astra_read_only_verifier(self) -> None:
+        with mock.patch("sys.stdin", io.StringIO("Verify the repository without edits.")):
+            with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                result = run_codex_agent.main([
+                    "--role", "astra-verifier", "--cwd", str(self.root),
+                    "--output-dir", str(self.output), "--codex", str(self.codex), "--dry-run",
+                ])
+        self.assertEqual(result, 0)
+        rendered = stdout.getvalue()
+        self.assertIn('"model": "gpt-6-astra"', rendered)
+        self.assertIn('"reasoningEffort": "medium"', rendered)
+        self.assertIn('"sandbox": "read-only"', rendered)
+        self.assertNotIn('service_tier="fast"', rendered)
+
     def test_terra_worker_requires_explicit_write_authority(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Implement the bounded fix.")):
             with self.assertRaisesRegex(SystemExit, "requires --allow-writes"):
                 run_codex_agent.main(
                     [
-                        "--role",
+                        "--suite", "economy", "--role",
                         "terra-worker",
                         "--cwd",
                         str(self.root),
@@ -197,7 +211,7 @@ print(json.dumps({"type": "turn.completed"}))
             ):
                 run_codex_agent.main(
                     [
-                        "--role",
+                        "--suite", "economy", "--role",
                         "luna-worker",
                         "--cwd",
                         str(self.root),
@@ -216,7 +230,7 @@ print(json.dumps({"type": "turn.completed"}))
             ):
                 run_codex_agent.main(
                     [
-                        "--role",
+                        "--suite", "economy", "--role",
                         "luna-max-worker",
                         "--cwd",
                         str(self.root),
@@ -231,7 +245,7 @@ print(json.dumps({"type": "turn.completed"}))
             with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
                 result = run_codex_agent.main(
                     [
-                        "--role",
+                        "--suite", "economy", "--role",
                         "luna-max-worker",
                         "--cwd",
                         str(self.root),
@@ -256,7 +270,7 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
             result = run_codex_agent.main(
                 [
-                    "--role",
+                    "--suite", "economy", "--role",
                     "terra-explorer",
                     "--cwd",
                     str(self.root),
@@ -344,7 +358,7 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
             result = run_codex_agent.main(
                 [
-                    "--role",
+                    "--suite", "economy", "--role",
                     "terra-explorer",
                     "--stage-id",
                     "map-api",
@@ -403,7 +417,7 @@ print(json.dumps({"type": "turn.completed"}))
             ):
                 run_codex_agent.main(
                     [
-                        "--role",
+                        "--suite", "economy", "--role",
                         "terra-explorer",
                         "--stage-id",
                         "map-api",
@@ -427,7 +441,7 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
             result = run_codex_agent.main(
                 [
-                    "--role",
+                    "--suite", "economy", "--role",
                     "terra-explorer",
                     "--cwd",
                     str(self.root),
@@ -450,7 +464,7 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
             result = run_codex_agent.main(
                 [
-                    "--role",
+                    "--suite", "economy", "--role",
                     "terra-explorer",
                     "--cwd",
                     str(self.root),
@@ -471,7 +485,7 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("WRITE_ALLOWED")):
             result = run_codex_agent.main(
                 [
-                    "--role",
+                    "--suite", "economy", "--role",
                     "terra-worker",
                     "--cwd",
                     str(self.root),
@@ -502,8 +516,8 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("WRITE_OUTSIDE")):
             result = run_codex_agent.main(
                 [
-                    "--role",
-                    "sol-engineer",
+                    "--suite", "economy", "--role",
+                    "astra-engineer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -525,7 +539,7 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("WRITE_ALLOWED COMMIT_CHANGE")):
             result = run_codex_agent.main(
                 [
-                    "--role",
+                    "--suite", "economy", "--role",
                     "terra-worker",
                     "--cwd",
                     str(self.root),
@@ -554,8 +568,8 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("WRITE_IGNORED")):
             result = run_codex_agent.main(
                 [
-                    "--role",
-                    "sol-engineer",
+                    "--suite", "economy", "--role",
+                    "astra-engineer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -580,8 +594,8 @@ print(json.dumps({"type": "turn.completed"}))
             with self.assertRaisesRegex(SystemExit, "symlinks that resolve outside"):
                 run_codex_agent.main(
                     [
-                        "--role",
-                        "sol-engineer",
+                        "--suite", "economy", "--role",
+                        "astra-engineer",
                         "--cwd",
                         str(self.root),
                         "--output-dir",
@@ -599,7 +613,7 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
             result = run_codex_agent.main(
                 [
-                    "--role",
+                    "--suite", "economy", "--role",
                     "terra-explorer",
                     "--cwd",
                     str(self.root),
@@ -621,7 +635,7 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("HANG")):
             result = run_codex_agent.main(
                 [
-                    "--role",
+                    "--suite", "economy", "--role",
                     "terra-explorer",
                     "--cwd",
                     str(self.root),
@@ -645,7 +659,7 @@ print(json.dumps({"type": "turn.completed"}))
             with self.assertRaisesRegex(SystemExit, "limit is 10"):
                 run_codex_agent.main(
                     [
-                        "--role",
+                        "--suite", "economy", "--role",
                         "terra-explorer",
                         "--cwd",
                         str(self.root),
@@ -662,7 +676,7 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("SPAM_STDOUT")):
             result = run_codex_agent.main(
                 [
-                    "--role",
+                    "--suite", "economy", "--role",
                     "terra-explorer",
                     "--cwd",
                     str(self.root),

@@ -97,6 +97,29 @@ class AuditFleetTests(unittest.TestCase):
         self.assertTrue(any("not deduplicated" in item for item in result["limitations"]))
         self.assertTrue(any("unattributed" in item for item in result["warnings"]))
 
+    def test_wrong_model_within_economy_is_still_a_violation(self) -> None:
+        with sqlite3.connect(self.home / "state_5.sqlite") as state:
+            state.execute("UPDATE threads SET model='gpt-5.6-luna' WHERE id='a'")
+        result = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(100, timezone.utc), root_thread="root")
+        violations = result["fleet"]["routeViolations"]
+        self.assertEqual(len(violations), 1)
+        self.assertIn("expected gpt-5.6-terra", violations[0]["reasons"][0])
+        self.assertEqual(result["fleet"]["latestOnlyChildren"], 1)
+
+    def test_sol_before_and_after_astra_cutover(self) -> None:
+        from routes import MIGRATION
+        cutoff = int(MIGRATION.timestamp())
+        with sqlite3.connect(self.home / "state_5.sqlite") as state:
+            state.execute("UPDATE threads SET agent_role='sol_engineer', model='gpt-5.6-sol', created_at=? WHERE id='a'", (cutoff - 1,))
+            state.execute("UPDATE threads SET agent_role='sol_engineer', model='gpt-5.6-sol', created_at=? WHERE id='c'", (cutoff,))
+        result = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(100, timezone.utc), until=datetime.fromtimestamp(cutoff + 100, timezone.utc), root_thread="root")
+        violations = result["fleet"]["routeViolations"]
+        self.assertEqual(violations, [])
+        self.assertEqual(result["fleet"]["staleProfileDiagnostics"][0]["threadId"], "c")
+        self.assertEqual(result["fleet"]["historicalProfileChildren"], 2)
+        strict = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(cutoff, timezone.utc), until=datetime.fromtimestamp(cutoff + 100, timezone.utc), root_thread="root", dispatch_suite="astra")
+        self.assertEqual(len(strict["fleet"]["routeViolations"]), 1)
+
     def test_catalog_model_mismatch_is_a_route_violation(self) -> None:
         state = sqlite3.connect(self.home / "state_5.sqlite")
         state.execute(

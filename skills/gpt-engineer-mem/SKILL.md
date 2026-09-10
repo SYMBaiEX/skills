@@ -1,6 +1,8 @@
 ---
 name: gpt-engineer-mem
-description: Memory-aware GPT engineering for codebase research, implementation, verification, and release. Use when a task should reuse Claude Mem or Codex session history without trusting stale recollections, flooding context, changing memory settings, or weakening the GPT-5.6 Sol/Terra/Luna engineering workflow.
+description: Memory-aware GPT engineering for codebase research, implementation, verification, and release. Use when a task should reuse native Codex notes, searchable session history, or Claude Mem without trusting stale recollections, flooding context, changing memory settings, or weakening the installed GPT Engineer Astra-first workflow.
+metadata:
+  version: "2.0.0"
 ---
 
 # GPT Engineer Mem
@@ -11,29 +13,40 @@ decisions; the current repository, runtime, primary documentation, and tests rem
 ## Load the engineering contract
 
 Use the installed `gpt-engineer` skill as the base contract when it is available. Read its
-`SKILL.md` and follow its scope ledger, latest-only routing preflight, bounded delegation, ownership,
+`SKILL.md` and follow its scope ledger, current routing contract, bounded delegation, ownership,
 integration, verification, gap scan, and teardown rules. Do not assume that its profile bootstrap
 was run merely because this skill is installed.
 
 If `gpt-engineer` is unavailable, continue with this standalone contract:
 
 - The parent owns scope, plan, integration, user updates, final verification, and external actions.
-- Use the smallest useful agent graph. Prefer `gpt-5.6-sol` for hard judgment,
-  `gpt-5.6-terra` for exploration and implementation, and `gpt-5.6-luna` for bounded mechanical
-  work and verification. Never silently substitute a different model when exact routing matters.
+- Use the smallest useful graph. Request `gpt-6-astra` for the parent and children:
+  `astra_engineer` at `high`; `astra_explorer`, `astra_worker`, and `astra_verifier` at `medium`.
+  Terra/Luna economy lanes require explicit opt-in; Sol is retired. Never silently substitute
+  an older model.
 - Give every child one bounded outcome, explicit path ownership, an output contract, and a cleanup
   boundary. Use `fork_turns: "none"` with a compact evidence packet when supported.
 - Integrate centrally, verify the product rather than only the patch, run a fresh gap scan, and
   reclaim task-owned agents, processes, listeners, and temporary worktrees. Shared MCP services are
   not teardown targets.
 
-Latest-only is the default. If exact GPT-5.6 routing is unavailable, fail closed for delegated
-latest-only lanes and either work in the capable parent or ask for direction; do not claim a model
-route that was not actually used.
+Prefer native exact profiles or direct model selection before Python helpers. Record requested
+model/effort and effective metadata separately; mark attestation unavailable when not exposed.
+If exact Astra selection is unavailable, report that limitation and continue only with a suitable
+available parent or ask for direction. Do not claim a model route that was not observed.
 
 ## Preflight memory safely
 
-Run the bundled read-only diagnostic before relying on Claude Mem:
+Prefer native Codex notes and targeted history retrieval when the active runtime exposes them.
+The experimental `features.context_management.experimental_mode` setting is off by default and
+requires eligible ChatGPT sign-in; API-key/custom-provider sessions are excluded. Do not enable it
+or assume `new_context` or searchable history exists merely because Astra was selected. Feature-detect
+the exposed tools, follow their contract, and retain a compact checkpoint when unavailable.
+See [configuration](https://learn.chatgpt.com/docs/config-file/config-reference) and
+[runtime release notes](https://learn.chatgpt.com/docs/changelog).
+
+For Claude Mem specifically, use its exposed read-only health/status tools first. If their evidence
+is insufficient and Python is available, run the bundled read-only diagnostic:
 
 ```bash
 python3 <skill-root>/scripts/memory_preflight.py --json
@@ -55,7 +68,7 @@ Read [memory-workflow.md](references/memory-workflow.md) before using memory too
 [claude-mem-capabilities.md](references/claude-mem-capabilities.md) only when deciding whether a
 specialized Claude Mem workflow should influence the task.
 
-For the normal path:
+For Claude Mem retrieval (native history follows its own tool contract):
 
 1. Identify the exact repository root, branch, current commit, task intent, and relevant modules.
 2. Search memory using the repository/project identity and two to four high-signal terms.

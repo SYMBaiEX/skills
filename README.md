@@ -10,15 +10,14 @@ servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and ap
 
 ## Skills
 
-- [`skills/gpt-engineer/`](skills/gpt-engineer/) — the primary end-to-end GPT engineer: strict
-  GPT-5.6 Sol/Terra/Luna research, layered engineering standards, adaptive one/three/six-lane fleets
-  with an opt-in qualified eight-reader team mode, isolated implementation, integration,
-  verification, private resumable run journals, content-addressed gate reuse, outcome-based fleet
-  tuning, bounded goal persistence, and task-owned resource teardown. Native Codex custom agents are
-  the interactive default; the official Codex SDK/app-server is the programmatic path, and the
-  Python `codex exec` driver is a guarded compatibility adapter rather than the normal scheduler.
+- [`skills/gpt-engineer/`](skills/gpt-engineer/) — GPT-6 Astra engineering from research through
+  verified delivery. Start with one Astra agent; delegate when independent work saves time or adds
+  useful review. Includes proportionate tests, optional economy routes, native context retrieval,
+  private durable run journals, outcome measurement, and task-owned cleanup. Native Codex is the
+  interactive path; current SDK and managed Agents API guidance supports programmatic work. The
+  Python CLI runner remains a guarded compatibility adapter.
 - [`skills/gpt-engineer-mem/`](skills/gpt-engineer-mem/) — the memory-aware GPT engineer: bounded
-  Claude Mem/Codex recall, live freshness checks, GPT-5.6 Sol/Terra/Luna delivery, and read-only
+  Claude Mem/Codex recall, live freshness checks, Astra delivery, and read-only
   memory-service diagnostics.
 - [`skills/gpt-engineer-spark/`](skills/gpt-engineer-spark/) — keep a capable lead in control while
   a model-pinned GPT-5.3-Codex-Spark fleet handles dependency-aware exploration, isolated candidate
@@ -95,13 +94,28 @@ python3 ~/.agents/skills/gpt-engineer-mem/scripts/memory_preflight.py --json
 ```
 
 The profile bootstrap is deliberately separate from skills.sh. It never edits provider configuration;
-`--upgrade` replaces only bundled agent-profile destinations. Use `--provider all --upgrade` only
+`--upgrade` updates bundled profiles and managed project hooks, and backs up/removes the known
+unmodified retired Sol profile. Customized retired profiles require review and are preserved.
+Use `--provider all --upgrade` only
 when Claude profiles are explicitly wanted. For project-local profiles and conservative Codex hooks,
 replace `--global` with `/path/to/repository`.
 
+The optional routing audit and repository validation require Python 3.11+ or an environment with
+`tomli` so all valid TOML profile syntax is parsed correctly. Native Astra work needs no Python helper.
+
 Do not activate a copied Luna model catalog as routine setup. Custom catalogs freeze upstream model
 metadata and the runtime audit rejects stale or unattested overrides. Prefer stock native routing;
-use the guarded CLI adapter when native Luna is temporarily unavailable.
+use the guarded CLI adapter for a justified compatibility gap in explicitly selected economy work.
+
+GPT Engineer 2 defaults to exact `gpt-6-astra` for the lead and optional children. The four bundled
+roles are `astra_engineer` (high effort), `astra_explorer`, `astra_worker`, and `astra_verifier`
+(medium effort). A runtime with explicit model/effort selection can delegate without installed
+custom roles. Existing Terra/Luna routes are available through explicit economy selection; Sol is
+historical. Astra's [official migration guidance](https://developers.openai.com/api/docs/guides/latest-model)
+informs the shorter prompts, selective delegation, persistent user intent, and calibrated testing.
+See [runtime choices and API compatibility](skills/gpt-engineer/references/dynamic-workflows.md)
+before building a controller: native Codex, Codex SDK, Agents API, and Responses expose different
+capabilities. The skill does not enable experimental context settings, Fast mode, or hosted sessions.
 
 Long GPT Engineer runs use private state outside the checkout by default. Inspect or resume that
 state with `run_journal.py`; opt a repository into a local `.engineer` control directory only with an
@@ -144,7 +158,7 @@ bash ~/.agents/skills/claude-multi-agent/scripts/run-workflow.sh \
 The saved `.claude/workflows/gpt-engineer-dynamic.js` uses Claude's native workflow runtime. The
 default runner starts from the exact clean `HEAD` and returns an isolated candidate patch; exit `3`
 means the outer engineer must integrate and verify it. The outer GPT Engineer remains responsible
-for any transition to Codex Sol, Terra, Luna, or Spark.
+for any transition to Codex Astra, explicitly selected economy routes, or Spark.
 
 Project hooks/settings are optional: run `bootstrap.sh /path/to/repository`, then commit those files
 before an isolated workflow run (or explicitly use `IN_PLACE=1`). Workflow evidence defaults to a

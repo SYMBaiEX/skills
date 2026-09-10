@@ -4,7 +4,7 @@ description: Turn an existing audit, finding list, issue set, review, failing-te
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.4.1"
+  version: "2.0.0"
 ---
 
 # GPT Orchestration Build
@@ -43,7 +43,9 @@ Order confirmed work by dependency and blast radius:
 5. cleanup, documentation, and generated artifacts;
 6. independent verification and residual-gap scan.
 
-Use the runtime's available concurrency, counting the orchestrator as a slot. Give one writer ownership of each file or tightly coupled subsystem. Latest-only is the default: use confirmed `sol_engineer` (`gpt-5.6-sol`) for hard integration, `terra_worker` (`gpt-5.6-terra`) for bounded implementation, `terra_explorer` for read-heavy gaps, and `luna_verifier` (`gpt-5.6-luna`) for mechanical checks. Native custom agents are the interactive default; for a new programmatic controller, prefer the stable official Codex SDK where it covers the need and version-pin/feature-detect experimental app-server APIs. If neither can request the required route or prove isolation and the sibling `gpt-engineer` skill is installed, use its guarded CLI compatibility adapter with an explicit `--compatibility-reason`; it does not independently attest the provider's effective model. Otherwise never use a generic, inherited, model-less, GPT-5, GPT-5.4, Spark, or Claude substitute; keep work with a proven parent or report the limitation.
+Use the runtime's available concurrency and include the orchestrator in the resource budget. Give one writer ownership of each file or tightly coupled subsystem. Read the installed `gpt-engineer` skill and follow its routing contract; do not duplicate a conflicting wrapper policy or assume profiles were installed.
+
+Without the core skill, request `gpt-6-astra` for the parent and every child: `astra_engineer` at `high`, and `astra_worker`, `astra_explorer`, and `astra_verifier` at `medium`. Terra/Luna economy lanes require explicit opt-in; Sol is retired. Prefer native exact profiles or direct model selection before Python helpers. Use the official Codex SDK or feature-detected app-server APIs for programmatic control; use the core skill's guarded CLI adapter only when needed. Record requested model/effort and effective metadata separately, marking attestation unavailable when not exposed. Never silently substitute an older model; if exact selection is unavailable, report it and continue only with a suitable available parent or seek direction.
 
 Every writer contract must include exact paths, success criteria, prohibited side effects, required tests, baseline constraints, and expected handoff evidence. Keep overlapping work read-only.
 

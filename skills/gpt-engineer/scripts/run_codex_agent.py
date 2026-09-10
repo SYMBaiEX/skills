@@ -23,45 +23,8 @@ import run_journal
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 HANDOFF_SCHEMA = SKILL_ROOT / "assets" / "codex" / "handoff.schema.json"
-ROLES = {
-    "sol-engineer": {
-        "model": "gpt-5.6-sol",
-        "effort": "high",
-        "profile": "sol-engineer.toml",
-        "write_capable": True,
-    },
-    "terra-explorer": {
-        "model": "gpt-5.6-terra",
-        "effort": "medium",
-        "profile": "terra-explorer.toml",
-        "write_capable": False,
-    },
-    "terra-worker": {
-        "model": "gpt-5.6-terra",
-        "effort": "medium",
-        "profile": "terra-worker.toml",
-        "write_capable": True,
-    },
-    "luna-worker": {
-        "model": "gpt-5.6-luna",
-        "effort": "low",
-        "profile": "luna-worker.toml",
-        "write_capable": True,
-    },
-    "luna-max-worker": {
-        "model": "gpt-5.6-luna",
-        "effort": "max",
-        "service_tier": "fast",
-        "profile": "luna-max-worker.toml",
-        "write_capable": True,
-    },
-    "luna-verifier": {
-        "model": "gpt-5.6-luna",
-        "effort": "medium",
-        "profile": "luna-verifier.toml",
-        "write_capable": True,
-    },
-}
+from routes import ROLES, suite_routes
+
 COMPATIBILITY_REASONS = (
     "native-routing-unavailable",
     "native-sandbox-unproven",
@@ -428,7 +391,7 @@ def build_command(
     allow_writes: bool,
 ) -> list[str]:
     profile = ROLES[role]
-    if role in {"terra-worker", "luna-worker", "luna-max-worker"} and not allow_writes:
+    if role in {"astra-worker", "terra-worker", "luna-worker", "luna-max-worker"} and not allow_writes:
         raise SystemExit(f"{role} requires --allow-writes")
     sandbox = (
         "workspace-write" if profile["write_capable"] and allow_writes else "read-only"
@@ -602,6 +565,7 @@ def bounded_error(error: BaseException, cwd: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--role", choices=tuple(ROLES), required=True)
+    parser.add_argument("--suite", choices=("astra", "economy"), default="astra")
     parser.add_argument(
         "--compatibility-reason",
         choices=COMPATIBILITY_REASONS,
@@ -675,6 +639,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    if args.role not in suite_routes(args.suite):
+        parser.error("Economy role requires explicit --suite economy; no model fallback is permitted")
     if args.compatibility_reason not in COMPATIBILITY_REASONS:
         parser.error(
             "--compatibility-reason is required; use native Codex custom agents or the "
@@ -748,6 +714,7 @@ def main(argv: list[str] | None = None) -> int:
                     "executionSurface": "codex-cli-compatibility-adapter",
                     "compatibilityReason": args.compatibility_reason,
                     "role": args.role,
+                    "suite": args.suite,
                     "stageId": stage_id,
                     "model": profile["model"],
                     "requestedModel": profile["model"],
@@ -893,6 +860,7 @@ def main(argv: list[str] | None = None) -> int:
                         metadata={
                             "producer": "run_codex_agent.py",
                             "role": args.role,
+                            "suite": args.suite,
                             "route": profile["model"],
                             "effort": profile["effort"],
                             "mode": execution_mode,
@@ -946,6 +914,7 @@ def main(argv: list[str] | None = None) -> int:
                         "laneId": lane_id,
                         "status": "running",
                         "role": args.role,
+                        "suite": args.suite,
                         "route": profile["model"],
                         "effort": profile["effort"],
                         "mode": execution_mode,
@@ -1178,6 +1147,7 @@ def main(argv: list[str] | None = None) -> int:
         "attempt": attempt,
         "dispatchId": dispatch_id,
         "role": args.role,
+        "suite": args.suite,
         "stageId": stage_id,
         "route": profile["model"],
         "effort": profile["effort"],

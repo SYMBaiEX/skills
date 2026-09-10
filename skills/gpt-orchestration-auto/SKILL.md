@@ -4,7 +4,7 @@ description: Autonomously pursue a sustained engineering outcome through repeate
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.4.1"
+  version: "2.0.0"
 ---
 
 # GPT Orchestration Auto
@@ -57,10 +57,9 @@ integration. Never restart repository-wide research just because automatic conti
 
 Inspect the live agent tree and tool schema before choosing a topology. Count the orchestrator as a concurrency slot. Use later waves rather than oversubscribing the runtime.
 
-- Latest-only is the default. Use confirmed `sol_engineer` / `gpt-5.6-sol` routing for ambiguous architecture, hard implementation, and integration.
-- Use confirmed `terra_explorer` and `terra_worker` / `gpt-5.6-terra` routing for read-heavy research and bounded routine implementation.
-- Use confirmed `luna_verifier` / `gpt-5.6-luna` routing for high-volume mechanical verification and residual scans.
-- Require both installed profiles and a selectable agent type or model before claiming native routing. Native custom agents are the interactive default; for a new programmatic controller, prefer the stable official Codex SDK where it covers the need and version-pin/feature-detect experimental app-server APIs. If neither can request the required route or prove isolation and the sibling `gpt-engineer` skill is installed, use its guarded CLI compatibility adapter with an explicit `--compatibility-reason`; it does not independently attest the provider's effective model. Otherwise never use generic, inherited, model-less, GPT-5, GPT-5.4, Spark, or Claude substitutes; keep work with a proven parent or record the blocker.
+- Read the installed `gpt-engineer` skill and follow its routing contract, not a separate wrapper policy. Do not assume its profiles were installed.
+- Standalone fallback requests `gpt-6-astra` for parent and children: `astra_engineer` at `high`; `astra_explorer`, `astra_worker`, and `astra_verifier` at `medium`. Terra/Luna economy lanes require explicit opt-in; Sol is retired. Never silently substitute older models.
+- Prefer native exact profiles or direct model selection before Python helpers. Use the official Codex SDK for programmatic control or feature-detected app-server APIs; the core skill's guarded CLI adapter is a compatibility option only when needed. Record requested model/effort separately from effective metadata, and mark attestation unavailable when the runtime does not expose it. If exact selection is unavailable, report that boundary and continue only with a suitable available parent or seek direction.
 - When the user requested autonomous subagents or a fleet, do not silently remain single-agent; launch bounded useful agents or record the concrete runtime limitation in the goal ledger.
 - Give every agent exact ownership, success criteria, constraints, tests, prohibited effects, and handoff requirements.
 - Keep one writer per file or tightly coupled subsystem.

@@ -68,13 +68,11 @@ def main() -> int:
         if name in LATEST_ONLY:
             lowered = text.lower()
             for required in (
-                "latest-only is the default",
-                "gpt-5.6-sol",
-                "gpt-5.6-terra",
-                "gpt-5.6-luna",
+                "gpt-6-astra",
+                "economy",
             ):
                 if required not in lowered:
-                    fail(f"latest-only contract missing {required!r}: {path}")
+                    fail(f"Astra routing contract missing {required!r}: {path}")
             for forbidden in (
                 "use generic subagents only",
                 "behavioral profiles only",
@@ -84,29 +82,17 @@ def main() -> int:
                     fail(f"fail-open routing phrase remains {forbidden!r}: {path}")
         if name == "gpt-engineer":
             for required in (
-                "**fast:**",
-                "delta-only",
-                "explicitly",
                 "scripts/plan_fleet.py",
                 "scripts/run_journal.py",
                 "scripts/cache_gates.py",
                 "scripts/join_fleet_outcomes.py",
                 "references/run-journal.md",
-                "six for a broad read-heavy wave",
-                "--team-qualified",
-                "--routes-attested",
-                "--lanes-independent",
-                "--paired-comparison",
-                "native 5.6 custom agents for normal interactive fleets",
-                "codex sdk/app-server",
-                "--compatibility-reason",
-                "audit_routing.py --cwd <repo> --runtime",
-                "do not spend a separate synthetic model turn merely to test routing",
+                "references/codex-astra.md",
             ):
                 if required not in text.lower():
                     fail(f"GPT Engineer fast-path contract missing {required!r}: {path}")
         if name == "gpt-engineer-spark":
-            for required in ("explicitly requests spark", "not a gpt-5.6 latest-only route"):
+            for required in ("explicitly requests spark",):
                 if required not in text.lower():
                     fail(f"Spark opt-in contract missing {required!r}: {path}")
         if name == "gpt-engineer-mem":
@@ -125,13 +111,22 @@ def main() -> int:
                 if required not in lowered:
                     fail(f"fleet lifecycle contract missing {required!r}: {path}")
 
-    sol_profile = SKILLS / "gpt-engineer" / "assets" / "codex" / "agents" / "sol-engineer.toml"
-    if 'model = "gpt-5.6-sol"' not in sol_profile.read_text():
-        fail(f"Sol profile is not explicitly pinned to gpt-5.6-sol: {sol_profile}")
+    sys.path.insert(0, str(SKILLS / "gpt-engineer" / "scripts"))
+    from routes import ROLES, ASTRA_MODEL, suite_routes
+    from audit_routing import read_profile
+    agents = SKILLS / "gpt-engineer" / "assets" / "codex" / "agents"
+    if {path.name for path in agents.glob("*.toml")} != {route["profile"] for route in ROLES.values()}:
+        fail("Bundled agent assets disagree with route registry")
+    for name, route in ROLES.items():
+        profile = read_profile(agents / route["profile"])
+        if (profile.get("name"), profile.get("model"), profile.get("model_reasoning_effort"), profile.get("service_tier")) != (name.replace("-", "_"), route["model"], route["effort"], route.get("service_tier")):
+            fail(f"Bundled profile disagrees with registry: {name}")
+    if any(route["model"] != ASTRA_MODEL for route in suite_routes().values()):
+        fail("Default suite permits a non-Astra route")
     codex_runner = SKILLS / "gpt-engineer" / "scripts" / "run_codex_agent.py"
     codex_runner_text = codex_runner.read_text()
-    if '"model": "gpt-5.6-sol"' not in codex_runner_text:
-        fail(f"Codex compatibility adapter is not explicitly pinned to gpt-5.6-sol: {codex_runner}")
+    if "from routes import ROLES, suite_routes" not in codex_runner_text:
+        fail(f"Codex compatibility adapter is not explicitly pinned to gpt-6-astra: {codex_runner}")
     for required in (
         "--compatibility-reason",
         "codex-cli-compatibility-adapter",

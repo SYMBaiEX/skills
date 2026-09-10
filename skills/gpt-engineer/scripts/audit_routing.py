@@ -13,17 +13,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        tomllib = None
+
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
-ALLOWED_PARENT_MODELS = {"gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"}
-EXPECTED = {
-    "sol_engineer": ("gpt-5.6-sol", "high", None),
-    "terra_explorer": ("gpt-5.6-terra", "medium", None),
-    "terra_worker": ("gpt-5.6-terra", "medium", None),
-    "luna_worker": ("gpt-5.6-luna", "low", None),
-    "luna_max_worker": ("gpt-5.6-luna", "max", "fast"),
-    "luna_verifier": ("gpt-5.6-luna", "medium", None),
-}
+from routes import ASTRA_MODEL, expected_profiles
+ALLOWED_PARENT_MODELS = {ASTRA_MODEL}
+EXPECTED = expected_profiles()
 APP_CODEX = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
 MANAGED_CATALOG = Path("model-catalogs/gpt-engineer-luna-v2.json")
 
@@ -33,15 +35,24 @@ def sha256(path: Path) -> str:
 
 
 def read_profile(path: Path) -> dict[str, object]:
+    if tomllib is None:
+        raise ValueError(
+            f"Cannot parse custom agent profile {path}: routing audit requires Python 3.11+ "
+            "(tomllib) or the optional tomli package; no regex fallback is permitted"
+        )
     try:
-        text = path.read_text()
-    except OSError as exc:
-        raise SystemExit(f"Cannot parse custom agent profile {path}: {exc}") from exc
+        with path.open("rb") as stream:
+            document = tomllib.load(stream)
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"Cannot parse custom agent profile {path}: {exc}") from exc
     profile: dict[str, object] = {}
     for field in ("name", "model", "model_reasoning_effort", "service_tier"):
-        match = re.search(rf'(?m)^{field}\s*=\s*"([^"]*)"\s*$', text)
-        if match:
-            profile[field] = match.group(1)
+        if field not in document:
+            continue
+        value = document[field]
+        if not isinstance(value, str):
+            raise ValueError(f"Invalid custom agent profile {path}: top-level {field} must be a string")
+        profile[field] = value
     return profile
 
 
@@ -276,16 +287,26 @@ def audit(
     observed_routes: list[str] | None = None,
     include_runtime: bool = False,
     explicit_codex: str | None = None,
+    suite: str = "astra",
 ) -> dict[str, object]:
+    EXPECTED = expected_profiles(suite)
     violations: list[str] = []
     warnings: list[str] = []
+    if tomllib is None:
+        violations.append("Routing audit requires Python 3.11+ (tomllib) or optional tomli; no regex fallback is permitted")
     if parent_model and parent_model not in ALLOWED_PARENT_MODELS:
         violations.append(f"parent model is outside pinned-suite routing: {parent_model}")
 
     found: dict[str, list[dict[str, object]]] = {name: [] for name in EXPECTED}
     for scope, path in profile_candidates(cwd, codex_home):
-        profile = read_profile(path)
+        try:
+            profile = read_profile(path)
+        except ValueError as exc:
+            violations.append(f"{scope} profile: {exc}")
+            continue
         name = str(profile.get("name", ""))
+        if name == "sol_engineer":
+            warnings.append(f"retired Sol profile remains installed but is not an allowed dispatch target: {path}")
         if name not in EXPECTED:
             continue
         model = str(profile.get("model", ""))
@@ -357,6 +378,7 @@ def audit(
         "cwd": str(cwd),
         "codexHome": str(codex_home),
         "parentModel": parent_model,
+        "suite": suite,
         "allowedParentModels": sorted(ALLOWED_PARENT_MODELS),
         "profiles": found,
         "observedRoutes": observed,
@@ -387,6 +409,7 @@ def main(argv: list[str] | None = None) -> int:
         metavar="AGENT_TYPE=MODEL[:EFFORT]",
         help="Validate effective child metadata exported by the runtime; repeat for each child",
     )
+    parser.add_argument("--suite", choices=("astra", "economy"), default="astra")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
     args = parser.parse_args(argv)
 
@@ -403,6 +426,7 @@ def main(argv: list[str] | None = None) -> int:
         args.observed_route,
         args.runtime,
         args.codex,
+        args.suite,
     )
     if args.json:
         print(json.dumps(result, indent=2))

@@ -36,7 +36,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(installed.returncode, 0, installed.stderr)
         checked = self.run_script("--check", str(self.root))
         self.assertEqual(checked.returncode, 0, checked.stderr)
-        self.assertEqual(len(list((self.root / ".codex" / "agents").glob("*.toml"))), 6)
+        self.assertEqual(len(list((self.root / ".codex" / "agents").glob("*.toml"))), 9)
         self.assertEqual(len(list((self.root / ".claude" / "agents").glob("*.md"))), 4)
         self.assertTrue((self.root / ".codex" / "hooks.json").exists())
 
@@ -48,12 +48,12 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(installed.returncode, 0, installed.stderr)
         checked = self.run_script("--check", "--global", env=env)
         self.assertEqual(checked.returncode, 0, checked.stderr)
-        self.assertEqual(len(list((Path(env["CODEX_HOME"]) / "agents").glob("*.toml"))), 6)
+        self.assertEqual(len(list((Path(env["CODEX_HOME"]) / "agents").glob("*.toml"))), 9)
         self.assertEqual(len(list((Path(env["CLAUDE_CONFIG_DIR"]) / "agents").glob("*.md"))), 4)
         self.assertFalse((Path(env["CODEX_HOME"]) / "hooks.json").exists())
 
     def test_refuses_conflicting_agent_file(self) -> None:
-        conflict = self.root / ".codex" / "agents" / "sol-engineer.toml"
+        conflict = self.root / ".codex" / "agents" / "astra-engineer.toml"
         conflict.parent.mkdir(parents=True)
         conflict.write_text("user-owned\n")
         result = self.run_script("--provider", "codex", str(self.root))
@@ -62,12 +62,12 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(conflict.read_text(), "user-owned\n")
 
     def test_explicit_upgrade_replaces_bundled_profile(self) -> None:
-        conflict = self.root / ".codex" / "agents" / "sol-engineer.toml"
+        conflict = self.root / ".codex" / "agents" / "astra-engineer.toml"
         conflict.parent.mkdir(parents=True)
-        conflict.write_text('name = "sol_engineer"\nmodel = "gpt-5.6"\n')
+        conflict.write_text('name = "astra_engineer"\nmodel = "gpt-5.6"\n')
         result = self.run_script("--provider", "codex", "--upgrade", str(self.root))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('model = "gpt-5.6-sol"', conflict.read_text())
+        self.assertIn('model = "gpt-6-astra"', conflict.read_text())
 
     def test_warns_when_claude_forces_one_subagent_model(self) -> None:
         env = os.environ.copy()

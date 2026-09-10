@@ -1,4 +1,4 @@
 interface:
   display_name: "GPT Engineer"
-  short_description: "Build with strict GPT-5.6 agent routing"
-  default_prompt: "Use $gpt-engineer with exact GPT-5.6 Sol, Terra, and Luna routes to own this outcome through the smallest verified workflow."
+  short_description: "Build and verify software with GPT-6 Astra"
+  default_prompt: "Use $gpt-engineer with GPT-6 Astra to own this engineering outcome, delegate useful parallel work, and verify the integrated result."

@@ -12,25 +12,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-ALLOWED_MODELS = {"gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"}
-CURRENT_ROLES = {
-    "sol_engineer",
-    "terra_explorer",
-    "terra_worker",
-    "luna_worker",
-    "luna_max_worker",
-    "luna_verifier",
-}
-HISTORICAL_ROLES = {
-    "gpt-engineer-lead",
-    "gpt-engineer-explorer",
-    "gpt-engineer-worker",
-    "gpt-engineer-verifier",
-}
+from routes import ROLES, LEGACY, LEGACY_RETIREMENT, historical_policy, ASTRA, ECONOMY
+ALLOWED_MODELS = {value["model"] for value in ROLES.values()}
+CURRENT_ROLES = {name.replace("-", "_") for name in ROLES}
+HISTORICAL_ROLES = set(LEGACY) | {"sol_engineer"}
 CATALOG_ROLES = CURRENT_ROLES | HISTORICAL_ROLES
 # The native-first profile names shipped in this commit. Historical names stay
 # queryable for baselines but are not valid dispatch targets after this point.
-HISTORICAL_ROLE_RETIREMENT = datetime(2026, 8, 31, 7, 15, 45, tzinfo=timezone.utc)
+HISTORICAL_ROLE_RETIREMENT = LEGACY_RETIREMENT
 
 
 def parse_since(value: str | None) -> datetime:
@@ -197,7 +186,10 @@ def audit(
     since: datetime,
     until: datetime | None = None,
     root_thread: str | None = None,
+    dispatch_suite: str | None = None,
 ) -> dict[str, object]:
+    if dispatch_suite not in (None, "astra", "economy"):
+        raise ValueError("Unknown dispatch suite")
     state_path = codex_home / "state_5.sqlite"
     history_path = codex_home / "thread_history_1.sqlite"
     logs_path = codex_home / "logs_2.sqlite"
@@ -266,15 +258,20 @@ def audit(
     unattributed_rows = [row for row in rows if row["agent_role"] not in CATALOG_ROLES]
     catalog_rows = current_rows + historical_rows
     route_violations = []
+    stale_profiles = []
     for row in rows:
         reasons = []
-        if row["agent_role"] in CATALOG_ROLES and row["model"] not in ALLOWED_MODELS:
-            reasons.append("model outside pinned GPT-5.6 allowlist")
-        if (
-            row["agent_role"] in HISTORICAL_ROLES
-            and int(row["created_at"]) >= int(HISTORICAL_ROLE_RETIREMENT.timestamp())
-        ):
-            reasons.append("retired GPT Engineer profile used after native-first migration")
+        expected_model, retired = historical_policy(row["agent_role"], int(row["created_at"]))
+        if expected_model is not None and row["model"] != expected_model:
+            reasons.append(f"model does not match profile policy: expected {expected_model}")
+        if retired and row["agent_role"] == "sol_engineer" and dispatch_suite is None:
+            stale_profiles.append({"threadId": row["id"], "agentRole": row["agent_role"], "reason": "Sol profile after release cutover; installed workflow version and dispatch policy are unknown"})
+        elif retired:
+            reasons.append(retired)
+        if dispatch_suite and row["agent_role"] == "sol_engineer" and not retired:
+            reasons.append("Sol is outside the explicitly asserted v2 dispatch suite")
+        if dispatch_suite == "astra" and row["agent_role"] in {name.replace("-", "_") for name in ECONOMY}:
+            reasons.append("economy profile is outside the explicitly asserted Astra dispatch suite")
         if reasons:
             route_violations.append(
                 {
@@ -327,7 +324,7 @@ def audit(
             "historicalProfileChildren": len(historical_rows),
             "unattributedChildren": len(unattributed_rows),
             "latestOnlyChildren": sum(
-                row["agent_role"] in CURRENT_ROLES and row["model"] in ALLOWED_MODELS
+                row["agent_role"] in CURRENT_ROLES and row["model"] == historical_policy(row["agent_role"], int(row["created_at"]))[0]
                 for row in rows
             ),
             "modelCounts": dict(model_counts.most_common()),
@@ -335,9 +332,17 @@ def audit(
             "parentCounts": dict(parent_counts.most_common()),
             "spawnEdgeStatusCounts": dict(spawn_status_counts.most_common()),
             "routeViolations": route_violations,
+            "staleProfileDiagnostics": stale_profiles,
+            "assertedDispatchSuite": dispatch_suite,
         },
         "history": all_history,
         "historyByProfileCohort": history_by_cohort,
+        "routeCohorts": {
+            "astra": sum(row["agent_role"].replace("_", "-") in ASTRA for row in rows if row["agent_role"]),
+            "economy": sum(row["agent_role"].replace("_", "-") in ECONOMY for row in rows if row["agent_role"]),
+            "historical": len(historical_rows),
+            "economyAuthorization": "not observable from thread model metadata; requires dispatch evidence",
+        },
         "otelScope": {
             "rows": scoped_log_rows,
             "threads": scoped_log_threads,
@@ -358,6 +363,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--since", help="ISO-8601 start time; defaults to seven days ago")
     parser.add_argument("--until", help="Exclusive ISO-8601 snapshot end; defaults to now")
     parser.add_argument("--root-thread", help="Limit the cohort to descendants of one root thread")
+    parser.add_argument("--dispatch-suite", choices=("astra", "economy"), help="Assert a known v2 dispatch policy; omit for version-unknown historical data")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -366,6 +372,7 @@ def main(argv: list[str] | None = None) -> int:
             since=parse_since(args.since),
             until=parse_until(args.until),
             root_thread=args.root_thread,
+            dispatch_suite=args.dispatch_suite,
         )
     except (FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))

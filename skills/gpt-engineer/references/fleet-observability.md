@@ -37,6 +37,10 @@ command retries, compactions, or finding acceptance from the three SQLite summar
 its output with runner `result.json` lifecycle envelopes and targeted rollout analysis when those
 metrics matter.
 
+Use `--dispatch-suite astra` or `--dispatch-suite economy` only when the selected audit window's
+dispatch contract is known to use that v2 policy. Omission preserves historical interpretation and
+reports post-cutover retired profiles as diagnostics rather than assuming every running task upgraded.
+
 When the durable run journal is available, join normalized outcomes without copying raw logs:
 
 ```bash
@@ -68,10 +72,14 @@ projection gaps, not that a dispatch did no work. A spawn edge with status `open
 not proof that an operating-system process is still alive.
 
 Keep current GPT Engineer profiles, retired GPT Engineer profiles, and unattributed specialist
-children separate. A child outside the GPT Engineer profile catalog may come from another skill or
+children separate. Distinguish the Astra cohort, retained economy routes, and historical 5.6 roles;
+the public release date does not prove when a running task loaded the new skill. Validate the exact
+model assigned to each role. Economy authorization requires dispatch/journal evidence and cannot be
+inferred from the model name alone. A child outside the GPT Engineer profile catalog may come from another skill or
 an explicit specialist workflow; it is not a GPT Engineer route violation without a journal or
 dispatch identity linking it to this skill. Retired profile names remain useful for historical
-baselines but are violations when used for a new post-migration dispatch.
+baselines. Diagnose retired post-release profiles separately when the loaded routing policy is
+unknown; use a confirmed dispatch policy before calling a valid older run an Astra route violation.
 
 ## Measure what changes decisions
 
@@ -95,7 +103,8 @@ and the final cumulative usage event; usage attributes can appear on many nested
 Classify wall time before changing fleet size:
 
 1. **Parent control-loop bound:** many parent sampling turns, compactions, repeated instructions, or
-   small sequential waves. Use compact delta prompts, dispatch the full ready wave, and join once.
+  small sequential waves. Use compact delta prompts, dispatch useful ready work, and join only the
+  prerequisites needed for the next decision.
 2. **Child-compute bound:** long child turns with independent ready work. Increase read-only fan-out
    within the adaptive ceiling, lower effort where acceptance still passes, or split a genuinely
    oversized lane.
@@ -118,6 +127,11 @@ Require a sufficiently covered sample and comparable one-variable pairs before a
 `expand`, `lower-effort`, or `raise-effort`. Treat `insufficient-evidence` and `hold` literally. A
 recommendation never edits Codex configuration, changes the pinned-suite allowlist, enables Fast or
 Team mode, or authorizes a provider transition.
+
+Compare single-agent Astra against Astra with selected delegation before increasing fleet size.
+Use the same task and acceptance contract, record coordination/synthesis time, and count duplicated
+findings and rework. Correctness tests for the migration do not establish a latency or cost win.
+Keep prior Sol/Terra/Luna runs as historical baseline evidence rather than relabeling them Astra.
 
 Use a Broad read ceiling of six as the default experiment, not a permanent conclusion. A qualified
 Team read wave may compare seven or eight lanes against Broad, but it must measure accepted findings,

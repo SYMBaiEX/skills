@@ -1,4 +1,4 @@
 interface:
   display_name: "GPT Orchestration"
-  short_description: "Coordinate strict GPT-5.6 agent fleets"
-  default_prompt: "Use $gpt-orchestration with exact GPT-5.6 routes to research this codebase, build confirmed findings, and verify the result."
+  short_description: "Coordinate Astra-first engineering fleets"
+  default_prompt: "Use $gpt-orchestration and the installed GPT Engineer routing contract to research this codebase, build confirmed findings, and verify the result with Astra-first agents."

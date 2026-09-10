@@ -1,10 +1,10 @@
 ---
 name: gpt-orchestration
-description: Coordinate hierarchical coding-agent fleets for repository-wide audits, implementation sprints, migrations, and complex work that benefits from parallel specialists. Use when a user asks for subagents, a fleet, parallel delegation, GPT-5.6 Sol, Terra, or Luna routing, broad codebase completion, or independent implementation and verification passes. Enforce bounded ownership, concurrency-aware waves, dirty-worktree safety, runtime-honest model handling, and evidence-based integration.
+description: Coordinate hierarchical coding-agent fleets for repository-wide audits, implementation sprints, migrations, and complex work that benefits from parallel specialists. Use when a user asks for subagents, a fleet, parallel delegation, GPT-6 Astra routing, broad codebase completion, or independent implementation and verification passes. Follow the installed GPT Engineer routing contract, bounded ownership, dirty-worktree safety, and evidence-based integration.
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.4.1"
+  version: "2.0.0"
 ---
 
 # GPT Orchestration
@@ -16,9 +16,9 @@ Treat findings as inputs to action, not the end product. When the user authorize
 ## Establish runtime truth
 
 1. Inspect the available collaboration tool schemas, custom agent types, and current agent tree before promising a topology.
-2. Check for confirmed Codex custom agents that bind a type to a model, or an explicit model field on the spawn API. A custom agent type is real routing only when its configuration or current runtime confirms the model.
-3. Latest-only is the default. Allow exactly `gpt-5.6-sol` for ambiguous integration and hard engineering, `gpt-5.6-terra` for exploration and bounded implementation, and `gpt-5.6-luna` for high-volume mechanical verification.
-4. Native Codex custom agents are the normal interactive path. For a new programmatic controller, prefer the stable official Codex SDK where it covers the need, request model and sandbox per thread, and version-pin/feature-detect experimental app-server APIs. If neither path can request the required route or prove isolation and the sibling `gpt-engineer` skill is installed, use its guarded `scripts/run_codex_agent.py` compatibility adapter with an explicit `--compatibility-reason`; it does not independently attest the provider's effective model. Otherwise do not spawn a generic, inherited, model-less, GPT-5, GPT-5.4, Spark, or Claude fallback; keep work with a proven parent or report the blocker.
+2. Read the installed `gpt-engineer` skill and follow its current routing contract rather than maintaining a separate model policy here. Profile installation is not implied by skill installation.
+3. Without the core skill, request `gpt-6-astra` for the parent and all children: `astra_engineer` at `high`, and `astra_explorer`, `astra_worker`, and `astra_verifier` at `medium`. Use an available exact profile or direct model selector. Terra/Luna economy lanes require explicit opt-in; Sol is retired. Never silently substitute an older model.
+4. Prefer native collaboration before any Python helper. For a programmatic controller, use the official Codex SDK or feature-detected app-server APIs when appropriate. Use the core skill's guarded CLI compatibility adapter only when needed. Record the requested model and effort, and effective metadata only when exported; unavailable attestation is not proof of a wrong route or a reason to fabricate one. If exact selection is unavailable, report that limitation and continue only with a suitable available parent or seek direction.
 5. When the user explicitly requests subagents or a fleet, do not silently remain single-agent. Spawn useful bounded agents or report the concrete runtime limitation.
 6. Treat the orchestrator as one occupied concurrency slot. Compute each wave from the currently exposed capacity and active-agent count. Keep spawn depth at one unless deeper delegation is necessary and explicitly bounded.
 
@@ -42,13 +42,13 @@ For a repository-wide completion pass, prefer this first wave:
 
 | Profile | Mode | Responsibility |
 | --- | --- | --- |
-| Sol / `sol_engineer` | Bounded writes when authorized | Resolve ambiguous architecture, hard implementation, integration, and root-cause debugging |
-| Terra / `terra_explorer` | Read-only | Trace architecture, SDK usage, dependencies, documentation, and incomplete product paths |
-| Terra / `terra_worker` | Bounded writes | Implement isolated, well-specified findings with focused tests |
-| Luna / `luna_verifier` | Verification | Run test matrices, diff hygiene, residual scans, and acceptance evidence |
+| Astra / `astra_engineer` (`high`) | Bounded writes when authorized | Resolve ambiguous architecture, hard implementation, integration, and root-cause debugging |
+| Astra / `astra_explorer` (`medium`) | Read-only | Trace architecture, SDK usage, dependencies, documentation, and incomplete product paths |
+| Astra / `astra_worker` (`medium`) | Bounded writes | Implement isolated, well-specified findings with focused tests |
+| Astra / `astra_verifier` (`medium`) | Verification | Run test matrices, diff hygiene, residual scans, and acceptance evidence |
 | Orchestrator | Integrator | Resolve overlaps, own cross-cutting judgment, and decide final acceptance |
 
-When Codex custom profiles are present and selectable, route by their exact agent types. A profile file alone is not proof that the child used its model. Keep final semantic acceptance and authority decisions with the orchestrator even when Luna performs mechanical verification.
+This table is the standalone Astra baseline; the installed core contract governs routing when present. A profile file alone is not runtime attestation. Keep final semantic acceptance and authority decisions with the orchestrator, including in explicitly selected economy mode.
 
 ## Write task contracts
 
@@ -74,7 +74,7 @@ Choose **fast** for one known path, **standard** for two or more independent sha
 3. **Synthesize:** Normalize findings by severity, user impact, confidence, path ownership, dependencies, and verification method. Deduplicate symptoms that share a root cause.
 4. **Assign writes:** Create non-overlapping remediation contracts. Prefer subsystem ownership over issue-by-issue edits when files are tightly coupled.
 5. **Integrate:** Review each diff immediately. Check that the agent stayed in scope and preserved baseline changes before starting the next dependent wave.
-6. **Verify independently:** Give Luna-profile reviewers raw artifacts and acceptance criteria, not the intended conclusion. Use a fresh reviewer where capacity permits.
+6. **Verify independently:** Give verifiers raw artifacts and acceptance criteria, not the intended conclusion. Use a fresh reviewer where capacity permits.
 7. **Close:** Run repository-wide gates, inspect the final diff against the baseline, close the fleet, and report completed work plus any genuinely unresolved items.
 
 After the first cycle, work delta-only: reuse accepted evidence, inspect confirmed residuals and
@@ -143,7 +143,7 @@ Lead with the outcome. Include:
 - what changed, grouped by subsystem;
 - the verification matrix and exact failures or skips;
 - preserved pre-existing changes or scope constraints;
-- model-routing reality when Terra or Luna were requested;
+- requested model and effort, observed routing when available, and any unavailable metadata;
 - unresolved blockers, residual risks, and recommended next action.
 
 Claim complete only when the requested scope and verification gates are satisfied. Otherwise state precisely what remains partial.

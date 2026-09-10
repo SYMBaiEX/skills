@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -14,6 +15,24 @@ from pathlib import Path
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 ASSET_ROOT = SKILL_ROOT / "assets"
+RETIRED = {"sol-engineer.toml": "4807e2754006d0da7b5cc3b9d5de2449c0fdfb94bc37976cedca187b3ec479e0"}
+
+
+def retire_profiles(destination: Path, check: bool, upgrade: bool) -> None:
+    for name, digest in RETIRED.items():
+        path = destination / "agents" / name
+        if not path.exists():
+            continue
+        if check or not upgrade:
+            raise SystemExit(f"Retired profile remains installed; use --upgrade: {path}")
+        if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise SystemExit(f"Refusing to remove modified retired profile: {path}")
+        backup = destination / "retired-agent-backups" / (name + "." + digest)
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        if backup.is_symlink() or (backup.exists() and backup.read_bytes() != path.read_bytes()):
+            raise SystemExit(f"Retired profile backup conflicts: {backup}")
+        shutil.copy2(path, backup)
+        path.unlink()
 
 
 def repo_root(target: str | None) -> Path:
@@ -63,6 +82,18 @@ def merge_codex_hooks(destination: Path, check: bool) -> None:
         }
         for group in groups:
             commands = {handler.get("command") for handler in group.get("hooks", [])}
+            # Managed identity is the exact bundled command, not a matcher that
+            # changes when the route catalog changes. Preserve unrelated handlers.
+            for existing in list(target_groups):
+                existing_commands = {handler.get("command") for handler in existing.get("hooks", [])}
+                if existing_commands == commands and existing.get("matcher") != group.get("matcher"):
+                    existing["matcher"] = group.get("matcher")
+                    changed = True
+                elif commands.issubset(existing_commands) and existing.get("matcher") != group.get("matcher"):
+                    managed = [handler for handler in existing["hooks"] if handler.get("command") in commands]
+                    existing["hooks"] = [handler for handler in existing["hooks"] if handler.get("command") not in commands]
+                    target_groups.append({**existing, "matcher": group.get("matcher"), "hooks": managed})
+                    changed = True
             if commands - known:
                 target_groups.append(group)
                 known.update(commands)
@@ -92,6 +123,7 @@ def install_agents(
 
 
 def install_codex(destination: Path, check: bool, project: bool, upgrade: bool) -> None:
+    retire_profiles(destination, check, upgrade)
     install_agents(
         ASSET_ROOT / "codex" / "agents",
         destination / "agents",
@@ -102,7 +134,7 @@ def install_codex(destination: Path, check: bool, project: bool, upgrade: bool) 
     if not project:
         return
     for source in sorted((ASSET_ROOT / "codex" / "hooks").glob("*.py")):
-        install_file(source, destination / "hooks" / source.name, check)
+        install_file(source, destination / "hooks" / source.name, check, upgrade)
     merge_codex_hooks(destination / "hooks.json", check)
 
 

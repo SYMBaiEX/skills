@@ -2,8 +2,12 @@
 
 Read this reference for a durable goal, a multi-wave build, a resumed run, command-evidence reuse,
 or fleet tuning from completed outcomes. The run journal is an orchestration and evidence ledger. It
-is not a transcript store or a replacement for Codex conversation state, GPT-5.6 persisted
-reasoning, Responses compaction, Git, OTel, or external runner artifacts.
+is not a transcript store or a replacement for Codex conversation state, native Astra notes/history
+retrieval, persisted reasoning, Responses compaction, Git, OTel, or external runner artifacts.
+
+Single-agent one-off edits normally need no journal. Use it when durable recovery, multiple stages,
+or outcome measurement justifies the bookkeeping. Native notes/history capabilities are conditional
+on the runtime; the skill does not enable them or copy transcripts into the journal.
 
 ## Choose the backend deliberately
 

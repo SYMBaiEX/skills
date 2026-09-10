@@ -5,6 +5,7 @@ import json
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import audit_routing
@@ -47,23 +48,65 @@ class AuditRoutingTests(unittest.TestCase):
         return executable
 
     def test_valid_profiles_and_parent_pass(self) -> None:
-        result = audit_routing.audit(self.root, self.home, "gpt-5.6-sol")
+        result = audit_routing.audit(self.root, self.home, "gpt-6-astra")
         self.assertEqual(result["status"], "passed")
         self.assertEqual(result["violations"], [])
+
+    def test_single_quoted_commented_shadow_cannot_bypass_audit(self) -> None:
+        shadow = self.root / ".codex" / "agents" / "shadow.toml"
+        shadow.write_text("name = 'astra_worker' # valid TOML\nmodel = 'gpt-5.4' # wrong route\nmodel_reasoning_effort = 'medium'\n")
+        result = audit_routing.audit(self.root, self.home, "gpt-6-astra")
+        self.assertEqual(result["status"], "failed")
+        self.assertTrue(any(str(shadow) in item and "expected gpt-6-astra" in item for item in result["violations"]))
+
+    def test_multiline_toml_string_and_nested_fields(self) -> None:
+        path = self.root / ".codex" / "agents" / "multiline.toml"
+        path.write_text('name = """astra_worker"""\nmodel = """gpt-6-astra"""\nmodel_reasoning_effort = "medium" # comment\n[metadata]\nname = "astra_worker"\nmodel = "gpt-5.4"\n')
+        self.assertEqual(audit_routing.read_profile(path)["model"], "gpt-6-astra")
+        self.assertEqual(audit_routing.audit(self.root, self.home, "gpt-6-astra")["status"], "passed")
+        path.write_text('[metadata]\nname = "astra_worker"\nmodel = "gpt-5.4"\n')
+        self.assertEqual(audit_routing.read_profile(path), {})
+        (self.home / "agents" / "astra-worker.toml").unlink()
+        result = audit_routing.audit(self.root, self.home, "gpt-6-astra")
+        self.assertIn("missing installed custom agent profile: astra_worker", result["violations"])
+
+    def test_malformed_and_duplicate_keys_fail_with_source(self) -> None:
+        path = self.root / ".codex" / "agents" / "malformed.toml"
+        for content in ('name = "astra_worker\n', 'name = "astra_worker"\nname = "other"\n'):
+            with self.subTest(content=content):
+                path.write_text(content)
+                result = audit_routing.audit(self.root, self.home, "gpt-6-astra")
+                self.assertEqual(result["status"], "failed")
+                self.assertTrue(any(str(path) in item and "Cannot parse" in item for item in result["violations"]))
+
+    def test_routing_fields_require_top_level_strings(self) -> None:
+        path = self.root / ".codex" / "agents" / "typed.toml"
+        for field in ("name", "model", "model_reasoning_effort", "service_tier"):
+            with self.subTest(field=field):
+                path.write_text(f'{field} = ["invalid"]\n')
+                result = audit_routing.audit(self.root, self.home, "gpt-6-astra")
+                self.assertEqual(result["status"], "failed")
+                self.assertTrue(any(str(path) in item and f"{field} must be a string" in item for item in result["violations"]))
+
+    def test_missing_supported_parser_fails_closed(self) -> None:
+        with mock.patch.object(audit_routing, "tomllib", None):
+            result = audit_routing.audit(self.root, self.home, "gpt-6-astra")
+        self.assertEqual(result["status"], "failed")
+        self.assertTrue(any("Python 3.11+" in item and "tomli" in item for item in result["violations"]))
 
     def test_project_shadow_with_old_model_fails(self) -> None:
         shadow = self.root / ".codex" / "agents" / "shadow.toml"
         shadow.write_text(
-            'name = "terra_explorer"\n'
+            'name = "astra_explorer"\n'
             'description = "bad shadow"\n'
             'model = "gpt-5.4"\n'
             'model_reasoning_effort = "high"\n'
             'developer_instructions = "read"\n'
         )
-        result = audit_routing.audit(self.root, self.home, "gpt-5.6-sol")
+        result = audit_routing.audit(self.root, self.home, "gpt-6-astra")
         self.assertEqual(result["status"], "failed")
         self.assertTrue(
-            any("expected gpt-5.6-terra/medium" in item for item in result["violations"])
+            any("expected gpt-6-astra/medium" in item for item in result["violations"])
         )
 
     def test_old_parent_model_fails(self) -> None:
@@ -75,11 +118,11 @@ class AuditRoutingTests(unittest.TestCase):
         )
 
     def test_missing_profile_fails(self) -> None:
-        (self.home / "agents" / "luna-worker.toml").unlink()
+        (self.home / "agents" / "astra-worker.toml").unlink()
         result = audit_routing.audit(self.root, self.home, None)
         self.assertEqual(result["status"], "failed")
         self.assertIn(
-            "missing installed custom agent profile: luna_worker",
+            "missing installed custom agent profile: astra_worker",
             result["violations"],
         )
 
@@ -87,8 +130,8 @@ class AuditRoutingTests(unittest.TestCase):
         result = audit_routing.audit(
             self.root,
             self.home,
-            "gpt-5.6-sol",
-            ["terra_explorer=gpt-5.6-terra:medium"],
+            "gpt-6-astra",
+            ["astra_explorer=gpt-6-astra:medium"],
         )
         self.assertEqual(result["status"], "passed")
         self.assertTrue(result["observedRoutes"][0]["valid"])
@@ -97,10 +140,10 @@ class AuditRoutingTests(unittest.TestCase):
         result = audit_routing.audit(
             self.root,
             self.home,
-            "gpt-5.6-sol",
+            "gpt-6-astra",
             [
                 "security-auditor=gpt-5.4:high",
-                "terra_worker=gpt-5.4:high",
+                "astra_worker=gpt-5.4:high",
             ],
         )
         self.assertEqual(result["status"], "failed")
@@ -108,12 +151,12 @@ class AuditRoutingTests(unittest.TestCase):
             any("unsupported agent type" in item for item in result["violations"])
         )
         self.assertTrue(
-            any("expected gpt-5.6-terra" in item for item in result["violations"])
+            any("expected gpt-6-astra" in item for item in result["violations"])
         )
 
     def test_malformed_observed_route_fails(self) -> None:
         result = audit_routing.audit(
-            self.root, self.home, "gpt-5.6-sol", ["terra_explorer"]
+            self.root, self.home, "gpt-6-astra", ["astra_explorer"]
         )
         self.assertEqual(result["status"], "failed")
         self.assertTrue(any("invalid observed route" in item for item in result["violations"]))
@@ -135,7 +178,7 @@ class AuditRoutingTests(unittest.TestCase):
         source = {
             "client_version": "0.151.0",
             "models": [
-                {"slug": "gpt-5.6-sol", "multi_agent_version": "v2"},
+                {"slug": "gpt-6-astra", "multi_agent_version": "v2"},
                 {"slug": "gpt-5.6-terra", "multi_agent_version": "v2"},
                 {"slug": "gpt-5.6-luna", "multi_agent_version": "v1"},
             ],
