@@ -76,6 +76,31 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("overrides every Claude agent profile", result.stderr)
 
+    def test_custom_retired_profile_preserved_during_install_and_check(self) -> None:
+        retired = self.root / ".codex" / "agents" / "sol-engineer.toml"
+        retired.parent.mkdir(parents=True)
+        customized = 'name = "sol_engineer"\n# model inherited by owner choice\n'
+        retired.write_text(customized)
+        for arguments in (("--upgrade",), ("--check",)):
+            result = self.run_script("--provider", "codex", *arguments, str(self.root))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Preserving customized or symlink retired profile", result.stderr)
+            self.assertEqual(retired.read_text(), customized)
+            self.assertTrue((retired.parent / "astra-engineer.toml").is_file())
+
+    def test_retired_symlink_preserved_including_dangling_target(self) -> None:
+        retired = self.root / ".codex" / "agents" / "sol-engineer.toml"
+        retired.parent.mkdir(parents=True)
+        target = Path(self.temp.name) / "owner-profile.toml"
+        retired.symlink_to(target)
+        for arguments in (("--upgrade",), ("--check",)):
+            result = self.run_script("--provider", "codex", *arguments, str(self.root))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Preserving customized or symlink retired profile", result.stderr)
+            self.assertTrue(retired.is_symlink())
+            self.assertFalse(target.exists())
+            self.assertTrue((retired.parent / "astra-worker.toml").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()
