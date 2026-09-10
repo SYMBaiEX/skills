@@ -128,9 +128,10 @@ Hash identifiers by default and never emit prompt text, final messages, commands
 paths. Deduplicate events and result envelopes by stable IDs and content hashes. Exclude ambiguous
 joins from outcome rates and report the conflict.
 
-Do not change model, effort, fleet ceiling, prompt packet, and test strategy at once. Require a
-minimum comparable sample, high journal/result coverage, and one-variable paired evidence before a
-default changes. Recommendations are advisory: shrink on measured failures or resource pressure;
+For causal performance experiments, change one of model, effort, fleet ceiling, prompt packet, or
+test strategy at a time. Require comparable samples and high journal/result coverage before claiming
+a measured improvement. A user-directed migration can change several components; label it a new
+baseline rather than attributing gains to one variable. Recommendations are advisory: shrink on measured failures or resource pressure;
 expand only when independent ready work exists and accepted outcomes remain non-inferior while wall
 time or useful yield improves. Team mode retains its explicit qualification gates.
 

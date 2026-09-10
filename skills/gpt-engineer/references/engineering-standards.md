@@ -136,7 +136,8 @@ Mine representative completed and failed runs into a small regression set. Compa
 effort, and fleet changes against task completion, requirement coverage, accepted findings, user
 corrections, wall time, retries, compactions, tokens, and post-change defects. Use trace grading when
 an SDK workflow exposes end-to-end traces; otherwise retain the same criteria in the local run
-ledger. Change defaults only when repeated evaluations show a benefit.
+ledger. Use repeated evaluations to justify performance tuning; treat an authorized model migration
+as a new baseline until comparable outcome evidence establishes its effects.
 
 ## Official sources
 

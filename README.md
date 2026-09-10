@@ -95,7 +95,8 @@ python3 ~/.agents/skills/gpt-engineer-mem/scripts/memory_preflight.py --json
 
 The profile bootstrap is deliberately separate from skills.sh. It never edits provider configuration;
 `--upgrade` updates bundled profiles and managed project hooks, and backs up/removes the known
-unmodified retired Sol profile. Customized retired profiles require review and are preserved.
+unmodified retired Sol profile. Customized retired profiles are preserved with a warning and do not
+prevent Astra installation.
 Use `--provider all --upgrade` only
 when Claude profiles are explicitly wanted. For project-local profiles and conservative Codex hooks,
 replace `--global` with `/path/to/repository`.

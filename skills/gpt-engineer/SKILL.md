@@ -4,7 +4,7 @@ description: "Deliver software-engineering outcomes with GPT-6 Astra: investigat
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "2.0.0"
+  version: "2.0.1"
 ---
 
 # GPT Engineer

@@ -21,12 +21,17 @@ RETIRED = {"sol-engineer.toml": "4807e2754006d0da7b5cc3b9d5de2449c0fdfb94bc37976
 def retire_profiles(destination: Path, check: bool, upgrade: bool) -> None:
     for name, digest in RETIRED.items():
         path = destination / "agents" / name
-        if not path.exists():
+        if not path.exists() and not path.is_symlink():
+            continue
+        if path.is_symlink() or not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            print(
+                f"warning: Preserving customized or symlink retired profile: {path}; "
+                "it is not an allowed GPT Engineer dispatch target",
+                file=sys.stderr,
+            )
             continue
         if check or not upgrade:
             raise SystemExit(f"Retired profile remains installed; use --upgrade: {path}")
-        if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
-            raise SystemExit(f"Refusing to remove modified retired profile: {path}")
         backup = destination / "retired-agent-backups" / (name + "." + digest)
         backup.parent.mkdir(parents=True, exist_ok=True)
         if backup.is_symlink() or (backup.exists() and backup.read_bytes() != path.read_bytes()):

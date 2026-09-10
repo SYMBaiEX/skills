@@ -88,8 +88,9 @@ class AstraMigrationTests(unittest.TestCase):
             self.assertEqual((self.home / "retired-agent-backups" / (path.name + "." + digest)).read_bytes(), content)
             bootstrap.retire_profiles(self.home, False, True)
             path.write_text("customized")
-            with self.assertRaisesRegex(SystemExit, "modified"):
+            with mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
                 bootstrap.retire_profiles(self.home, False, True)
+            self.assertIn("Preserving customized", stderr.getvalue())
             self.assertEqual(path.read_text(), "customized")
 
     def test_existing_matcher_migrates_and_unrelated_hooks_survive(self):

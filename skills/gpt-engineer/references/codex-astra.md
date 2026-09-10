@@ -72,7 +72,8 @@ an active parent's model or change its live collaboration schema. Project-scoped
 shadow global ones; apply the same authorized migration to the relevant project path.
 
 Bootstrap preserves unrelated files and provider settings, backs up known retired managed profiles,
-and reports customized conflicts. Review those conflicts rather than deleting all old agent files.
+and warns about customized retired profiles while preserving them. These unused legacy files do
+not prevent Astra installation; review them separately if their removal is desired.
 Project hook upgrades update the managed matcher and scripts while preserving unrelated hooks.
 Global installation adds no hooks. Claude profiles are installed only when explicitly selected.
 
