@@ -1,5 +1,10 @@
 # Fleet observability
 
+For v2.1 model-aware cohorts, `audit_fleet.py --dispatch-suite same-model` or `mixed-model`
+asserts known policy evidence; neither option attests actual parent equality. Preserve `astra`/`economy`
+for documented v2.0 cohorts. A timestamp or currently installed skill version cannot establish which
+policy an old run loaded. Unknown-policy Sol records are diagnostics, not confirmed violations.
+
 Use this reference to tune a GPT Engineer run from evidence rather than perceived age, thread count,
 or raw token totals.
 
@@ -125,13 +130,14 @@ work exists and the final acceptance contract still passes.
 
 Require a sufficiently covered sample and comparable one-variable pairs before accepting
 `expand`, `lower-effort`, or `raise-effort`. Treat `insufficient-evidence` and `hold` literally. A
-recommendation never edits Codex configuration, changes the pinned-suite allowlist, enables Fast or
+recommendation never edits Codex configuration, changes the supported-model contract, enables Fast or
 Team mode, or authorizes a provider transition.
 
-Compare single-agent Astra against Astra with selected delegation before increasing fleet size.
+Compare the selected parent alone against that same parent with useful delegation before increasing fleet size.
 Use the same task and acceptance contract, record coordination/synthesis time, and count duplicated
 findings and rework. Correctness tests for the migration do not establish a latency or cost win.
-Keep prior Sol/Terra/Luna runs as historical baseline evidence rather than relabeling them Astra.
+Keep original model, effort, runtime and loaded skill policy/version evidence. Sol, Terra and Luna
+remain supported current parents; a historical policy is not a model retirement.
 
 Use a Broad read ceiling of six as the default experiment, not a permanent conclusion. A qualified
 Team read wave may compare seven or eight lanes against Broad, but it must measure accepted findings,

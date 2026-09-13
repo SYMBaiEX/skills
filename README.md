@@ -10,14 +10,14 @@ servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and ap
 
 ## Skills
 
-- [`skills/gpt-engineer/`](skills/gpt-engineer/) — GPT-6 Astra engineering from research through
-  verified delivery. Start with one Astra agent; delegate when independent work saves time or adds
-  useful review. Includes proportionate tests, optional economy routes, native context retrieval,
+- [`skills/gpt-engineer/`](skills/gpt-engineer/) — model-aware engineering from research through
+  verified delivery. Respect the selected Astra, Sol, Terra, or Luna parent; delegate when independent
+  work saves time or adds useful review. Includes proportionate tests, explicit same/mixed-model routes,
   private durable run journals, outcome measurement, and task-owned cleanup. Native Codex is the
   interactive path; current SDK and managed Agents API guidance supports programmatic work. The
   Python CLI runner remains a guarded compatibility adapter.
 - [`skills/gpt-engineer-mem/`](skills/gpt-engineer-mem/) — the memory-aware GPT engineer: bounded
-  Claude Mem/Codex recall, live freshness checks, Astra delivery, and read-only
+  Claude Mem/Codex recall, live freshness checks, model-aware delivery, and read-only
   memory-service diagnostics.
 - [`skills/gpt-engineer-spark/`](skills/gpt-engineer-spark/) — keep a capable lead in control while
   a model-pinned GPT-5.3-Codex-Spark fleet handles dependency-aware exploration, isolated candidate
@@ -71,15 +71,13 @@ bunx skills add SYMBaiEX/skills --skill symbaiex-research-jobs -y
 bunx skills add SYMBaiEX/skills --skill symbaiex-webhooks -y
 ```
 
-For the complete GPT Engineer workflow in Codex and Claude Code, install it globally, register the
-bundled provider-native model profiles, then restart both clients:
+Install the portable GPT Engineer core for Codex and Claude Code. Native model selectors do not
+require Python or custom profile registration:
 
 ```bash
-npx skills add https://github.com/SYMBaiEX/skills \
+bunx skills@1.5.26 add SYMBaiEX/skills \
   --skill gpt-engineer --agent codex claude-code --global --yes
-python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --provider codex --upgrade --global
-python3 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --provider codex --check --global
-python3 ~/.agents/skills/gpt-engineer/scripts/audit_routing.py --cwd /path/to/repo --runtime --json
+bunx skills@1.5.26 update gpt-engineer --global --yes
 ```
 
 Install the memory-aware variant alongside the base engineer. It reuses the base profile setup when
@@ -87,33 +85,40 @@ available, remains usable as a standalone orchestration contract, and never conf
 Claude Mem automatically:
 
 ```bash
-npx skills add https://github.com/SYMBaiEX/skills \
+bunx skills@1.5.26 add SYMBaiEX/skills \
   --skill gpt-engineer gpt-engineer-mem \
   --agent codex claude-code --global --yes
 python3 ~/.agents/skills/gpt-engineer-mem/scripts/memory_preflight.py --json
 ```
 
-The profile bootstrap is deliberately separate from skills.sh. It never edits provider configuration;
-`--upgrade` updates bundled profiles and managed project hooks, and backs up/removes the known
-unmodified retired Sol profile. Customized retired profiles are preserved with a warning and do not
-prevent Astra installation.
-Use `--provider all --upgrade` only
-when Claude profiles are explicitly wanted. For project-local profiles and conservative Codex hooks,
-replace `--global` with `/path/to/repository`.
+Optional profile/bootstrap setup is separate from skills.sh; it never changes the selected parent
+or provider configuration. Upgrades preserve customized files. Sol is supported, not retired.
+For optional Codex presets:
+
+```bash
+python3.11 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --provider codex --upgrade --global
+python3.11 ~/.agents/skills/gpt-engineer/scripts/bootstrap.py --provider codex --check --global
+```
+
+Choose `--provider claude` separately for Claude-native profiles. These do not run GPT models.
+Project-local setup targets `/path/to/repository` instead of `--global`; inspect the hook definitions
+and use Codex `/hooks` to review/trust them. Global preset installation registers no hooks.
+Use `npx --yes skills@1.5.26` instead of `bunx` when Bun is unavailable.
 
 The optional routing audit and repository validation require Python 3.11+ or an environment with
-`tomli` so all valid TOML profile syntax is parsed correctly. Native Astra work needs no Python helper.
+`tomli` so all valid TOML profile syntax is parsed correctly. Native engineering needs no Python helper.
 
-Do not activate a copied Luna model catalog as routine setup. Custom catalogs freeze upstream model
-metadata and the runtime audit rejects stale or unattested overrides. Prefer stock native routing;
-use the guarded CLI adapter for a justified compatibility gap in explicitly selected economy work.
+The unsupported Luna catalog-creation path has been removed. The recovery tool can diagnose and
+disable the old managed setting, never create/refresh an override or enable Fast. Prefer stock
+native routing; retain the guarded CLI adapter for an evidenced compatibility/isolation gap.
 
-GPT Engineer 2 defaults to exact `gpt-6-astra` for the lead and optional children. The four bundled
-roles are `astra_engineer` (high effort), `astra_explorer`, `astra_worker`, and `astra_verifier`
-(medium effort). A runtime with explicit model/effort selection can delegate without installed
-custom roles. Existing Terra/Luna routes are available through explicit economy selection; Sol is
-historical. Astra's [official migration guidance](https://developers.openai.com/api/docs/guides/latest-model)
-informs the shorter prompts, selective delegation, persistent user intent, and calibrated testing.
+GPT Engineer 2.1 supports exact `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`
+parents. Same-model children are selected explicitly by default; mixed-model work is a deliberate
+policy. Optional pinned presets remain available, but do not dictate the parent. Unknown metadata
+is not guessed, and parent hook fields are not child attestation. The generic CLI adapter roles
+accept all four models with explicit model/effort and same/mixed policy.
+See [model routing](skills/gpt-engineer/references/model-routing.md) and the
+[capability/install/evaluation matrix](skills/gpt-engineer/references/runtime-integrations.md).
 See [runtime choices and API compatibility](skills/gpt-engineer/references/dynamic-workflows.md)
 before building a controller: native Codex, Codex SDK, Agents API, and Responses expose different
 capabilities. The skill does not enable experimental context settings, Fast mode, or hosted sessions.
@@ -159,7 +164,7 @@ bash ~/.agents/skills/claude-multi-agent/scripts/run-workflow.sh \
 The saved `.claude/workflows/gpt-engineer-dynamic.js` uses Claude's native workflow runtime. The
 default runner starts from the exact clean `HEAD` and returns an isolated candidate patch; exit `3`
 means the outer engineer must integrate and verify it. The outer GPT Engineer remains responsible
-for any transition to Codex Astra, explicitly selected economy routes, or Spark.
+for any explicitly selected transition among supported GPT models, Claude, or Spark.
 
 Project hooks/settings are optional: run `bootstrap.sh /path/to/repository`, then commit those files
 before an isolated workflow run (or explicitly use `IN_PLACE=1`). Workflow evidence defaults to a

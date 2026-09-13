@@ -106,6 +106,14 @@ class AuditFleetTests(unittest.TestCase):
         self.assertIn("expected gpt-5.6-terra", violations[0]["reasons"][0])
         self.assertEqual(result["fleet"]["latestOnlyChildren"], 1)
 
+    def test_missing_child_role_is_unattributed_not_a_crash(self) -> None:
+        with sqlite3.connect(self.home / "state_5.sqlite") as state:
+            state.execute("UPDATE threads SET agent_role=NULL WHERE id='b'")
+        result = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(100, timezone.utc))
+        self.assertEqual(result["fleet"]["spawnedChildren"], 4)
+        self.assertEqual(result["fleet"]["unattributedChildren"], 2)
+        self.assertEqual(result["fleet"]["routeViolations"], [])
+
     def test_sol_before_and_after_astra_cutover(self) -> None:
         from routes import MIGRATION
         cutoff = int(MIGRATION.timestamp())
@@ -119,6 +127,10 @@ class AuditFleetTests(unittest.TestCase):
         self.assertEqual(result["fleet"]["historicalProfileChildren"], 2)
         strict = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(cutoff, timezone.utc), until=datetime.fromtimestamp(cutoff + 100, timezone.utc), root_thread="root", dispatch_suite="astra")
         self.assertEqual(len(strict["fleet"]["routeViolations"]), 1)
+        for policy in ("same-model", "mixed-model"):
+            current = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(cutoff, timezone.utc), until=datetime.fromtimestamp(cutoff + 100, timezone.utc), root_thread="root", dispatch_suite=policy)
+            self.assertEqual(current["fleet"]["routeViolations"], [])
+            self.assertEqual(current["fleet"]["staleProfileDiagnostics"], [])
 
     def test_catalog_model_mismatch_is_a_route_violation(self) -> None:
         state = sqlite3.connect(self.home / "state_5.sqlite")

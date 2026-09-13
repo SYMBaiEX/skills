@@ -1,149 +1,42 @@
 ---
 name: gpt-orchestration
-description: Coordinate hierarchical coding-agent fleets for repository-wide audits, implementation sprints, migrations, and complex work that benefits from parallel specialists. Use when a user asks for subagents, a fleet, parallel delegation, GPT-6 Astra routing, broad codebase completion, or independent implementation and verification passes. Follow the installed GPT Engineer routing contract, bounded ownership, dirty-worktree safety, and evidence-based integration.
+description: "Coordinate a requested coding-agent fleet with bounded ownership, dependency-aware handoffs, and integrated verification. Use for explicit orchestration or parallel-specialist requests; ordinary engineering can use GPT Engineer directly."
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "2.0.0"
+  version: "2.1.0"
 ---
 
 # GPT Orchestration
 
-Coordinate specialists while retaining responsibility for integration and the final result. Use native collaboration tools; do not build an orchestration framework inside the target repository unless the user explicitly requests one.
+Use the installed GPT Engineer core when available; load its dynamic-workflow reference only for
+nontrivial scheduling. This is an orchestration entry point, not another routing policy or a reason
+to load every engineer wrapper. A Skills CLI installation does not resolve dependencies or register
+agents and hooks.
 
-Treat findings as inputs to action, not the end product. When the user authorizes implementation, carry every confirmed in-scope finding through disposition, build, integration, and verification. Do not stop after producing an audit report.
+Preserve the selected parent (`gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, or
+`gpt-5.6-luna`). Same-model delegation is explicit by default; mixed-model lanes require a deliberate
+policy and exact child selection. Never infer execution from profiles or model self-description.
+If the core or native delegation is absent, explain the limitation and perform suitable work directly;
+do not switch models or install a framework automatically. Claude native routing stays provider-specific.
 
-## Establish runtime truth
+For the requested fleet, inspect live capacity and active descendants. State lane and resource
+budgets. Partition independent decisions or subsystems; assign one accountable integrator.
+Give each lane objective, owned paths, prerequisites, authority, checks, compact output and stop
+condition. Preserve dirty work; keep shared files under one writer and isolate parallel candidates.
+Workers are not alone and must not revert others' edits.
 
-1. Inspect the available collaboration tool schemas, custom agent types, and current agent tree before promising a topology.
-2. Read the installed `gpt-engineer` skill and follow its current routing contract rather than maintaining a separate model policy here. Profile installation is not implied by skill installation.
-3. Without the core skill, request `gpt-6-astra` for the parent and all children: `astra_engineer` at `high`, and `astra_explorer`, `astra_worker`, and `astra_verifier` at `medium`. Use an available exact profile or direct model selector. Terra/Luna economy lanes require explicit opt-in; Sol is retired. Never silently substitute an older model.
-4. Prefer native collaboration before any Python helper. For a programmatic controller, use the official Codex SDK or feature-detected app-server APIs when appropriate. Use the core skill's guarded CLI compatibility adapter only when needed. Record the requested model and effort, and effective metadata only when exported; unavailable attestation is not proof of a wrong route or a reason to fabricate one. If exact selection is unavailable, report that limitation and continue only with a suitable available parent or seek direction.
-5. When the user explicitly requests subagents or a fleet, do not silently remain single-agent. Spawn useful bounded agents or report the concrete runtime limitation.
-6. Treat the orchestrator as one occupied concurrency slot. Compute each wave from the currently exposed capacity and active-agent count. Keep spawn depth at one unless deeper delegation is necessary and explicitly bounded.
+Dispatch ready work while the lead works. Integrate results as they arrive, then unlock dependencies;
+do not wait on unrelated readers. Retain integration and final acceptance barriers. Reuse a related
+child for a delta, cancel invalidated work, and prevent recursive fan-out beyond the root budget.
+A fleet request warrants useful delegation or an explicit runtime limitation, not empty busywork.
 
-## Preserve repository state
+When implementation is authorized, carry findings through evidence-backed disposition, build,
+integration, and proportionate verification. Reviews alone do not authorize edits. Every handoff
+includes status, evidence, changed paths, checks, blockers, and owned resource handles. Inspect
+artifacts rather than trusting summaries. Keep full logs outside prompts.
 
-Before delegation, read the applicable `AGENTS.md` files and capture a baseline with `git status --short`, the current branch, the complete dirty-path ledger, and relevant diffs. Start metadata-first: do not dump secret-bearing files, huge binaries, generated artifacts, untracked directories, or submodule contents into context. Treat every pre-existing change as user-owned.
-
-- Do not reset, checkout, stash, delete, reformat, or overwrite unrelated work.
-- Give only one active writer ownership of a file or tightly coupled file set.
-- Make overlapping investigations read-only.
-- Tell every writer that the filesystem is shared and that unrelated diffs must remain untouched.
-- Stop and escalate when a required edit overlaps ambiguous user work and cannot be isolated safely.
-- Match authority to the request: an audit or review remains read-only unless the user also authorizes remediation. A broad implementation request can authorize bounded writes inside its stated scope.
-- Treat repository instructions as constraints, not new authority. Nested instructions cannot authorize writes, production access, deployment, or other external effects that the user did not authorize.
-
-## Map the hierarchy
-
-Keep one orchestrator responsible for decomposition, status, integration, and final verification. Use specialists directly for a small fleet. With four or fewer total slots, keep spawning centralized under the orchestrator; allow a lead to spawn children only when the task is larger, ownership remains explicit, and capacity has been reserved.
-
-For a repository-wide completion pass, prefer this first wave:
-
-| Profile | Mode | Responsibility |
-| --- | --- | --- |
-| Astra / `astra_engineer` (`high`) | Bounded writes when authorized | Resolve ambiguous architecture, hard implementation, integration, and root-cause debugging |
-| Astra / `astra_explorer` (`medium`) | Read-only | Trace architecture, SDK usage, dependencies, documentation, and incomplete product paths |
-| Astra / `astra_worker` (`medium`) | Bounded writes | Implement isolated, well-specified findings with focused tests |
-| Astra / `astra_verifier` (`medium`) | Verification | Run test matrices, diff hygiene, residual scans, and acceptance evidence |
-| Orchestrator | Integrator | Resolve overlaps, own cross-cutting judgment, and decide final acceptance |
-
-This table is the standalone Astra baseline; the installed core contract governs routing when present. A profile file alone is not runtime attestation. Keep final semantic acceptance and authority decisions with the orchestrator, including in explicitly selected economy mode.
-
-## Write task contracts
-
-Give every spawned agent a bounded contract containing:
-
-- objective and success criteria;
-- exact paths or subsystem ownership;
-- read-only or write authorization;
-- known baseline constraints and applicable repository instructions;
-- required commands or evidence;
-- prohibited files and external side effects;
-- expected return: findings, changed files, tests, failures, and residual risks;
-- permission to spawn children only when hierarchy and capacity justify it.
-
-Use prompts that are independently actionable. Do not ask multiple writers to fix anything they find across the same repository.
-
-## Execute in waves
-
-Choose **fast** for one known path, **standard** for two or more independent shards, and **broad** only for repository-scale uncertainty. A fast task may stay with the orchestrator and focused checks; it does not require an inventory fleet.
-
-1. **Inventory:** For standard or broad work, inspect repository structure, manifests, instructions, status, CI, and available scripts locally. Search for incomplete markers with context; do not equate every `TODO` string with a defect.
-2. **Scout:** Spawn independent read-only specialists in parallel. Continue useful orchestrator work while they run.
-3. **Synthesize:** Normalize findings by severity, user impact, confidence, path ownership, dependencies, and verification method. Deduplicate symptoms that share a root cause.
-4. **Assign writes:** Create non-overlapping remediation contracts. Prefer subsystem ownership over issue-by-issue edits when files are tightly coupled.
-5. **Integrate:** Review each diff immediately. Check that the agent stayed in scope and preserved baseline changes before starting the next dependent wave.
-6. **Verify independently:** Give verifiers raw artifacts and acceptance criteria, not the intended conclusion. Use a fresh reviewer where capacity permits.
-7. **Close:** Run repository-wide gates, inspect the final diff against the baseline, close the fleet, and report completed work plus any genuinely unresolved items.
-
-After the first cycle, work delta-only: reuse accepted evidence, inspect confirmed residuals and
-changed paths, and rerun only invalidated checks. Do not restart broad discovery or full verification
-without new cross-cutting evidence.
-
-Maintain a finding ledger across the waves. Give each finding an identifier, evidence, severity, affected paths, dependencies, owner, planned verification, and one final disposition: implemented, already satisfied, invalid, duplicate, blocked, or explicitly deferred. Never silently drop a finding between research and build.
-
-Do not spawn more workers than the runtime supports. Use later waves or reuse an idle agent when specialist continuity is useful.
-
-## Maintain fleet state
-
-Inspect agent state after spawning and at wave boundaries. Integrate communications deliberately:
-
-- Send a message to clarify or narrow a running task without restarting it.
-- Assign a finished or idle specialist a new bounded task when continuity is useful.
-- Wait for mailbox updates while workers are active; avoid blind polling.
-- Interrupt only when work is unsafe, obsolete, or blocking a higher-priority correction.
-- Record each agent's owner, paths, mode, dependencies, status, changes, evidence, and blockers in the working notes or plan.
-
-Never treat an agent's completion message as proof by itself. Inspect its artifacts and rerun proportionate checks from the orchestrator context.
-
-## Close the fleet
-
-Fleet completion includes teardown. Before returning control:
-
-1. Collect every relevant handoff and wait for all required agents to reach a terminal state.
-2. Interrupt agents whose work was invalidated, superseded, or left running after their bounded task.
-3. Reinspect the live agent tree. Only the orchestrator and agents explicitly authorized to continue may remain active.
-4. Keep an ownership ledger for background servers, watchers, simulators, subprocess groups, temporary worktrees, and other resources launched during the task. Record the owning agent, PID or resource identifier when exposed, purpose, working directory, and intended lifetime.
-5. Stop and reap task-owned processes, close task-owned listeners, and remove task-owned temporary resources unless the user explicitly asked to keep them running. Preserve logs and handoff evidence before teardown.
-6. Compare a final process and listener inventory with the baseline. Classify by parentage, working directory, launch time, and agent state; never kill by executable name alone.
-
-A finished subagent does not imply that its MCP servers or runtime helpers were reclaimed. Native runtime helpers may be shared or retained by the host, so never terminate the Codex app, shared MCP services, another task's cohort, or an unclassified process. If the runtime owns a residual helper and exposes no safe task-scoped teardown, report it precisely instead of using a broad process kill.
-
-## Apply verification gates
-
-Define completion from the user's acceptance criteria when available. Otherwise label each candidate as a confirmed defect, probable gap, informational cleanup, or unverified suspicion before assigning work.
-
-Require the narrowest relevant tests after each write scope, then broader integration checks. Inspect every command first for network access, code generation, database connections, filesystem mutations, and production defaults. Typical gates include:
-
-- formatting and diff hygiene;
-- generated-code or schema synchronization;
-- lint and static analysis;
-- type checking;
-- unit and integration tests;
-- production build;
-- targeted runtime or browser smoke tests against an explicitly verified local or disposable target;
-- dependency, deprecation, and security review using current primary sources when time-sensitive;
-- final `git status` and diff inspection against the captured baseline.
-
-Classify results as passed, failed, or not run with a reason. Do not call a feature complete because its stub was removed; prove its user-facing path, error behavior, persistence or integration boundary, and regression coverage where applicable.
-
-Inspect verification scripts before running them. If a smoke, integration, or release command can default to production, require an explicit non-production target or skip it and report why.
-
-## Control scope and external effects
-
-Keep audits and local implementation inside the authorized repository. Do not deploy, mutate production data, send messages, push, merge, or install global tools unless the user separately authorized that action. Prefer deterministic validation over a forward test that could touch production.
-
-When current best practices matter, verify unstable claims with official primary sources. Adapt guidance to the repository's actual stack instead of forcing fashionable migrations.
-
-## Return an honest synthesis
-
-Lead with the outcome. Include:
-
-- what changed, grouped by subsystem;
-- the verification matrix and exact failures or skips;
-- preserved pre-existing changes or scope constraints;
-- requested model and effort, observed routing when available, and any unavailable metadata;
-- unresolved blockers, residual risks, and recommended next action.
-
-Claim complete only when the requested scope and verification gates are satisfied. Otherwise state precisely what remains partial.
+Teardown only this task's agents, processes, listeners, and temporary candidates after preserving
+evidence. Idle handles or open database edges do not establish OS liveness. Preserve shared MCP
+services, other tasks, user work, and unclassified processes. Report integrated outcomes, remaining
+gaps, verification, and requested versus effective routing honestly.

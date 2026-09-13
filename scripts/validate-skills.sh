@@ -3,20 +3,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILLS_REF_REV="38a2ff82958afee88dadf4831509e6f7e9d8ef4e"
-SKILLS_CLI_VERSION="1.5.16"
+SKILLS_CLI_VERSION="1.5.26"
 
 python3 "$ROOT/scripts/check-skills.py"
-python3 "$ROOT/skills/gpt-engineer/scripts/test_bootstrap.py"
-python3 "$ROOT/skills/gpt-engineer/scripts/test_bootstrap_codex.py"
-python3 "$ROOT/skills/gpt-engineer/scripts/test_run_codex_agent.py"
-python3 "$ROOT/skills/gpt-engineer/scripts/test_run_journal.py"
-python3 "$ROOT/skills/gpt-engineer/scripts/test_cache_gates.py"
-python3 "$ROOT/skills/gpt-engineer/scripts/test_join_fleet_outcomes.py"
-python3 "$ROOT/skills/gpt-engineer/scripts/test_plan_fleet.py"
-python3 "$ROOT/skills/gpt-engineer/scripts/test_audit_routing.py"
-python3 "$ROOT/skills/gpt-engineer/scripts/test_audit_fleet.py"
-python3 "$ROOT/skills/gpt-engineer/scripts/test_astra_migration.py"
-python3 "$ROOT/skills/gpt-engineer/scripts/test_configure_luna_v2.py"
+python3 -m unittest discover -s "$ROOT/skills/gpt-engineer/scripts" -p 'test_*.py'
 python3 "$ROOT/skills/gpt-engineer-mem/scripts/test_memory_preflight.py"
 python3 "$ROOT/skills/gpt-engineer-spark/scripts/test_bootstrap.py"
 python3 "$ROOT/skills/gpt-engineer-spark/scripts/test_run_spark_agent.py"

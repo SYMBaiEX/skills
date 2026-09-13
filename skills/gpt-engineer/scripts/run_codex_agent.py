@@ -23,7 +23,7 @@ import run_journal
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 HANDOFF_SCHEMA = SKILL_ROOT / "assets" / "codex" / "handoff.schema.json"
-from routes import ROLES, suite_routes
+from routes import ROLES, SUPPORTED_MODELS, suite_routes
 
 COMPATIBILITY_REASONS = (
     "native-routing-unavailable",
@@ -389,8 +389,9 @@ def build_command(
     cwd: Path,
     final_message_path: Path,
     allow_writes: bool,
+    route_override: dict | None = None,
 ) -> list[str]:
-    profile = ROLES[role]
+    profile = route_override or ROLES[role]
     if role in {"astra-worker", "terra-worker", "luna-worker", "luna-max-worker"} and not allow_writes:
         raise SystemExit(f"{role} requires --allow-writes")
     sandbox = (
@@ -564,8 +565,12 @@ def bounded_error(error: BaseException, cwd: Path) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--role", choices=tuple(ROLES), required=True)
+    parser.add_argument("--role", choices=tuple(ROLES) + ("engineer", "explorer", "worker", "verifier"), required=True)
     parser.add_argument("--suite", choices=("astra", "economy"), default="astra")
+    parser.add_argument("--model", choices=SUPPORTED_MODELS, help="Exact model for a generic role; never changes the parent")
+    parser.add_argument("--parent-model", choices=SUPPORTED_MODELS, help="Observed parent model for same-model policy")
+    parser.add_argument("--policy", choices=("same-model", "mixed-model"), default="same-model")
+    parser.add_argument("--reasoning-effort", choices=("low", "medium", "high", "xhigh", "max"))
     parser.add_argument(
         "--compatibility-reason",
         choices=COMPATIBILITY_REASONS,
@@ -639,8 +644,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
-    if args.role not in suite_routes(args.suite):
+    generic = args.role in ("engineer", "explorer", "worker", "verifier")
+    base_role = "astra-" + args.role if generic else args.role
+    if generic:
+        if not args.model or not args.reasoning_effort:
+            parser.error("Generic roles require explicit --model and --reasoning-effort")
+        if args.policy == "same-model" and args.parent_model != args.model:
+            parser.error("Same-model routing requires matching observed --parent-model; use explicit mixed-model policy otherwise")
+        profile = {**ROLES[base_role], "model": args.model, "effort": args.reasoning_effort}
+        # Do not inherit a preset Fast tier or report an Astra profile as a model pin.
+        profile.pop("service_tier", None)
+        args.suite = args.policy
+    elif args.model or args.reasoning_effort or args.parent_model or args.policy != "same-model":
+        parser.error("Explicit model/policy controls require a generic role, not a pinned preset")
+    elif args.role not in suite_routes(args.suite):
         parser.error("Economy role requires explicit --suite economy; no model fallback is permitted")
+    else:
+        profile = dict(ROLES[args.role])
     if args.compatibility_reason not in COMPATIBILITY_REASONS:
         parser.error(
             "--compatibility-reason is required; use native Codex custom agents or the "
@@ -690,12 +710,12 @@ def main(argv: list[str] | None = None) -> int:
         )
     allow_paths = normalize_scope(args.allow_path)
     allow_dirty = normalize_scope(args.allow_dirty_path)
-    profile = ROLES[args.role]
-    profile_sha256 = hashlib.sha256(
+    instruction_template_sha256 = hashlib.sha256(
         (
             SKILL_ROOT / "assets" / "codex" / "agents" / str(profile["profile"])
         ).read_bytes()
     ).hexdigest()
+    profile_sha256 = None if generic else instruction_template_sha256
     write_mode = bool(profile["write_capable"] and args.allow_writes)
     execution_mode = "isolated-candidate" if write_mode else "read-only"
     if args.dry_run:
@@ -703,10 +723,11 @@ def main(argv: list[str] | None = None) -> int:
             validate_write_scope(cwd, snapshot(cwd), allow_paths, allow_dirty)
         command = build_command(
             codex,
-            args.role,
+            base_role,
             cwd,
             output_dir / "last-message.txt",
             args.allow_writes,
+            profile,
         )
         print(
             json.dumps(
@@ -723,6 +744,8 @@ def main(argv: list[str] | None = None) -> int:
                     "reasoningEffort": profile["effort"],
                     "serviceTier": profile.get("service_tier", "default"),
                     "profileSha256": profile_sha256,
+                    "instructionTemplateSha256": instruction_template_sha256,
+                    "routeSource": "explicit-selector" if generic else "bundled-preset",
                     "codexVersion": codex_version_text,
                     "sandbox": command[command.index("--sandbox") + 1],
                     "allowPaths": allow_paths,
@@ -806,13 +829,14 @@ def main(argv: list[str] | None = None) -> int:
             execution_cwd = cwd
         command = build_command(
             codex,
-            args.role,
+            base_role,
             execution_cwd,
             final_message_path,
             args.allow_writes,
+            profile,
         )
         delegated_prompt = (
-            role_instructions(args.role)
+            role_instructions(base_role)
             + "\n\nDo not delegate further. Stay within the exact task and authority below.\n\n"
             + (
                 "You are editing an isolated candidate copy. The original repository is not writable. "
@@ -865,6 +889,8 @@ def main(argv: list[str] | None = None) -> int:
                             "effort": profile["effort"],
                             "mode": execution_mode,
                             "profileSha256": profile_sha256,
+                    "instructionTemplateSha256": instruction_template_sha256,
+                    "routeSource": "explicit-selector" if generic else "bundled-preset",
                             "taskClass": args.task_class,
                             "acceptanceContractHash": args.acceptance_contract_hash,
                             "remainingRouteContext": route_context or None,
@@ -920,6 +946,8 @@ def main(argv: list[str] | None = None) -> int:
                         "mode": execution_mode,
                         "serviceTier": profile.get("service_tier", "default"),
                         "profileSha256": profile_sha256,
+                    "instructionTemplateSha256": instruction_template_sha256,
+                    "routeSource": "explicit-selector" if generic else "bundled-preset",
                         "taskClass": args.task_class,
                         "acceptanceContractHash": args.acceptance_contract_hash,
                         "remainingRouteContext": route_context or None,
@@ -1160,6 +1188,8 @@ def main(argv: list[str] | None = None) -> int:
         "routeAttestation": "requested-only",
         "requestedReasoningEffort": profile["effort"],
         "profileSha256": profile_sha256,
+                    "instructionTemplateSha256": instruction_template_sha256,
+                    "routeSource": "explicit-selector" if generic else "bundled-preset",
         "codexVersion": codex_version_text,
         "status": "completed" if success else "failed",
         "exitCode": process.returncode if process is not None else None,

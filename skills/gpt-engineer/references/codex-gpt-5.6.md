@@ -1,15 +1,14 @@
-# Legacy GPT-5.6 compatibility
+# GPT-5.6 routing and old catalog recovery
 
-Current routing and installation live in [codex-astra.md](codex-astra.md). GPT Engineer 2 defaults
-to Astra. Terra/Luna remain explicit economy options; historical Sol and old Codex role records are
-retained for audit comparisons, not default dispatch.
+Sol, Terra and Luna are current supported parents, alongside Astra. See
+[model routing](model-routing.md); they are not restricted to an Astra-led economy fleet.
 
-Some older runtimes cached Luna as Multi-Agent V1 while using V2 for other models. First use a
-supported current runtime and the upstream catalog. Never copy or patch a catalog to enable Astra.
+Use supported runtime selectors and the upstream catalog. The old unsupported Luna V1-to-V2 catalog
+creation path has been removed. Never patch a catalog to make a model available or claim execution
+from configuration alone.
 
-`scripts/configure_luna_v2.py` remains a compatibility/recovery tool. Disable a stale managed override
-with `--disable` and restart Codex. Its `--apply --acknowledge-unsupported-catalog-override` path
-requires explicit owner acceptance and a verified old Luna mismatch; it freezes upstream metadata
-and is not routine setup. Prefer a supported native/SDK path or a recorded compatibility-adapter
-attempt while an economy route is blocked. Do not rewrite models_cache.json in place or claim
-effective execution from configuration alone.
+`scripts/configure_luna_v2.py --check` diagnoses the known managed override.
+With explicit setup/recovery authorization, `--disable` backs up configuration privately and removes
+only that exact setting while preserving all other parsed values. It leaves any catalog file intact
+because it may have been customized. Restart Codex after recovery. Custom overrides and symlinks
+are preserved or rejected for review, never silently replaced. No apply/refresh/Fast enable path remains.

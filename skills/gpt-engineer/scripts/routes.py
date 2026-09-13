@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 
 ASTRA_MODEL = "gpt-6-astra"
+SUPPORTED_MODELS = (ASTRA_MODEL, "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna")
 # Policy cutover is an explicit instant, not the beginning of the release day.
 MIGRATION = datetime(2026, 9, 10, 23, 23, 48, tzinfo=timezone.utc)
 LEGACY_RETIREMENT = datetime(2026, 8, 31, 7, 15, 45, tzinfo=timezone.utc)
@@ -36,11 +37,15 @@ def suite_routes(suite="astra"):
 def expected_profiles(suite="astra"):
     return {name.replace("-", "_"): (value["model"], value["effort"], value.get("service_tier")) for name, value in suite_routes(suite).items()}
 
-def historical_policy(role, created_at):
+def historical_policy(role, created_at, dispatch_policy=None):
     """Return exact model and retirement reason; never infer economy authorization."""
+    if not isinstance(role, str):
+        return None, None
     if role in LEGACY:
         return LEGACY[role], "retired GPT Engineer profile used after native-first migration" if created_at >= LEGACY_RETIREMENT.timestamp() else None
     if role == "sol_engineer":
+        if dispatch_policy in ("same-model", "mixed-model"):
+            return "gpt-5.6-sol", None
         return "gpt-5.6-sol", "retired Sol profile used after Astra migration" if created_at >= MIGRATION.timestamp() else None
     current = ROLES.get(role.replace("_", "-"))
     return (current["model"], None) if current else (None, None)

@@ -12,8 +12,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-from routes import ROLES, LEGACY, LEGACY_RETIREMENT, historical_policy, ASTRA, ECONOMY
-ALLOWED_MODELS = {value["model"] for value in ROLES.values()}
+from routes import ROLES, LEGACY, LEGACY_RETIREMENT, historical_policy, ASTRA, ECONOMY, SUPPORTED_MODELS
+ALLOWED_MODELS = set(SUPPORTED_MODELS)
 CURRENT_ROLES = {name.replace("-", "_") for name in ROLES}
 HISTORICAL_ROLES = set(LEGACY) | {"sol_engineer"}
 CATALOG_ROLES = CURRENT_ROLES | HISTORICAL_ROLES
@@ -188,7 +188,7 @@ def audit(
     root_thread: str | None = None,
     dispatch_suite: str | None = None,
 ) -> dict[str, object]:
-    if dispatch_suite not in (None, "astra", "economy"):
+    if dispatch_suite not in (None, "astra", "economy", "same-model", "mixed-model"):
         raise ValueError("Unknown dispatch suite")
     state_path = codex_home / "state_5.sqlite"
     history_path = codex_home / "thread_history_1.sqlite"
@@ -261,14 +261,14 @@ def audit(
     stale_profiles = []
     for row in rows:
         reasons = []
-        expected_model, retired = historical_policy(row["agent_role"], int(row["created_at"]))
+        expected_model, retired = historical_policy(row["agent_role"], int(row["created_at"]), dispatch_suite)
         if expected_model is not None and row["model"] != expected_model:
             reasons.append(f"model does not match profile policy: expected {expected_model}")
         if retired and row["agent_role"] == "sol_engineer" and dispatch_suite is None:
             stale_profiles.append({"threadId": row["id"], "agentRole": row["agent_role"], "reason": "Sol profile after release cutover; installed workflow version and dispatch policy are unknown"})
         elif retired:
             reasons.append(retired)
-        if dispatch_suite and row["agent_role"] == "sol_engineer" and not retired:
+        if dispatch_suite in ("astra", "economy") and row["agent_role"] == "sol_engineer" and not retired:
             reasons.append("Sol is outside the explicitly asserted v2 dispatch suite")
         if dispatch_suite == "astra" and row["agent_role"] in {name.replace("-", "_") for name in ECONOMY}:
             reasons.append("economy profile is outside the explicitly asserted Astra dispatch suite")
@@ -363,7 +363,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--since", help="ISO-8601 start time; defaults to seven days ago")
     parser.add_argument("--until", help="Exclusive ISO-8601 snapshot end; defaults to now")
     parser.add_argument("--root-thread", help="Limit the cohort to descendants of one root thread")
-    parser.add_argument("--dispatch-suite", choices=("astra", "economy"), help="Assert a known v2 dispatch policy; omit for version-unknown historical data")
+    parser.add_argument("--dispatch-suite", choices=("astra", "economy", "same-model", "mixed-model"), help="Assert documented policy for the selected cohort, never infer it from timestamps. Does not attest same-model parent equality.")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:

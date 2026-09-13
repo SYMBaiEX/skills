@@ -94,6 +94,34 @@ print(json.dumps({"type": "turn.completed"}))
         self.environment.stop()
         self.temp.cleanup()
 
+    def test_generic_role_dry_runs_all_supported_models_without_changing_parent(self) -> None:
+        from routes import SUPPORTED_MODELS
+        for model in SUPPORTED_MODELS:
+            with mock.patch("sys.stdin", io.StringIO("Trace the API only")), mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+                status = run_codex_agent.main([
+                    "--role", "explorer", "--model", model, "--parent-model", model,
+                    "--reasoning-effort", "medium", "--policy", "same-model",
+                    "--cwd", str(self.root), "--output-dir", str(self.output),
+                    "--codex", str(self.codex), "--dry-run",
+                ])
+            self.assertEqual(status, 0)
+            result = json.loads(output.getvalue())
+            self.assertEqual(result["requestedModel"], model)
+            self.assertIsNone(result["effectiveModel"])
+            self.assertEqual(result["suite"], "same-model")
+            self.assertIsNone(result["profileSha256"])
+            self.assertEqual(result["routeSource"], "explicit-selector")
+            self.assertEqual(len(result["instructionTemplateSha256"]), 64)
+            self.assertFalse(self.output.exists())
+
+    def test_generic_same_model_rejects_mismatch_before_launch(self) -> None:
+        with mock.patch("sys.stderr"), self.assertRaises(SystemExit):
+            run_codex_agent.main([
+                "--role", "explorer", "--model", "gpt-5.6-luna", "--parent-model", "gpt-6-astra",
+                "--reasoning-effort", "medium", "--output-dir", str(self.output), "--dry-run",
+            ])
+        self.assertFalse(self.output.exists())
+
     def test_handoff_schema_requires_engineering_evidence_fields(self) -> None:
         schema = json.loads(run_codex_agent.HANDOFF_SCHEMA.read_text())
         required = set(schema["required"])

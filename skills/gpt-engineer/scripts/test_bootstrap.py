@@ -38,7 +38,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(checked.returncode, 0, checked.stderr)
         self.assertEqual(len(list((self.root / ".codex" / "agents").glob("*.toml"))), 9)
         self.assertEqual(len(list((self.root / ".claude" / "agents").glob("*.md"))), 4)
-        self.assertTrue((self.root / ".codex" / "hooks.json").exists())
+        self.assertFalse((self.root / ".codex" / "hooks.json").exists())
 
     def test_global_install_uses_provider_homes_without_hooks(self) -> None:
         env = os.environ.copy()
@@ -52,6 +52,19 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(len(list((Path(env["CLAUDE_CONFIG_DIR"]) / "agents").glob("*.md"))), 4)
         self.assertFalse((Path(env["CODEX_HOME"]) / "hooks.json").exists())
 
+    def test_claude_uninstall_preserves_custom_profiles_and_settings(self) -> None:
+        installed = self.run_script(str(self.root), "--provider", "claude")
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        folder = self.root / ".claude"
+        profiles = sorted((folder / "agents").glob("*.md"))
+        profiles[0].write_text("customized profile")
+        (folder / "settings.json").write_text('{"owner":true}')
+        removed = self.run_script(str(self.root), "--provider", "claude", "--uninstall")
+        self.assertEqual(removed.returncode, 0, removed.stderr)
+        self.assertEqual(profiles[0].read_text(), "customized profile")
+        self.assertFalse(profiles[1].exists())
+        self.assertEqual((folder / "settings.json").read_text(), '{"owner":true}')
+
     def test_refuses_conflicting_agent_file(self) -> None:
         conflict = self.root / ".codex" / "agents" / "astra-engineer.toml"
         conflict.parent.mkdir(parents=True)
@@ -61,22 +74,23 @@ class BootstrapTests(unittest.TestCase):
         self.assertIn("Refusing to overwrite conflicting file", result.stderr)
         self.assertEqual(conflict.read_text(), "user-owned\n")
 
-    def test_explicit_upgrade_replaces_bundled_profile(self) -> None:
+    def test_explicit_upgrade_preserves_unknown_profile(self) -> None:
         conflict = self.root / ".codex" / "agents" / "astra-engineer.toml"
         conflict.parent.mkdir(parents=True)
         conflict.write_text('name = "astra_engineer"\nmodel = "gpt-5.6"\n')
         result = self.run_script("--provider", "codex", "--upgrade", str(self.root))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('model = "gpt-6-astra"', conflict.read_text())
+        self.assertIn("Preserving customized or symlink file", result.stderr)
+        self.assertIn('model = "gpt-5.6"', conflict.read_text())
 
     def test_warns_when_claude_forces_one_subagent_model(self) -> None:
         env = os.environ.copy()
         env["CLAUDE_CODE_SUBAGENT_MODEL"] = "opus"
         result = self.run_script("--provider", "claude", str(self.root), env=env)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("overrides every Claude agent profile", result.stderr)
+        self.assertIn("verify version-specific resolution", result.stderr)
 
-    def test_custom_retired_profile_preserved_during_install_and_check(self) -> None:
+    def test_legacy_profile_is_preserved_during_install_and_check(self) -> None:
         retired = self.root / ".codex" / "agents" / "sol-engineer.toml"
         retired.parent.mkdir(parents=True)
         customized = 'name = "sol_engineer"\n# model inherited by owner choice\n'
@@ -84,11 +98,10 @@ class BootstrapTests(unittest.TestCase):
         for arguments in (("--upgrade",), ("--check",)):
             result = self.run_script("--provider", "codex", *arguments, str(self.root))
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("Preserving customized or symlink retired profile", result.stderr)
             self.assertEqual(retired.read_text(), customized)
             self.assertTrue((retired.parent / "astra-engineer.toml").is_file())
 
-    def test_retired_symlink_preserved_including_dangling_target(self) -> None:
+    def test_legacy_symlink_preserved_including_dangling_target(self) -> None:
         retired = self.root / ".codex" / "agents" / "sol-engineer.toml"
         retired.parent.mkdir(parents=True)
         target = Path(self.temp.name) / "owner-profile.toml"
@@ -96,7 +109,6 @@ class BootstrapTests(unittest.TestCase):
         for arguments in (("--upgrade",), ("--check",)):
             result = self.run_script("--provider", "codex", *arguments, str(self.root))
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("Preserving customized or symlink retired profile", result.stderr)
             self.assertTrue(retired.is_symlink())
             self.assertFalse(target.exists())
             self.assertTrue((retired.parent / "astra-worker.toml").is_file())

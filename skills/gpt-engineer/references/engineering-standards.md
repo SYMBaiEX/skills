@@ -79,24 +79,24 @@ the gate blocked/not run and explain what would be needed.
 
 ## Logical engineering-team lanes
 
-These are optional task lenses, not a requirement to spawn a team. One Astra agent can cover several
+These are optional task lenses, not a requirement to spawn a team. One selected parent can cover several
 lenses coherently. Delegate only independent work that reduces elapsed time or adds useful review:
 
 | Logical lane | Normal route | Output |
 | --- | --- | --- |
-| Requirements and product completeness | Lead or `astra_explorer` | Requirement map, incomplete journeys, stale promises, acceptance gaps |
-| Architecture and boundaries | Lead or `astra_engineer` | Execution/data/API map, coupling and migration risks, decision options |
-| Correctness and compatibility | Lead or `astra_verifier` | Concrete defects, races, error paths, compatibility and regression risks |
-| Security and privacy | Lead or `astra_engineer` | Trust boundaries, abuse cases, auth/data/supply-chain findings, required proof |
-| SDKs, dependencies, and deprecations | Lead or `astra_explorer` | Primary-source version/API evidence, official SDK opportunities, drift and lockfile impact |
-| Tests and user journeys | Lead or `astra_verifier` | Gate inventory, actual pass/fail/skip counts, missing layers, runtime/browser evidence |
-| Performance, reliability, and observability | Lead or a bounded Astra lane | Baselines, hot paths, capacity/failure evidence, missing operational signals |
-| Operations, release, and documentation | Lead or `astra_explorer` | CI/CD truth, configuration, rollback/canary/runbook and documentation dispositions |
+| Requirements and product completeness | Lead or a bounded explorer | Requirement map, incomplete journeys, stale promises, acceptance gaps |
+| Architecture and boundaries | Lead or an independent reviewer | Execution/data/API map, coupling and migration risks, decision options |
+| Correctness and compatibility | Lead or a verifier | Concrete defects, races, error paths, compatibility and regression risks |
+| Security and privacy | Lead or an independent reviewer | Trust boundaries, abuse cases, auth/data/supply-chain findings, required proof |
+| SDKs, dependencies, and deprecations | Lead or a bounded explorer | Primary-source version/API evidence, official SDK opportunities, drift and lockfile impact |
+| Tests and user journeys | Lead or a verifier | Gate inventory, actual pass/fail/skip counts, missing layers, runtime/browser evidence |
+| Performance, reliability, and observability | Lead or a bounded independent lane | Baselines, hot paths, capacity/failure evidence, missing operational signals |
+| Operations, release, and documentation | Lead or a bounded explorer | CI/CD truth, configuration, rollback/canary/runbook and documentation dispositions |
 
 Combine lanes when the repository is small. Split them by subsystem when the codebase is large. The
 lead deduplicates findings before any build wave and keeps architecture, security acceptance,
-integration, and final completion judgment accountable to the Astra lead. Explicit economy mode may
-route bounded task lenses to the retained Terra/Luna profiles; it does not transfer final acceptance.
+integration, and final completion judgment accountable to the selected lead. Deliberate mixed-model
+lanes do not transfer final acceptance or silently upgrade the parent.
 
 ## Qualify an eight-reader Team wave
 

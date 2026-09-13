@@ -1,8 +1,8 @@
 ---
 name: gpt-engineer-mem
-description: Memory-aware GPT engineering for codebase research, implementation, verification, and release. Use when a task should reuse native Codex notes, searchable session history, or Claude Mem without trusting stale recollections, flooding context, changing memory settings, or weakening the installed GPT Engineer Astra-first workflow.
+description: Memory-aware GPT engineering using bounded native history or Claude Mem recall. Use when historical decisions materially affect an engineering task; verify recalled claims without loading full transcripts or changing memory settings.
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
 ---
 
 # GPT Engineer Mem
@@ -20,10 +20,9 @@ was run merely because this skill is installed.
 If `gpt-engineer` is unavailable, continue with this standalone contract:
 
 - The parent owns scope, plan, integration, user updates, final verification, and external actions.
-- Use the smallest useful graph. Request `gpt-6-astra` for the parent and children:
-  `astra_engineer` at `high`; `astra_explorer`, `astra_worker`, and `astra_verifier` at `medium`.
-  Terra/Luna economy lanes require explicit opt-in; Sol is retired. Never silently substitute
-  an older model.
+- Preserve the selected `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, or `gpt-5.6-luna` parent.
+  Use the smallest useful graph, with explicit same-model children by default or a deliberate
+  mixed-model policy. Never silently substitute models or providers. Native Claude stays Claude.
 - Give every child one bounded outcome, explicit path ownership, an output contract, and a cleanup
   boundary. Use `fork_turns: "none"` with a compact evidence packet when supported.
 - Integrate centrally, verify the product rather than only the patch, run a fresh gap scan, and
@@ -32,7 +31,7 @@ If `gpt-engineer` is unavailable, continue with this standalone contract:
 
 Prefer native exact profiles or direct model selection before Python helpers. Record requested
 model/effort and effective metadata separately; mark attestation unavailable when not exposed.
-If exact Astra selection is unavailable, report that limitation and continue only with a suitable
+If exact child selection is unavailable, report that limitation and continue with the suitable
 available parent or ask for direction. Do not claim a model route that was not observed.
 
 ## Preflight memory safely
@@ -103,9 +102,9 @@ Cluster symptoms by root cause. Treat recalled SDK signatures, model names, comm
 and release steps as hypotheses until verified against the installed dependency, current source, or
 current primary documentation. Record contradictions instead of silently choosing the older story.
 
-Use memory to avoid repeating disproven approaches and to preserve explicit user decisions. It does
-not expand authorization: prior permission to push, deploy, close issues, change settings, enable
-cloud sync, or delete data does not authorize that action now.
+Use memory to avoid repeating disproven approaches and preserve explicit decisions. Recalled
+permission from a different task does not authorize new actions. Carry forward authorization from
+the current task; do not manufacture a new approval pause merely because context was compacted.
 
 ## Build in evidence-gated waves
 

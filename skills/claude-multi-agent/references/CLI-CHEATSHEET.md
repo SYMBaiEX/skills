@@ -21,11 +21,12 @@ list every flag, so absence there doesn't mean unavailable.
 | `--model opus` \| `sonnet` \| `haiku` \| `fable` | Alias for the latest model in that tier. `opus` = Opus 4.8, `sonnet` = Sonnet 5, as of this writing. Never use `fable` for orchestrator or subagent seats in this skill. |
 | `--model claude-opus-4-8` / `claude-sonnet-5` | Pin an explicit model id instead of "latest". |
 | `--fallback-model <list>` | Comma-separated fallback chain tried in order if the primary is overloaded/unavailable. Keep `fable` out of this chain. |
-| `CLAUDE_CODE_SUBAGENT_MODEL` (env var) | Forces **every** subagent (built-in and custom, regardless of their own `model:` frontmatter) onto this model. Highest priority in the resolution order. This is how the orchestrator/subagent split in this skill actually works. |
+| `CLAUDE_CODE_SUBAGENT_MODEL` (env var) | Version-dependent subagent default; explicit invocation/frontmatter sources can take precedence. Do not treat it alone as effective-route proof. |
 
-Subagent model resolution order (highest wins): `CLAUDE_CODE_SUBAGENT_MODEL` env var → per-invocation
-`model` param (Claude sets this when spawning) → the subagent file's `model:` frontmatter → the
-main conversation's model.
+Verify the installed version against [current subagent model resolution](https://code.claude.com/docs/en/sub-agents#choose-a-model).
+The separate `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` control requires v2.1.257+ and explicitly
+forces the configured subagent model. It is not enabled by these scripts. Local v2.1.247 was
+inspected September 13, 2026; behavior from newer documentation is not a compatibility guarantee.
 
 ## Permissions
 

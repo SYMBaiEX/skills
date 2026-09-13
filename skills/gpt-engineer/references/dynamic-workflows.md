@@ -1,6 +1,6 @@
 # Dynamic engineering workflows
 
-Start with direct Astra execution. Add independent children only when their work shortens the
+Start with direct execution in the selected parent model. Add independent children only when their work shortens the
 critical path or adds useful review. A large task or a strong model alone does not decide topology.
 
 ## Choose the runtime by the work it must do
@@ -17,7 +17,7 @@ critical path or adds useful review. A large task or a strong model alone does n
 
 Codex SDK is local coding automation; Agents API is a managed harness; Responses is lower-level
 model control. Do not rebuild the normal Codex loop merely to gain another wrapper. `codex mcp-server`
-is deprecated; prefer current Codex SDK/app-server integration for new controllers.
+and the standalone binary are removed in current documentation; use Codex SDK/app-server instead.
 
 ## Execute a dependency graph without global waiting
 

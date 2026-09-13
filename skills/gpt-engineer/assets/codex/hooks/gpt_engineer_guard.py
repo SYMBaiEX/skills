@@ -10,11 +10,32 @@ BLOCKED = (
     (re.compile(r"(?:^|[;&|]\s*)git\s+clean\s+[^\n;&|]*-[a-z]*f[a-z]*(?:\s|$)", re.I), "forced git clean"),
     (re.compile(r"(?:^|[;&|]\s*)git\s+push\s+[^\n;&|]*(?:--force(?:-with-lease)?|-f)(?:\s|$)", re.I), "forced git push"),
 )
+MAX_INPUT_BYTES = 16_384
+
+
+def _read_event():
+    stream = getattr(sys.stdin, "buffer", sys.stdin)
+    raw = stream.read(MAX_INPUT_BYTES + 1)
+    if len(raw) > MAX_INPUT_BYTES:
+        return None
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    return json.loads(raw)
 
 
 def main() -> int:
-    event = json.load(sys.stdin)
-    command = str(event.get("tool_input", {}).get("command", ""))
+    try:
+        event = _read_event()
+    except (json.JSONDecodeError, OSError, TypeError, UnicodeDecodeError):
+        return 0
+    if not isinstance(event, dict):
+        return 0
+    tool_input = event.get("tool_input")
+    if not isinstance(tool_input, dict):
+        return 0
+    command = tool_input.get("command", "")
+    if not isinstance(command, str):
+        return 0
     for pattern, label in BLOCKED:
         if pattern.search(command):
             json.dump(

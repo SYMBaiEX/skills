@@ -7,7 +7,7 @@
 #   PERMISSION_MODE                default: acceptEdits   (see references/SAFETY.md)
 #   MAX_TURNS                      optional turn cap
 #   MAX_BUDGET_USD                 optional spend cap
-#   CLAUDE_CODE_SUBAGENT_MODEL     default: sonnet (forces every subagent's model)
+#   CLAUDE_CODE_SUBAGENT_MODEL     default: sonnet (version-dependent default; verify child routes)
 #   CLAUDE_CODE_DISABLE_BACKGROUND_TASKS   default: 1 (forces subagents to run in the
 #                                   foreground so the orchestrator can't end its turn
 #                                   while one is still working — see references/HANDOFF-PROTOCOL.md)

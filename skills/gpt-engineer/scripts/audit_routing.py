@@ -23,8 +23,8 @@ except ImportError:
 
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
-from routes import ASTRA_MODEL, expected_profiles
-ALLOWED_PARENT_MODELS = {ASTRA_MODEL}
+from routes import ASTRA_MODEL, SUPPORTED_MODELS, expected_profiles
+ALLOWED_PARENT_MODELS = set(SUPPORTED_MODELS)
 EXPECTED = expected_profiles()
 APP_CODEX = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
 MANAGED_CATALOG = Path("model-catalogs/gpt-engineer-luna-v2.json")
@@ -305,8 +305,8 @@ def audit(
             violations.append(f"{scope} profile: {exc}")
             continue
         name = str(profile.get("name", ""))
-        if name == "sol_engineer":
-            warnings.append(f"retired Sol profile remains installed but is not an allowed dispatch target: {path}")
+        if name == "sol_engineer" and suite == "astra":
+            warnings.append(f"Sol profile is outside this explicit Astra profile audit; direct Sol routing remains supported: {path}")
         if name not in EXPECTED:
             continue
         model = str(profile.get("model", ""))

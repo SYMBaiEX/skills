@@ -1,104 +1,56 @@
-#!/usr/bin/env python3
-from __future__ import annotations
-
 import json
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
-
-import configure_luna_v2
-
-
-def catalog(luna_version: str = "v1") -> dict[str, object]:
-    return {
-        "fetched_at": "2026-07-31T00:00:00Z",
-        "etag": "test",
-        "client_version": "0.144.6",
-        "models": [
-            {"slug": "gpt-5.6-sol", "multi_agent_version": "v2", "marker": "sol"},
-            {"slug": "gpt-5.6-terra", "multi_agent_version": "v2", "marker": "terra"},
-            {"slug": "gpt-5.6-luna", "multi_agent_version": luna_version, "marker": "luna"},
-        ],
-    }
+import configure_luna_v2 as recovery
 
 
-class ConfigureLunaV2Tests(unittest.TestCase):
-    def setUp(self) -> None:
+class CatalogRecoveryTests(unittest.TestCase):
+    def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.home = Path(self.temp.name) / ".codex"
-        self.home.mkdir()
-        (self.home / "models_cache.json").write_text(json.dumps(catalog()))
-        (self.home / "config.toml").write_text(
-            'model = "gpt-5.6-sol"\nsecret_setting = "preserve-me"\n\n[features]\nmulti_agent = true\n'
-        )
+        self.addCleanup(self.temp.cleanup)
+        self.home = Path(self.temp.name).resolve()
+        self.config = self.home / "config.toml"
 
-    def tearDown(self) -> None:
-        self.temp.cleanup()
+    def test_stock_is_readonly(self):
+        self.config.write_text('model = "gpt-5.6-luna"\n')
+        before = self.config.read_bytes()
+        self.assertEqual(recovery.recover(self.home)["status"], "stock")
+        self.assertEqual(self.config.read_bytes(), before)
+        self.assertEqual(len(list(self.home.iterdir())), 1)
 
-    def test_apply_changes_only_luna_route_and_preserves_config(self) -> None:
-        self.assertEqual(configure_luna_v2.apply(self.home, True, validate_runtime=False), 0)
-        target = self.home / configure_luna_v2.MANAGED_CATALOG
-        patched = json.loads(target.read_text())
-        expected = catalog()
-        self.assertEqual(configure_luna_v2.model(patched, "gpt-5.6-luna")["multi_agent_version"], "v2")
-        configure_luna_v2.model(patched, "gpt-5.6-luna")["multi_agent_version"] = "v1"
-        for item in patched["models"]:
-            item.pop("supports_reasoning_summaries")
-        self.assertEqual(patched, expected)
-        config = (self.home / "config.toml").read_text()
-        self.assertIn('secret_setting = "preserve-me"', config)
-        self.assertIn(f'model_catalog_json = "{target}"', config)
-        self.assertIn("fast_mode = true", config)
-        self.assertEqual(configure_luna_v2.check(self.home, True, validate_runtime=False), 0)
+    def test_disable_preserves_all_other_values_and_catalog(self):
+        target = self.home / recovery.MANAGED_CATALOG
+        target.parent.mkdir()
+        target.write_text('{"custom":true}')
+        self.config.write_text('model_catalog_json = ' + json.dumps(str(target)) + '\nmodel = "gpt-5.6-sol"\n[features]\nfast_mode = true\n')
+        self.assertEqual(recovery.recover(self.home)["status"], "legacy-override-active")
+        self.assertEqual(recovery.recover(self.home, True)["status"], "disabled")
+        self.assertEqual(recovery.configuration(self.config)[1], {"model": "gpt-5.6-sol", "features": {"fast_mode": True}})
+        self.assertTrue(target.is_file())
+        backup = next(self.home.glob("*.bak"))
+        self.assertEqual(backup.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(recovery.recover(self.home, True)["status"], "stock")
 
-    def test_refresh_detects_stale_source(self) -> None:
-        self.assertEqual(configure_luna_v2.apply(self.home, False, validate_runtime=False), 0)
-        changed = catalog()
-        changed["etag"] = "new"
-        (self.home / "models_cache.json").write_text(json.dumps(changed))
-        self.assertEqual(configure_luna_v2.check(self.home, False, validate_runtime=False), 1)
-        self.assertEqual(configure_luna_v2.apply(self.home, False, validate_runtime=False), 0)
-        self.assertEqual(configure_luna_v2.check(self.home, False, validate_runtime=False), 0)
+    def test_custom_override_preserved(self):
+        self.config.write_text('model_catalog_json = "/custom/catalog.json"\n')
+        before = self.config.read_bytes()
+        self.assertEqual(recovery.recover(self.home, True)["status"], "custom-preserved")
+        self.assertEqual(self.config.read_bytes(), before)
 
-    def test_disable_removes_only_managed_override(self) -> None:
-        self.assertEqual(configure_luna_v2.apply(self.home, True, validate_runtime=False), 0)
-        self.assertEqual(configure_luna_v2.disable(self.home), 0)
-        config = (self.home / "config.toml").read_text()
-        self.assertNotIn("model_catalog_json", config)
-        self.assertIn('secret_setting = "preserve-me"', config)
-        self.assertIn("fast_mode = true", config)
-        self.assertFalse((self.home / configure_luna_v2.MANAGED_CATALOG).exists())
+    def test_symlink_and_duplicate_fail_closed(self):
+        self.config.symlink_to(self.home / "missing")
+        with self.assertRaises(ValueError):
+            recovery.recover(self.home, True)
+        self.config.unlink()
+        self.config.write_text('model_catalog_json="a"\nmodel_catalog_json="b"\n')
+        with self.assertRaises(ValueError):
+            recovery.recover(self.home, True)
 
-    def test_stock_v2_needs_no_shim(self) -> None:
-        (self.home / "models_cache.json").write_text(json.dumps(catalog("v2")))
-        self.assertEqual(configure_luna_v2.apply(self.home, True, validate_runtime=False), 0)
-        self.assertFalse((self.home / configure_luna_v2.MANAGED_CATALOG).exists())
-
-    def test_runtime_validation_fails_closed_when_codex_rejects_catalog(self) -> None:
-        rejected = subprocess.CompletedProcess([], 1, stdout="", stderr="invalid catalog")
-        with mock.patch("configure_luna_v2.resolve_codex", return_value="codex"):
-            with mock.patch("configure_luna_v2.subprocess.run", return_value=rejected):
-                with self.assertRaisesRegex(SystemExit, "Codex rejected.*invalid catalog"):
-                    configure_luna_v2.validate_catalog_with_codex(catalog(), self.home)
-
-    def test_cli_apply_requires_unsupported_override_acknowledgement(self) -> None:
-        with self.assertRaisesRegex(SystemExit, "2"):
-            configure_luna_v2.main(
-                ["--apply", "--codex-home", str(self.home)]
-            )
-
-    def test_resolve_codex_prefers_newer_available_runtime(self) -> None:
-        old = Path(self.temp.name) / "old-codex"
-        new = Path(self.temp.name) / "new-codex"
-        old.write_text("#!/bin/sh\necho 'codex-cli 0.144.6'\n")
-        new.write_text("#!/bin/sh\necho 'codex-cli 0.151.0'\n")
-        old.chmod(0o755)
-        new.chmod(0o755)
-        self.assertEqual(
-            configure_luna_v2.resolve_codex([str(old), str(new)]), str(new)
-        )
+    def test_apply_removed(self):
+        with mock.patch("sys.stderr"), self.assertRaises(SystemExit):
+            recovery.main(["--apply", "--codex-home", str(self.home)])
 
 
 if __name__ == "__main__":

@@ -26,7 +26,7 @@ class AstraMigrationTests(unittest.TestCase):
         declaration = ["terra_worker=gpt-5.6-terra:medium"]
         self.assertEqual(audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL, declaration)["status"], "failed")
         self.assertEqual(audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL, declaration, suite="economy")["status"], "passed")
-        self.assertEqual(audit_routing.audit(self.root, self.home, "gpt-5.6-sol", suite="economy")["status"], "failed")
+        self.assertEqual(audit_routing.audit(self.root, self.home, "gpt-5.6-sol", suite="economy")["status"], "passed")
 
     def test_registry_and_assets_agree(self):
         for name, route in routes.ROLES.items():
@@ -53,7 +53,7 @@ class AstraMigrationTests(unittest.TestCase):
         path.write_text('name = "sol_engineer"\nmodel = "gpt-5.6-sol"\nmodel_reasoning_effort = "high"\n')
         result = audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL)
         self.assertEqual(result["status"], "passed")
-        self.assertTrue(any("retired Sol" in item for item in result["warnings"]))
+        self.assertTrue(any("explicit Astra profile audit" in item for item in result["warnings"]))
         selected = audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL, ["sol_engineer=gpt-5.6-sol:high"])
         self.assertEqual(selected["status"], "failed")
         self.assertEqual(path.read_text(), 'name = "sol_engineer"\nmodel = "gpt-5.6-sol"\nmodel_reasoning_effort = "high"\n')
@@ -71,9 +71,10 @@ class AstraMigrationTests(unittest.TestCase):
         unrelated = destination / "hooks" / "custom.py"
         unrelated.write_text("# user hook\n")
         bootstrap.install_codex(destination, False, True, True)
-        self.assertEqual(hook.read_bytes(), (bootstrap.ASSET_ROOT / "codex" / "hooks" / hook.name).read_bytes())
+        self.assertEqual(hook.read_text(), "# previously installed hook\n")
         self.assertEqual(unrelated.read_text(), "# user hook\n")
-        bootstrap.install_codex(destination, True, True, True)
+        with self.assertRaisesRegex(SystemExit, "differs"):
+            bootstrap.install_codex(destination, True, True, True)
 
     def test_retirement_backup_and_modified_preservation(self):
         path = self.home / "agents" / "sol-engineer.toml"
@@ -106,8 +107,9 @@ class AstraMigrationTests(unittest.TestCase):
         self.assertEqual(destination.read_bytes(), before)
         bootstrap.merge_codex_hooks(destination, False)
         installed = json.loads(destination.read_text())["hooks"]["SubagentStart"]
-        self.assertIn("astra_engineer", installed[0]["matcher"])
+        self.assertEqual(installed[0]["matcher"], "^sol_engineer$")
         self.assertEqual(installed[1], custom)
+        self.assertIn("astra_engineer", installed[2]["matcher"])
         bootstrap.merge_codex_hooks(destination, True)
 
     def test_temporal_exact_model_policies(self):
@@ -130,7 +132,8 @@ class AstraMigrationTests(unittest.TestCase):
         bootstrap.merge_codex_hooks(destination, False)
         groups = json.loads(destination.read_text())["hooks"]["SubagentStart"]
         self.assertEqual(groups[0]["matcher"], "^sol_engineer$")
-        self.assertEqual(groups[0]["hooks"], [{"type": "command", "command": "echo custom"}])
+        self.assertEqual(len(groups[0]["hooks"]), 2)
+        self.assertIn({"type": "command", "command": "echo custom"}, groups[0]["hooks"])
         self.assertIn("astra_engineer", groups[1]["matcher"])
         bootstrap.merge_codex_hooks(destination, True)
 

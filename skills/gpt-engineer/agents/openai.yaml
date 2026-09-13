@@ -1,4 +1,4 @@
 interface:
   display_name: "GPT Engineer"
-  short_description: "Build and verify software with GPT-6 Astra"
-  default_prompt: "Use $gpt-engineer with GPT-6 Astra to own this engineering outcome, delegate useful parallel work, and verify the integrated result."
+  short_description: "Model-aware engineering with verified outcomes"
+  default_prompt: "Use $gpt-engineer with my selected model to own this engineering outcome, delegate useful bounded work, and verify the result."

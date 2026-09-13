@@ -4,7 +4,7 @@ description: Hand off engineering work to Claude Code as an autonomous team or n
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.4.0"
+  version: "1.4.1"
 ---
 
 # Claude Multi-Agent
@@ -25,11 +25,12 @@ Four levers control who does what and how reliably, and all four ship pre-wired 
 
 1. **The orchestrator is the main session**, launched with `--model opus`. It's the thing making
    decisions, writing the plan, and deciding what to delegate vs. do itself.
-2. **Every subagent is forced onto Sonnet** via the `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`
-   environment variable. This is the highest-priority entry in Claude Code's model-resolution
-   order — it overrides `model: inherit` on built-in subagents (Explore, Plan, general-purpose)
-   *and* any custom subagent, so you don't have to hunt down every agent file to keep costs sane.
-   The bundled custom agents in `assets/agents/` also set `model: sonnet` explicitly, belt-and-suspenders.
+2. **Sonnet is requested explicitly for bundled subagents** with `model: sonnet` in
+   `assets/agents/`. The launchers also set `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`, but current
+   documentation does not make that variable alone a universal override. Verify the installed
+   version and actual child route. `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` requires v2.1.257+
+   and explicit user intent; this skill does not enable it. The inspected v2.1.247 installation
+   is below that documented version. Do not silently claim or force uniform child routing.
 3. **Every subagent runs in the foreground**, via `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` (Claude
    Code's default since v2.1.198 is background). This makes the Agent tool call itself the join —
    it blocks until the subagent returns, so the orchestrator can't end its turn while one is still
@@ -41,7 +42,7 @@ Four levers control who does what and how reliably, and all four ship pre-wired 
    JavaScript orchestration. `scripts/run-workflow.sh` invokes the saved workflow directly and
    deliberately unsets `CLAUDE_CODE_SUBAGENT_MODEL` so its explicit phase models are honored.
 
-Everything below is just plumbing around those four facts.
+These are requested controls. Installation and documentation do not prove their effective runtime behavior.
 
 ## Quickstart
 
@@ -150,7 +151,7 @@ since changes now land directly on whatever you're checked out to.
 | What | How | Why |
 |---|---|---|
 | Orchestrator model | `--model opus` on the top-level `claude` invocation | `opus` always resolves to the latest Opus (currently 4.8) |
-| Subagent model | `CLAUDE_CODE_SUBAGENT_MODEL=sonnet` env var | Highest-priority override, catches every subagent regardless of its own frontmatter |
+| Subagent default | `CLAUDE_CODE_SUBAGENT_MODEL=sonnet` env var | Version-dependent default, not universal force; verify explicit model sources |
 | Subagent model (belt-and-suspenders) | `model: sonnet` in each `assets/agents/*.md` file | Explicit in case the env var isn't propagated by whatever wraps this |
 | Pinning instead of "latest" | `--model claude-opus-4-8`, `model: claude-sonnet-5` | Use if you need reproducible behavior across a model upgrade rather than always-latest |
 | Fallback on overload | `--fallback-model sonnet` (never include `fable`) | Keeps a degraded-but-capable path without dropping to a model unsuited for either seat |

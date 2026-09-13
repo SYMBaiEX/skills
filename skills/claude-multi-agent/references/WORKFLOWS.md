@@ -81,8 +81,10 @@ await agent("Inspect this bounded subsystem", { model: "sonnet", effort: "high" 
 ```
 
 `meta.phases[].model` is display metadata, not execution routing. The environment variable
-`CLAUDE_CODE_SUBAGENT_MODEL` overrides every per-agent model, including workflow agents. Leave it
-unset for a mixed Opus/Sonnet workflow. `scripts/run-workflow.sh` unsets it deliberately.
+`CLAUDE_CODE_SUBAGENT_MODEL` has version-dependent precedence; do not assume it overrides
+explicit per-agent routing. The separate FORCE control requires v2.1.257+. Leave the default
+unset for mixed Opus/Sonnet workflows; `scripts/run-workflow.sh` unsets it deliberately and
+never enables FORCE. Record requested and observed child routes separately.
 That wrapper has no default fallback; set `FALLBACK_MODEL` only when the alternate model is an
 authorized route and record the change in the run evidence.
 

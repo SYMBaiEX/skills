@@ -22,7 +22,7 @@ class BootstrapCodexTests(unittest.TestCase):
 
     def run_bootstrap(self, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["python3", str(SCRIPT), *args, str(self.root)],
+            ["python3", str(SCRIPT), "--with-hooks", *args, str(self.root)],
             check=False,
             capture_output=True,
             text=True,
