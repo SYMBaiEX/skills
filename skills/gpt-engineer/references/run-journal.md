@@ -118,6 +118,13 @@ Use a byte or token budget, not a fixed turn count. Do not inject the whole jour
 child prompt. Preserve the stable outcome, constraints, evidence references, and success criteria;
 let native conversation state or compaction carry model context while it remains useful.
 
+For long-running work, checkpoint at meaningful milestones, before a planned handoff, or when
+context pressure makes recovery useful. Retain open acceptance criteria, decisions, evidence
+references, live handles, and the next action in the existing plan/journal; do not start a second
+ledger or rewrite the full history. Compaction does not end the task or justify redispatching a live
+attempt. Reconcile the checkpoint and continue authorized work. A routine checkpoint is not a
+terminal handoff or a reason to close an active run. See [long-running work](long-running-work.md).
+
 ## Tune only from comparable outcomes
 
 Use `scripts/join_fleet_outcomes.py` after representative completed runs. Keep dispatched, routed,

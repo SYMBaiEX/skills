@@ -42,3 +42,17 @@ exceptions use `--allow-dirty-path`. Inspect result.json, candidate changes/dele
 route evidence before integration. At most two read-only adapters may run together; serialize
 candidate writers for the same repository. A successful dry run establishes command construction,
 not effective provider/model execution. Retain separate requested and effective fields.
+
+There is no default child runtime deadline. For an explicit operator deadline, pass `--timeout`
+with a positive number of seconds. A timeout triggers owned-group shutdown and reports failure;
+it never proves that a task was completed. Keep a supervising owner and process handle for an
+unlimited-duration invocation; inspect progress and use cancellation when required. Lock acquisition,
+metadata probes, and shutdown grace periods keep their short operational timeouts. Output limits
+still bound retained evidence; truncated evidence cannot pass acceptance. These controls are
+separate from a productive agent's running time.
+
+Shutdown escalates graceful signals to forced termination for the registered process group even
+after its leader exits. `cleanupVerified` requires a reaped direct child and an absent group;
+lingering, zombie, or inaccessible groups are unverified and cannot pass acceptance. Descendants
+that create a different session are outside this group guarantee and require separately recorded
+ownership/cleanup handles. Do not discover or kill unrelated processes to manufacture clean status.

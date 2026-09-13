@@ -1,10 +1,10 @@
 ---
 name: gpt-engineer
-description: "Carry software builds, remediation, and engineering investigations through evidence-backed outcomes. Adapt planning, implementation, optional delegation, and verification to the selected model and repository. Use for substantial engineering or explicit GPT Engineer requests; simple explanations and unrelated tasks do not need this workflow."
+description: "Complete substantial software builds, remediation, and engineering investigations with verified outcomes. Use for multi-step engineering work or explicit GPT Engineer requests."
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "2.1.0"
+  version: "2.1.1"
 ---
 
 # GPT Engineer
@@ -20,12 +20,17 @@ user changes and concurrent work. Establish observable acceptance, scope, and au
 forward prior authorization and steering in this task. Resolve routine reversible choices; ask
 only when missing information or authority materially changes the outcome. Reviews remain read-only
 unless implementation is authorized. Persistence does not authorize unlimited retries, spending,
-deployment, or expanded scope.
+deployment, or expanded scope. Continue through implementation, required verification, and fixing
+in-scope failures; do not stop at the first patch or ask to continue already-authorized work.
 
 Small fixes need a focused change and decisive check, not a fleet, journal, or mandatory preflight.
 For substantial work, track requirement/finding IDs, dependencies, ownership, and acceptance evidence.
-Before research fleets or repeated experiments, state concurrency, lane scope, time/resource budget,
-and stopping conditions. Reassess on repeated failure, low useful yield, or resource pressure.
+Before research fleets or repeated experiments, state concurrency, lane scope, progress checkpoints,
+and applicable resource limits. Productive work may take hours: elapsed time, compaction, or a
+checkpoint alone is not a reason to stop. Estimates are reassessment points, not hard deadlines.
+Honor explicit user/operator limits and runtime constraints; reassess repeated failure, low useful
+yield, or resource pressure. For extended work or prompt tuning, read
+[long-running work](references/long-running-work.md).
 
 ## Adapt from runtime evidence
 
@@ -55,7 +60,7 @@ and count descendants; ceilings are not utilization targets. Capability, token s
 alone do not establish that a larger fleet is better.
 
 Give each child an objective, owned paths, relevant constraints and dirty state, acceptance criteria,
-evidence pointers, authority, dependencies, budget, and stopping condition. Use fresh context for
+evidence pointers, authority, dependencies, applicable limits, and completion/escalation conditions. Use fresh context for
 independent lanes and only necessary recent context for related work. Never combine full-history
 forks with model overrides. Return compact findings and artifacts, not transcripts.
 
@@ -122,7 +127,8 @@ For setup, upgrade, hooks, disable/uninstall, or release evidence, read
 hook trust, observed execution, and measured benefit are separate states. Hooks supplement judgment;
 do not install generic auto-continue loops or run full tests after every edit.
 
-Report outcomes, checks, release status, meaningful limitations, and remaining required actions.
+Report outcomes, checks, release status, meaningful limitations, and remaining required actions in
+concise, plain language. Progress updates should convey new evidence or decisions, not repeat plans.
 Do not claim untested combinations or performance gains. If this skill causes a pause or divergence,
 identify the instruction and explain why. User instructions take precedence over skill guidance,
 subject to higher-level runtime rules.

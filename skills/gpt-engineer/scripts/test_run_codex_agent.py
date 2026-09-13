@@ -4,7 +4,10 @@ from __future__ import annotations
 import io
 import json
 import os
+import select
+import signal
 import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import datetime
@@ -659,8 +662,71 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertEqual(envelope["lifecycle"]["terminalState"], "launch_failed")
         self.assertTrue(envelope["lifecycle"]["cleanupVerified"])
 
+    def test_omitted_timeout_waits_without_runtime_deadline(self) -> None:
+        original_wait = subprocess.Popen.wait
+        delegate_timeouts = []
+
+        def record_wait(process, timeout=None):
+            if "--output-last-message" in process.args:
+                delegate_timeouts.append(timeout)
+            return original_wait(process, timeout=timeout)
+
+        with mock.patch("sys.stdin", io.StringIO("Complete the read-only task.")), mock.patch.object(
+            subprocess.Popen, "wait", autospec=True, side_effect=record_wait
+        ):
+            result = run_codex_agent.main([
+                "--role", "astra-explorer", "--cwd", str(self.root),
+                "--output-dir", str(self.output), "--codex", str(self.codex),
+            ])
+        self.assertEqual(result, 0)
+        self.assertEqual(delegate_timeouts, [None])
+
+    def test_rejects_nonpositive_timeout_before_launch(self) -> None:
+        for timeout in ("0", "-1"):
+            with self.subTest(timeout=timeout), mock.patch("sys.stderr", new_callable=io.StringIO) as stderr, mock.patch(
+                "run_codex_agent.subprocess.Popen"
+            ) as launch, self.assertRaises(SystemExit) as raised:
+                run_codex_agent.main([
+                    "--role", "astra-explorer", "--cwd", str(self.root),
+                    "--output-dir", str(self.output), "--codex", str(self.codex),
+                    "--timeout", timeout,
+                ])
+            self.assertEqual(raised.exception.code, 2)
+            self.assertIn("--timeout must be positive", stderr.getvalue())
+            launch.assert_not_called()
+            self.assertFalse(self.output.exists())
+
+    def test_no_deadline_still_cleans_up_on_interruption(self) -> None:
+        original_wait = subprocess.Popen.wait
+        interrupted = False
+
+        def interrupt_delegate(process, timeout=None):
+            nonlocal interrupted
+            if "--output-last-message" in process.args and not interrupted:
+                interrupted = True
+                self.assertIsNone(timeout)
+                raise KeyboardInterrupt
+            return original_wait(process, timeout=timeout)
+
+        with mock.patch("sys.stdin", io.StringIO("HANG")), mock.patch.object(
+            subprocess.Popen, "wait", autospec=True, side_effect=interrupt_delegate
+        ), mock.patch("run_codex_agent.os.killpg", wraps=os.killpg) as kill_group:
+            result = run_codex_agent.main([
+                "--role", "astra-explorer", "--cwd", str(self.root),
+                "--output-dir", str(self.output), "--codex", str(self.codex),
+            ])
+        self.assertEqual(result, 1)
+        kill_group.assert_called()
+        envelope = json.loads((self.output / "result.json").read_text())
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["lifecycle"]["terminalState"], "interrupted")
+        self.assertFalse(envelope["lifecycle"]["timedOut"])
+        self.assertTrue(envelope["lifecycle"]["cleanupVerified"])
+
     def test_timeout_reaps_process_group_and_records_lifecycle(self) -> None:
-        with mock.patch("sys.stdin", io.StringIO("HANG")):
+        with mock.patch("sys.stdin", io.StringIO("HANG")), mock.patch(
+            "run_codex_agent.os.killpg", wraps=os.killpg
+        ) as kill_group:
             result = run_codex_agent.main(
                 [
                     "--suite", "economy", "--role",
@@ -672,15 +738,103 @@ print(json.dumps({"type": "turn.completed"}))
                     "--codex",
                     str(self.codex),
                     "--timeout",
-                    "0",
+                    "1",
                 ]
             )
         self.assertEqual(result, 124)
+        kill_group.assert_called()
         envelope = json.loads((self.output / "result.json").read_text())
+        self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["lifecycle"]["terminalState"], "timed_out")
         self.assertTrue(envelope["lifecycle"]["timedOut"])
         self.assertTrue(envelope["lifecycle"]["cleanupVerified"])
         self.assertFalse(envelope["lifecycle"]["completionEventObserved"])
+
+    def test_cleanup_escalates_after_leader_exits_and_reaps_owned_descendant(self) -> None:
+        process = subprocess.Popen(
+            [sys.executable, "-c", """
+import os, signal, time
+signal.signal(signal.SIGINT, lambda *_: os._exit(0))
+if os.fork() == 0:
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    print("descendant ready", flush=True)
+    while True:
+        time.sleep(1)
+else:
+    while True:
+        time.sleep(1)
+"""],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        process._gpt_engineer_owned_pgid = process.pid
+        try:
+            self.assertTrue(select.select([process.stdout], [], [], 5)[0])
+            self.assertEqual(process.stdout.readline(), b"descendant ready\n")
+            with mock.patch("run_codex_agent.os.killpg", wraps=os.killpg) as kill_group:
+                verified = run_codex_agent.stop_process_group(process)
+                kill_group.assert_any_call(process.pid, signal.SIGKILL)
+                calls = kill_group.call_count
+                self.assertEqual(run_codex_agent.stop_process_group(process), verified)
+                self.assertEqual(kill_group.call_count, calls)
+            self.assertEqual(process.returncode, 0)
+            # Both processes held this pipe; EOF proves neither remains running,
+            # even on systems where init has not reaped an orphan zombie yet.
+            self.assertTrue(select.select([process.stdout], [], [], 2)[0])
+            self.assertEqual(process.stdout.read(1), b"")
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                pass
+            else:
+                self.assertFalse(verified, "A lingering group cannot be verified clean")
+        finally:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=5)
+            process.stdout.close()
+
+    def test_cleanup_refuses_unregistered_or_current_process_group(self) -> None:
+        for group_id in (None, os.getpgrp()):
+            process = mock.Mock(pid=os.getpgrp())
+            process._gpt_engineer_owned_pgid = group_id
+            process._gpt_engineer_cleanup_verified = None
+            with mock.patch("run_codex_agent.os.killpg") as kill_group:
+                self.assertFalse(run_codex_agent.stop_process_group(process))
+            kill_group.assert_not_called()
+
+    def test_cleanup_permission_error_remains_unverified_after_leader_exit(self) -> None:
+        process = mock.Mock(pid=987654321)
+        process._gpt_engineer_owned_pgid = process.pid
+        process._gpt_engineer_cleanup_verified = None
+        process.poll.return_value = 0
+        with mock.patch("run_codex_agent.os.killpg", side_effect=PermissionError) as kill_group:
+            self.assertFalse(run_codex_agent.stop_process_group(process))
+            calls = kill_group.call_count
+            self.assertFalse(run_codex_agent.stop_process_group(process))
+            self.assertEqual(kill_group.call_count, calls)
+
+    def test_unverified_group_cleanup_cannot_report_success(self) -> None:
+        original_stop = run_codex_agent.stop_process_group
+
+        def report_unverified(process):
+            original_stop(process)
+            return False
+
+        with mock.patch("sys.stdin", io.StringIO("Complete normally.")), mock.patch(
+            "run_codex_agent.stop_process_group", side_effect=report_unverified
+        ):
+            result = run_codex_agent.main([
+                "--role", "astra-explorer", "--cwd", str(self.root),
+                "--output-dir", str(self.output), "--codex", str(self.codex),
+            ])
+        self.assertEqual(result, 1)
+        envelope = json.loads((self.output / "result.json").read_text())
+        self.assertEqual(envelope["status"], "failed")
+        self.assertFalse(envelope["lifecycle"]["cleanupVerified"])
 
     def test_rejects_oversized_prompt_before_launch(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("01234567890")):

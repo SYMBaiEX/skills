@@ -12,7 +12,7 @@ critical path or adds useful review. A large task or a strong model alone does n
 | Agents API | Managed Codex harness for durable application sessions, orchestration, compaction and recovery | Public beta; currently US residency and not ZDR; subagents share environment filesystem, inherit MCP permissions, and do not support function tools |
 | Responses Multi-agent | Model-managed independent fan-out in an API application | Children share request model/tools; no Codex worktree isolation; app executes function calls from every agent |
 | Agents SDK | An application-owned orchestration loop with typed tools/handoffs/tracing | Application owns execution, state, deployment and lifecycle; distinct from managed Agents API |
-| CLI compatibility adapter | Existing headless/isolation or cross-provider compatibility gaps | Recorded reason, bounded processes, candidate writes and evidence; native/SDK first |
+| CLI compatibility adapter | Existing headless/isolation or cross-provider compatibility gaps | Recorded reason, owned processes, candidate writes and bounded evidence; native/SDK first |
 | Spark or Claude skills | User-selected provider/model workflows | Preserve their explicit routing and keep one accountable outer owner |
 
 Codex SDK is local coding automation; Agents API is a managed harness; Responses is lower-level

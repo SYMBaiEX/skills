@@ -15,7 +15,8 @@ servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and ap
   work saves time or adds useful review. Includes proportionate tests, explicit same/mixed-model routes,
   private durable run journals, outcome measurement, and task-owned cleanup. Native Codex is the
   interactive path; current SDK and managed Agents API guidance supports programmatic work. The
-  Python CLI runner remains a guarded compatibility adapter.
+  Python CLI runner remains a guarded compatibility adapter. Productive multi-hour work is supported;
+  checkpoints do not impose deadlines. See the [long-running guidance](skills/gpt-engineer/references/long-running-work.md).
 - [`skills/gpt-engineer-mem/`](skills/gpt-engineer-mem/) — the memory-aware GPT engineer: bounded
   Claude Mem/Codex recall, live freshness checks, model-aware delivery, and read-only
   memory-service diagnostics.

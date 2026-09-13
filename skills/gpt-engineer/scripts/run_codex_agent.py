@@ -464,19 +464,55 @@ def acquire_lock(cwd: Path, exclusive: bool, timeout: int):
             time.sleep(0.1)
 
 
-def stop_process_group(process: subprocess.Popen[bytes]) -> None:
-    for sig, grace in ((signal.SIGINT, 2), (signal.SIGTERM, 2), (signal.SIGKILL, 0)):
-        if process.poll() is not None:
-            return
+def stop_process_group(process: subprocess.Popen[bytes]) -> bool:
+    """Stop only the registered new-session group; leader exit is not group exit.
+
+    Cache the result so repeated finalizers cannot signal a recycled group ID.
+    Zombies or inaccessible groups remain unverified, not a cleanup success.
+    Descendants that escape into another session are outside this guarantee.
+    """
+    cached = getattr(process, "_gpt_engineer_cleanup_verified", None)
+    if cached is not None:
+        return bool(cached)
+    group_id = getattr(process, "_gpt_engineer_owned_pgid", None)
+    if group_id != process.pid or group_id == os.getpgrp():
+        return False
+
+    def group_exists() -> bool:
+        # poll reaps the direct child, including when it died before descendants.
+        process.poll()
         try:
-            os.killpg(process.pid, sig)
+            os.killpg(group_id, 0)
         except ProcessLookupError:
-            return
-        if grace:
-            try:
-                process.wait(timeout=grace)
-            except subprocess.TimeoutExpired:
-                continue
+            return False
+        except PermissionError:
+            pass
+        return True
+
+    verified = False
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGKILL):
+        if not group_exists():
+            verified = process.poll() is not None
+            break
+        try:
+            os.killpg(group_id, sig)
+        except ProcessLookupError:
+            verified = process.poll() is not None
+            break
+        except PermissionError:
+            break
+        deadline = time.monotonic() + 2
+        while True:
+            if not group_exists():
+                verified = process.poll() is not None
+                break
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.05)
+        if verified:
+            break
+    process._gpt_engineer_cleanup_verified = verified
+    return verified
 
 
 def close_process_pipes(process: subprocess.Popen[bytes]) -> None:
@@ -609,7 +645,10 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="Reviewed dirty path a writer may modify",
     )
-    parser.add_argument("--timeout", type=int, default=1800)
+    parser.add_argument(
+        "--timeout", type=int, default=None,
+        help="Optional positive runtime limit in seconds; omitted means no runtime deadline",
+    )
     parser.add_argument("--lock-timeout", type=int, default=30)
     parser.add_argument("--max-prompt-chars", type=int, default=24000)
     parser.add_argument("--max-events-bytes", type=int, default=8 * 1024 * 1024)
@@ -644,6 +683,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    if args.timeout is not None and args.timeout <= 0:
+        parser.error("--timeout must be positive when specified")
     generic = args.role in ("engineer", "explorer", "worker", "verifier")
     base_role = "astra-" + args.role if generic else args.role
     if generic:
@@ -965,6 +1006,7 @@ def main(argv: list[str] | None = None) -> int:
                 stderr=subprocess.PIPE,
                 start_new_session=True,
             )
+            process._gpt_engineer_owned_pgid = process.pid
             assert process.stdout is not None
             assert process.stderr is not None
             capture_threads = [
@@ -1037,8 +1079,12 @@ def main(argv: list[str] | None = None) -> int:
                 pass
         raise
     finally:
+        cleanup_verified = process is None
         if process is not None:
-            stop_process_group(process)
+            cleanup_verified = stop_process_group(process)
+            if not cleanup_verified:
+                lifecycle_error = lifecycle_error or "Owned process group cleanup could not be verified"
+                lifecycle_messages.append("Owned process group cleanup could not be verified")
             for thread in capture_threads:
                 thread.join(timeout=5)
             if any(thread.is_alive() for thread in capture_threads):
@@ -1155,7 +1201,6 @@ def main(argv: list[str] | None = None) -> int:
         and not violations
     )
     finished_at = datetime.now(timezone.utc)
-    cleanup_verified = process is None or process.poll() is not None
     terminal_state = (
         "timed_out"
         if timed_out

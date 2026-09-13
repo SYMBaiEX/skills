@@ -1,10 +1,10 @@
 ---
 name: gpt-orchestration-auto
-description: "Carry an explicitly sustained engineering objective through bounded research, implementation, verification, and resumption. Use for durable /goal-style engineering work; ordinary fixes do not need an automatic loop."
+description: "Complete sustained engineering objectives through research, building, verification, and recovery. Use for explicitly requested /goal-style engineering work."
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "2.1.0"
+  version: "2.1.1"
 ---
 
 # GPT Orchestration Auto
@@ -21,8 +21,11 @@ or scheduled continuation without runtime support. Skills installation is not de
 
 Carry forward authorization and steering within the active task. Routine decisions remain autonomous.
 Persistence does not authorize unlimited retries, spending, global setup, production writes, or
-new scope. Set stage/time/resource budgets before repeated work. On exhaustion, retain evidence and
-report remaining work; do not mark unfinished requirements complete or silently escalate the budget.
+new scope. Use milestones and progress checkpoints; estimates and checkpoint intervals are not
+automatic deadlines. Continue productive work for as long as needed within authorization and runtime
+constraints, including multi-hour work and compaction. Honor explicit user/operator time and resource
+limits; on exhaustion, retain evidence and report remaining work without claiming completion or
+silently raising the limit. Reassess stalled attempts from evidence rather than elapsed time alone.
 
 Research only uncertainty that affects a decision. Implement confirmed findings, integrate returned
 artifacts, and verify accepted behavior. Later cycles are delta-only: reconcile Git drift and live
