@@ -23,6 +23,12 @@ evidence source; policy; and profile hash if used. Missing effective evidence do
 an otherwise supported requested route unless the task requires attestation. Observed mismatch does.
 Never use a model-echo prompt as a routing test.
 
+The engineering-model contract does not apply to runtime-owned approval reviewers. For example,
+`codex-auto-review` with a native Guardian source is an approval service, not a worker routed to an
+unexpected coding model. Classify it separately from parent and delegated engineering work. A name
+alone is not provenance: keep unknown sources unknown. Do not disable the reviewer, modify its model,
+or loosen permissions to satisfy a routing audit. See [approval reviews](runtime-integrations.md#approval-reviews).
+
 ## Same-model and mixed-model policies
 
 - **Same-model (default):** request the observed supported parent model explicitly for useful

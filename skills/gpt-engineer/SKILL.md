@@ -4,7 +4,7 @@ description: "Complete substantial software builds, remediation, and engineering
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "2.1.1"
+  version: "2.1.2"
 ---
 
 # GPT Engineer
@@ -23,6 +23,10 @@ unless implementation is authorized. Persistence does not authorize unlimited re
 deployment, or expanded scope. Continue through implementation, required verification, and fixing
 in-scope failures; do not stop at the first patch or ask to continue already-authorized work.
 
+Work in the intended repository; a shell working directory does not change the task's writable roots.
+If repeated approvals expose a workspace mismatch, explain it rather than widening permissions.
+For approval friction, read [runtime integrations](references/runtime-integrations.md#approval-reviews).
+
 Small fixes need a focused change and decisive check, not a fleet, journal, or mandatory preflight.
 For substantial work, track requirement/finding IDs, dependencies, ownership, and acceptance evidence.
 Before research fleets or repeated experiments, state concurrency, lane scope, progress checkpoints,
@@ -39,6 +43,9 @@ self-description. Saved defaults do not prove the active session model. Keep req
 model, effort, and service tier separate, with source and subject ID. Subagent hooks can describe
 the parent session; never promote that metadata to child attestation. Missing evidence stays
 unavailable. An observed route mismatch stops the affected lane.
+
+Runtime approval reviewers such as `codex-auto-review` are separate from engineering delegates.
+Identify their runtime origin before attributing their model, usage, or reviews to this skill.
 
 Default to an explicit **same-model** child policy when delegation helps. **Mixed-model** routing
 is a deliberate task policy: specify the child model and why its output contract suits the lane.
@@ -63,6 +70,11 @@ Give each child an objective, owned paths, relevant constraints and dirty state,
 evidence pointers, authority, dependencies, applicable limits, and completion/escalation conditions. Use fresh context for
 independent lanes and only necessary recent context for related work. Never combine full-history
 forks with model overrides. Return compact findings and artifacts, not transcripts.
+
+Request decision-relevant tool output: filter structured results before returning them, bound searches,
+and keep large raw artifacts local. If output truncates, narrow the query or read the missing range;
+do not repeatedly dump the full result. Read every selected instruction file completely, budgeting
+large instruction reads separately when batching would truncate them.
 
 Keep one writer per shared file set. Parallel writers need isolated candidates with disjoint
 ownership. Tell workers they are not alone and must preserve others' edits. Dispatch ready work,

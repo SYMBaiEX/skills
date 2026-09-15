@@ -76,6 +76,26 @@ After profile changes restart the relevant client or start a fresh task as its c
 For Codex hooks, inspect `/hooks`, review the exact definitions and grant trust through the normal
 UI. Updated definitions may need renewed trust. Never bypass trust to make a test pass.
 
+## Approval reviews
+
+Codex's native Guardian (`codex-auto-review`) evaluates actions at existing approval boundaries;
+it is not an engineering review hook or a worker this skill selects. Astra's coding capability does
+not replace an authorization check. The skill does not enable, disable, or select this service.
+Check effective session permissions, reviewer source, and the exact pending action before attributing
+repeated reviews to a model, hook, or global configuration file.
+
+Outside-root edits, escalated shell/network actions, and approval-gated app/browser operations can
+trigger reviews. A shell `cwd` does not alter writable roots. Work in the intended task workspace;
+diagnose sibling-checkout mismatches before repeating a large edit wave. Use normal sandboxed
+operations where supported and reuse valid process handles. Only combine genuinely related checks.
+Do not preemptively escalate every command, evade a denial, broaden permissions, or disable review
+to improve speed. A necessary approval remains necessary.
+
+Audit review requests, reviewer sessions, responses, and engineering reviews separately. Sum only
+deduplicated per-response usage; cached input is a subset, and summed reviewer duration is not the
+parent's critical-path delay. See [official auto-review behavior](https://learn.chatgpt.com/docs/sandboxing/auto-review)
+and [fleet observability](fleet-observability.md).
+
 ## Hook acceptance contract
 
 Inventory user/project/inline/plugin sources before enabling a handler: all matching Codex hooks can

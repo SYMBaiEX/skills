@@ -35,7 +35,10 @@ python3 scripts/audit_fleet.py \
 ```
 
 Use an explicit exclusive `--until` for a reproducible snapshot. Omit `--root-thread` only when
-intentionally auditing every spawned child in the time window. The
+intentionally auditing the created-child cohort across parents. Its date filter selects child
+creation, not all activity: older resumed children, root work, and runtime approval services need
+separate activity-window queries. A fixed cutoff is not an immutable snapshot of rotating stores;
+record capture time and retention changes. The
 script does not sum token attributes because the same cumulative usage can appear on many nested
 OTel rows; use a turn/request-deduplicated query for token analysis. It also cannot reconstruct
 command retries, compactions, or finding acceptance from the three SQLite summaries alone. Combine
@@ -71,6 +74,8 @@ Use stable identities, not log-row counts:
 - **projected executions:** distinct children with one or more `thread_turns` rows;
 - **OTel-covered executions:** distinct thread or turn IDs with relevant retained OTel events;
 - **root runs:** ultimate ancestors after recursively following spawn edges.
+- **approval service:** source-attested native Guardian sessions, distinct request turns, and
+  per-response usage; not engineering delegates or model-routing violations.
 
 Never silently merge these denominators. Missing history or OTel rows usually mean retention or
 projection gaps, not that a dispatch did no work. A spawn edge with status `open` is registry state,
@@ -100,8 +105,21 @@ Capture per run and per wave:
 - accepted findings, implemented findings, rejected duplicates, and verification failures per lane.
 
 Runtime-reported total tokens are not automatically account billing. Cache reads can be discounted
-while still replaying a large context and adding latency. Deduplicate usage by thread ID, turn ID,
-and the final cumulative usage event; usage attributes can appear on many nested OTel log lines.
+while still replaying a large context and adding latency. Identify the emitting source and counter
+semantics before aggregating: deduplicate cumulative usage by thread/turn, or incremental response
+usage by thread/response. Do not sum both representations. Numeric strings copied inside tool
+output, fixture text, or prompts are not telemetry events. Missing evidence is unavailable, not zero.
+
+Context-scope token estimates and `token_limit_reached` signals do not establish completed
+compactions; require actual compaction events. Stored rollout/projection bytes also differ from
+text delivered to the model and billable tokens. Examine complete turn samples and report sampling
+bias. Attribute behavior to the version actually loaded, not today's installed version or release date.
+
+For suspected repeated reads, compare call arguments, emitted content, and intervening compaction or
+file changes. Pagination, different references, and necessary reloads are not redundant full reads.
+Budget large mandatory instruction reads so each can be read completely without truncation; filter
+ordinary search/diagnostic results before returning them. Do not cap useful engineering duration
+or remove required instruction reads merely to lower a byte count.
 
 ## Diagnose slow runs
 
@@ -120,6 +138,9 @@ Classify wall time before changing fleet size:
    structured summaries instead of logs.
 5. **Route leakage:** generic profiles select old or unintended models. Stop the lane, use an exact
    allowed agent type, and rerun `audit_routing.py` with observed route evidence.
+6. **Approval-bound:** source-attested runtime reviews gate repeated outside-root or escalated
+   actions. Check workspace scope and exact requests using
+   [runtime integrations](runtime-integrations.md#approval-reviews); do not weaken safety controls.
 
 ## Tune with paired runs
 
