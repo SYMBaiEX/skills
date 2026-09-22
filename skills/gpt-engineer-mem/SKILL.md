@@ -2,7 +2,7 @@
 name: gpt-engineer-mem
 description: Memory-aware GPT engineering using bounded native history or Claude Mem recall. Use when historical decisions materially affect an engineering task; verify recalled claims without loading full transcripts or changing memory settings.
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
 ---
 
 # GPT Engineer Mem
@@ -20,9 +20,12 @@ was run merely because this skill is installed.
 If `gpt-engineer` is unavailable, continue with this standalone contract:
 
 - The parent owns scope, plan, integration, user updates, final verification, and external actions.
-- Preserve the selected `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, or `gpt-5.6-luna` parent.
-  Use the smallest useful graph, with explicit same-model children by default or a deliberate
-  mixed-model policy. Never silently substitute models or providers. Native Claude stays Claude.
+- Preserve the selected parent. GPT-6 Astra is allowed only as the active parent/orchestrator,
+  never as a child. GPT-6 Sol and GPT-6 Luna are the only current GPT Engineer child routes; use
+  Sol for demanding ambiguous lanes and Luna for focused repeatable lanes. Same-model is the
+  default under Sol/Luna parents; an Astra parent requires an explicit Sol/Luna mixed-model route.
+  Existing GPT-5.6 parents can continue during rollout, but their children must be explicitly
+  routed to GPT-6 Sol/Luna. Never silently substitute models or providers. Native Claude stays Claude.
 - Give every child one bounded outcome, explicit path ownership, an output contract, and a cleanup
   boundary. Use `fork_turns: "none"` with a compact evidence packet when supported.
 - Integrate centrally, verify the product rather than only the patch, run a fresh gap scan, and

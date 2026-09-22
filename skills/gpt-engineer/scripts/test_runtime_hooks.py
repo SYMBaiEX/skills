@@ -118,7 +118,7 @@ class RuntimeHookTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("symlink path", result.stderr)
         self.assertTrue((codex / "agents").is_symlink())
-        self.assertFalse((owner / "astra-engineer.toml").exists())
+        self.assertFalse((owner / "gpt6-sol-engineer.toml").exists())
 
     def test_disable_removes_only_exact_managed_handlers(self) -> None:
         self.install()
@@ -163,12 +163,12 @@ class RuntimeHookTests(unittest.TestCase):
     def test_uninstall_removes_managed_files_and_keeps_custom_file(self) -> None:
         self.install()
         codex = self.root / ".codex"
-        custom = codex / "agents" / "astra-engineer.toml"
+        custom = codex / "agents" / "gpt6-sol-engineer.toml"
         custom.write_text("name = 'owner-owned'\n")
         result = self.run_bootstrap("--provider", "codex", "--uninstall")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(custom.read_text(), "name = 'owner-owned'\n")
-        self.assertFalse((codex / "agents" / "astra-explorer.toml").exists())
+        self.assertFalse((codex / "agents" / "gpt6-sol-explorer.toml").exists())
         self.assertFalse((codex / ".gpt-engineer-install.json").exists())
 
     def test_uninstall_keeps_script_referenced_by_preserved_custom_handler(self) -> None:
@@ -215,7 +215,7 @@ class RuntimeHookTests(unittest.TestCase):
             result = self.run_bootstrap("--provider", "codex", "--uninstall")
             self.assertNotEqual(result.returncode, 0)
             self.assertTrue((codex / "hooks" / GUARD_HOOK.name).exists())
-            self.assertTrue((codex / "agents" / "astra-engineer.toml").exists())
+            self.assertTrue((codex / "agents" / "gpt6-sol-engineer.toml").exists())
 
     def test_current_and_historical_managed_registration_collapse(self) -> None:
         self.install()

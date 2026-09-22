@@ -1,9 +1,10 @@
 # Fleet observability
 
-For v2.1 model-aware cohorts, `audit_fleet.py --dispatch-suite same-model` or `mixed-model`
-asserts known policy evidence; neither option attests actual parent equality. Preserve `astra`/`economy`
-for documented v2.0 cohorts. A timestamp or currently installed skill version cannot establish which
-policy an old run loaded. Unknown-policy Sol records are diagnostics, not confirmed violations.
+For the current contract, `audit_fleet.py --dispatch-suite gpt6` asserts that active GPT Engineer
+children use GPT-6 Sol or GPT-6 Luna and never Astra. It does not attest parent-child equality.
+Preserve `astra`/`economy` only for explicitly identified historical cohorts. A timestamp or
+currently installed skill version cannot establish which policy an old run loaded; an old Astra
+child route without dispatch evidence is historical, not automatically a confirmed violation.
 
 Use this reference to tune a GPT Engineer run from evidence rather than perceived age, thread count,
 or raw token totals.
@@ -45,9 +46,10 @@ command retries, compactions, or finding acceptance from the three SQLite summar
 its output with runner `result.json` lifecycle envelopes and targeted rollout analysis when those
 metrics matter.
 
-Use `--dispatch-suite astra` or `--dispatch-suite economy` only when the selected audit window's
-dispatch contract is known to use that v2 policy. Omission preserves historical interpretation and
-reports post-cutover retired profiles as diagnostics rather than assuming every running task upgraded.
+Use `--dispatch-suite gpt6` only when the selected audit window is known to have loaded the current
+policy. Use `astra` or `economy` solely for known v2.1 historical routing, not as current choices.
+Omission preserves historical interpretation; pre-existing Sol/Astra records are not reclassified
+by release date alone.
 
 When the durable run journal is available, join normalized outcomes without copying raw logs:
 
@@ -82,14 +84,14 @@ projection gaps, not that a dispatch did no work. A spawn edge with status `open
 not proof that an operating-system process is still alive.
 
 Keep current GPT Engineer profiles, retired GPT Engineer profiles, and unattributed specialist
-children separate. Distinguish the Astra cohort, retained economy routes, and historical 5.6 roles;
-the public release date does not prove when a running task loaded the new skill. Validate the exact
-model assigned to each role. Economy authorization requires dispatch/journal evidence and cannot be
-inferred from the model name alone. A child outside the GPT Engineer profile catalog may come from another skill or
-an explicit specialist workflow; it is not a GPT Engineer route violation without a journal or
-dispatch identity linking it to this skill. Retired profile names remain useful for historical
-baselines. Diagnose retired post-release profiles separately when the loaded routing policy is
-unknown; use a confirmed dispatch policy before calling a valid older run an Astra route violation.
+children separate. Current cohorts are GPT-6 Sol and GPT-6 Luna; Astra is an allowed parent but
+never a child. Keep historic Astra-child and GPT-5.6 cohorts for longitudinal comparison; the
+public release date does not prove when a running task loaded the new skill. Validate the exact
+model assigned to each known role. A child outside the GPT Engineer profile catalog may come from
+another skill or an explicit specialist workflow; it is not a GPT Engineer route violation without
+a journal or dispatch identity linking it to this skill. Retired profile names remain useful for
+historical baselines. Diagnose old routes separately when the loaded policy is unknown; use a
+confirmed current dispatch policy before calling an older run a violation.
 
 ## Measure what changes decisions
 
@@ -154,11 +156,12 @@ Require a sufficiently covered sample and comparable one-variable pairs before a
 recommendation never edits Codex configuration, changes the supported-model contract, enables Fast or
 Team mode, or authorizes a provider transition.
 
-Compare the selected parent alone against that same parent with useful delegation before increasing fleet size.
-Use the same task and acceptance contract, record coordination/synthesis time, and count duplicated
-findings and rework. Correctness tests for the migration do not establish a latency or cost win.
-Keep original model, effort, runtime and loaded skill policy/version evidence. Sol, Terra and Luna
-remain supported current parents; a historical policy is not a model retirement.
+Compare the selected parent alone against that same parent with useful delegation before increasing
+fleet size. Use the same task and acceptance contract, record coordination/synthesis time, and count
+duplicated findings and rework. Correctness tests for the migration do not establish a latency or cost
+win. Keep original model, effort, runtime, and loaded skill policy/version evidence. Existing
+GPT-5.6 Sol/Terra/Luna parent sessions may continue during rollout, but those models are not current
+GPT Engineer child routes; the child allowlist is GPT-6 Sol/Luna only.
 
 Use a Broad read ceiling of six as the default experiment, not a permanent conclusion. A qualified
 Team read wave may compare seven or eight lanes against Broad, but it must measure accepted findings,

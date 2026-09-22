@@ -1,89 +1,69 @@
 # Model-aware routing
 
-Reviewed against official documentation September 13, 2026. The supported GPT contract is exactly
-`gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`. Preserve the selected parent;
-neither a model upgrade nor a fleet is implicit. Claude and explicitly requested Spark are separate
-runtime/model workflows, not fallback members of this contract.
+Reviewed against the official Codex model and subagent documentation on September 22, 2026.
+This skill's routing rule is intentionally stricter than the platform: GPT-6 Astra is allowed only
+as the active parent/orchestrator (the current chat model), never as a GPT Engineer child. GPT-6
+Sol and GPT-6 Luna are the only current child routes. This is a GPT Engineer policy, not an OpenAI
+runtime restriction.
 
-## Select from evidence
+## Preserve the active parent
 
-The current runtime schema and current session/turn metadata govern what can be requested. A saved
-`model` setting, model catalog entry, profile, prior turn, or self-description does not prove current
-execution. After a session switch or resumption, refresh relevant metadata rather than carrying an
-old route forward. Record unavailable fields without guessing.
+Use current session or turn metadata and the runtime's exposed model selectors. A saved default,
+profile, prior turn, model catalog, or model self-description does not prove the current route.
+Keep requested and effective model, effort, and service tier separate, with subject identity and
+evidence source. If runtime evidence is unavailable, say so; never guess or silently change the
+parent.
 
-Codex hooks document a `model` extension. At parent-scoped events it is a useful runtime signal for
-the current parent. `SubagentStart`/`SubagentStop` use the parent `session_id`; their common `model`
-field is not independent child-model attestation. Keep `agent_id` separate. Child evidence needs
-that child's runtime metadata, correctly attributed turn, or an attested execution response.
-Claude's payloads differ; do not assume Codex extensions exist there.
-
-For each route retain requested/effective model, effort and tier; subject/parent/child identity;
-evidence source; policy; and profile hash if used. Missing effective evidence does not invalidate
-an otherwise supported requested route unless the task requires attestation. Observed mismatch does.
-Never use a model-echo prompt as a routing test.
-
-The engineering-model contract does not apply to runtime-owned approval reviewers. For example,
-`codex-auto-review` with a native Guardian source is an approval service, not a worker routed to an
-unexpected coding model. Classify it separately from parent and delegated engineering work. A name
-alone is not provenance: keep unknown sources unknown. Do not disable the reviewer, modify its model,
-or loosen permissions to satisfy a routing audit. See [approval reviews](runtime-integrations.md#approval-reviews).
-
-## Same-model and mixed-model policies
-
-- **Same-model (default):** request the observed supported parent model explicitly for useful
-  children. Include an appropriate supported child effort rather than inheriting an unintended
-  global default. If parent identity is unknown, continue direct work; do not silently guess a child.
-- **Mixed-model:** select an exact child model for a bounded contract, with the reason and budget.
-  The user can select this policy, or approve an explicit proposed policy where it changes cost or
-  capability materially. It is not automatic failure recovery. The selected parent remains the lead.
-- **Unavailable:** do not edit catalogs, bypass review, retry a denied route under another model,
-  or switch the parent. Continue independent suitable work, then report the missing capability.
-  Escalation changes only the affected lane and needs authority for any material scope/cost change.
-
-Use native direct `model` and `reasoning_effort` selectors when exposed. Give bounded role
-instructions in the task packet. A custom profile can override spawn/default/parent settings;
-inspect it and project shadows before relying on its name. A model-less profile is deliberate
-inheritance only if the resolved runtime policy supports the intended route, not proof by itself.
-The optional `scripts/select_route.py` validates a machine-readable route request without launching
-a model. Profile audits are diagnostics for users of bundled profiles, not a gate for direct work.
-
-## Adapt the task, not a stereotype
-
-| Selected model | Official guidance informs this starting hypothesis | Calibrate from outcomes |
+| Active parent | Default child policy | Allowed GPT Engineer child models |
 | --- | --- | --- |
-| Astra | Strong end-to-end reasoning; sensitive to skill instructions; may over-test or under-delegate | Give outcome/constraints; remove conflicting process rules; use proportional checks and useful independent review |
-| Sol | Complex, open-ended work and polish | Define done and research boundaries; keep coupled decisions coherent; delegate clear supporting evidence |
-| Terra | Everyday reasoning/tool work | Use a bounded feature or investigation with clear interfaces; expand scope only after accepted results |
-| Luna | Clear, repeatable/high-volume work | Give specific scope, output schema/examples when helpful, deterministic checks, and a stop condition; split ambiguity by decision boundary |
+| GPT-6 Astra | Explicit mixed-model only | GPT-6 Sol or GPT-6 Luna; never Astra |
+| GPT-6 Sol | Same-model when delegation helps | GPT-6 Sol; GPT-6 Luna only as a deliberate mixed route |
+| GPT-6 Luna | Same-model when delegation helps | GPT-6 Luna; GPT-6 Sol only as a deliberate mixed route |
+| GPT-5.6 Sol/Terra/Luna during rollout | Preserve parent; same-model is unavailable under this child contract | GPT-6 Sol or GPT-6 Luna only with an explicit mixed-model decision |
+| Unknown or unsupported parent | Parent-only until the active route is known | Do not guess a child route |
 
-These are prompting starting points, not claims that a model cannot do architecture or must delegate.
-Any supported parent can own design, implementation and final acceptance. Review consequential work
-independently when warranted. Do not prescribe fleet size from price or marketing descriptions.
+When Astra is the parent, select Sol for ambiguous, demanding, multi-step engineering lanes and
+Luna for focused, repeatable lanes. Under a Sol or Luna parent, same-model is the default unless
+the lane has a clear reason for cross-routing. Do not dispatch either model merely to fill fleet
+capacity. The parent remains responsible for architecture, integration, user communication, and
+final acceptance.
 
-Preserve the selected parent's effort. For child tasks, use the lowest supported effort that meets
-acceptance; medium is a starting experiment, not a universal floor. Raise effort or split an
-oversized lane only for demonstrated reasoning difficulty; tool waits are not solved by more effort.
-Keep supported effort values runtime-specific. Astra does not support none/minimal. Max and Ultra
-are distinct controls: official Codex guidance describes Ultra as subagent-enabled, so budget its
-actual topology rather than treating it as merely more single-agent reasoning. Service tier is
-independent; never silently enable Fast.
+OpenAI's Codex guidance recommends Sol for complex coding and agentic workflows and Luna for
+focused, repeatable tasks. These are starting points, not capability ceilings: shape lanes from the
+actual acceptance contract and runtime evidence. Start with medium effort for Sol and high for Luna
+when the runtime supports those controls; tune effort from observed outcomes. Higher effort can
+increase time and token use. Fast/service tiers are independent controls and are never enabled by
+this skill.
 
-## Bundled and legacy adapters
+The official Codex subagent behavior inherits the parent model and effort unless a child route is
+specified. Therefore, when Astra leads, always specify a Sol or Luna model explicitly. Likewise,
+use exact child model and effort selectors when relying on named profiles, and inspect project-level
+shadow profiles before trusting a profile name. Never install or request an Astra worker profile.
 
-Bundled Astra/Terra/Luna profiles remain optional presets with exact model/effort pins. They do not
-dictate the parent. Existing Sol profiles are supported when their resolved route is verified; the
-v2.0 Astra-only restriction was a skill policy, not OpenAI model retirement. Historical audit cohorts
-must retain their original policy/version, not be rewritten to the current policy.
+GPT-5.6 parents may remain available during the GPT-6 rollout. Preserve a user's already-selected
+GPT-5.6 parent, but do not create new GPT-5.6 child routes. Since GPT-5.6 is not in this skill's
+child allowlist, delegation from such a parent is explicitly mixed-model and must select GPT-6 Sol
+or Luna. Do not edit `models_cache.json`, `model_catalog_json`, permissions, or account-wide model
+settings to make a route appear available. If Sol/Luna selection is unavailable, continue suitable
+work directly under the active parent and report the limitation.
 
-The guarded CLI adapter is for documented headless/isolation gaps. Its candidate filesystem, allow
-paths, locks, process groups, handoff validation and cleanup are real guarantees; a new SDK alone
-does not replace them. See [Codex adapter details](codex-astra.md). New controllers should prefer
-official SDK/app-server surfaces after checking those guarantees and [runtime boundaries](dynamic-workflows.md).
+## Evidence boundaries
+
+Codex parent-scoped hook events can identify the parent model. `SubagentStart` and `SubagentStop`
+common model fields may still describe the parent and are not independent child attestation. Keep
+`agent_id`/subject identity separate; attest a child only from correctly attributed child runtime
+metadata, a child turn, or an execution response. Claude event payloads and model resolution are
+provider-specific; this GPT routing rule does not configure Claude Code.
+
+Runtime-owned approval reviewers (including `codex-auto-review`) are not GPT Engineer worker lanes.
+Identify their runtime provenance before attributing usage or review behavior to this skill. Do not
+disable them, change their model, or weaken permissions to satisfy a GPT Engineer route audit.
 
 ## Primary sources
 
-- [Codex models and reasoning](https://learn.chatgpt.com/docs/models)
-- [Subagent model resolution and custom agents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
-- [Hook fields and event semantics](https://learn.chatgpt.com/docs/hooks)
-- [Astra prompting and API restrictions](https://developers.openai.com/api/docs/guides/latest-model)
+- [Codex models](https://learn.chatgpt.com/docs/models)
+- [Codex subagents and model resolution](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+- [Codex hooks and event fields](https://learn.chatgpt.com/docs/hooks)
+- [GPT-6 Sol model](https://developers.openai.com/api/docs/models/gpt-6-sol)
+- [GPT-6 Luna model](https://developers.openai.com/api/docs/models/gpt-6-luna)
+- [Introducing GPT-6 Sol and Luna](https://openai.com/index/introducing-gpt-6-sol-and-luna/)

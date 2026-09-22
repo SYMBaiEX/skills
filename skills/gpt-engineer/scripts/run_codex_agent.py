@@ -23,7 +23,7 @@ import run_journal
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 HANDOFF_SCHEMA = SKILL_ROOT / "assets" / "codex" / "handoff.schema.json"
-from routes import ROLES, SUPPORTED_MODELS, suite_routes
+from routes import CHILD_MODELS, PARENT_MODELS, ROLES
 
 COMPATIBILITY_REASONS = (
     "native-routing-unavailable",
@@ -392,7 +392,7 @@ def build_command(
     route_override: dict | None = None,
 ) -> list[str]:
     profile = route_override or ROLES[role]
-    if role in {"astra-worker", "terra-worker", "luna-worker", "luna-max-worker"} and not allow_writes:
+    if role.endswith("-worker") and not allow_writes:
         raise SystemExit(f"{role} requires --allow-writes")
     sandbox = (
         "workspace-write" if profile["write_capable"] and allow_writes else "read-only"
@@ -602,9 +602,9 @@ def bounded_error(error: BaseException, cwd: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--role", choices=tuple(ROLES) + ("engineer", "explorer", "worker", "verifier"), required=True)
-    parser.add_argument("--suite", choices=("astra", "economy"), default="astra")
-    parser.add_argument("--model", choices=SUPPORTED_MODELS, help="Exact model for a generic role; never changes the parent")
-    parser.add_argument("--parent-model", choices=SUPPORTED_MODELS, help="Observed parent model for same-model policy")
+    parser.add_argument("--suite", choices=("sol", "luna"), help="Optional child-model family check")
+    parser.add_argument("--model", choices=CHILD_MODELS, help="Exact GPT-6 Sol or Luna child model; Astra is parent-only")
+    parser.add_argument("--parent-model", choices=PARENT_MODELS, help="Observed active chat/orchestrator model")
     parser.add_argument("--policy", choices=("same-model", "mixed-model"), default="same-model")
     parser.add_argument("--reasoning-effort", choices=("low", "medium", "high", "xhigh", "max"))
     parser.add_argument(
@@ -686,22 +686,37 @@ def main(argv: list[str] | None = None) -> int:
     if args.timeout is not None and args.timeout <= 0:
         parser.error("--timeout must be positive when specified")
     generic = args.role in ("engineer", "explorer", "worker", "verifier")
-    base_role = "astra-" + args.role if generic else args.role
     if generic:
         if not args.model or not args.reasoning_effort:
-            parser.error("Generic roles require explicit --model and --reasoning-effort")
+            parser.error("Generic roles require explicit GPT-6 Sol/Luna --model and --reasoning-effort")
+        if not args.parent_model:
+            parser.error("Specify the observed active --parent-model before routing a child")
+        if args.suite and not args.model.endswith(args.suite):
+            parser.error("--suite must match the explicitly selected child model")
         if args.policy == "same-model" and args.parent_model != args.model:
-            parser.error("Same-model routing requires matching observed --parent-model; use explicit mixed-model policy otherwise")
+            parser.error("Same-model requires a Sol/Luna parent matching the child; Astra or another model requires --policy mixed-model")
+        base_role = "gpt6-" + args.model.removeprefix("gpt-6-") + "-" + args.role
+        if base_role not in ROLES:
+            parser.error("This model does not provide the requested child role")
+        args.suite = args.model.removeprefix("gpt-6-")
         profile = {**ROLES[base_role], "model": args.model, "effort": args.reasoning_effort}
-        # Do not inherit a preset Fast tier or report an Astra profile as a model pin.
+        # Do not inherit a preset service tier or parent model.
         profile.pop("service_tier", None)
-        args.suite = args.policy
-    elif args.model or args.reasoning_effort or args.parent_model or args.policy != "same-model":
-        parser.error("Explicit model/policy controls require a generic role, not a pinned preset")
-    elif args.role not in suite_routes(args.suite):
-        parser.error("Economy role requires explicit --suite economy; no model fallback is permitted")
     else:
+        if args.role not in ROLES:
+            parser.error("Unknown GPT Engineer child role")
+        if args.model or args.reasoning_effort:
+            parser.error("Pinned child profiles cannot be overridden with --model or --reasoning-effort")
+        if not args.parent_model:
+            parser.error("Specify the observed active --parent-model before routing a child")
+        base_role = args.role
         profile = dict(ROLES[args.role])
+        family = "sol" if profile["model"] == "gpt-6-sol" else "luna"
+        if args.suite and args.suite != family:
+            parser.error("--suite conflicts with the pinned child profile")
+        if args.policy == "same-model" and args.parent_model != profile["model"]:
+            parser.error("This child requires an explicit mixed-model policy for the observed parent")
+        args.suite = family
     if args.compatibility_reason not in COMPATIBILITY_REASONS:
         parser.error(
             "--compatibility-reason is required; use native Codex custom agents or the "
@@ -777,6 +792,9 @@ def main(argv: list[str] | None = None) -> int:
                     "compatibilityReason": args.compatibility_reason,
                     "role": args.role,
                     "suite": args.suite,
+                    "routingPolicy": args.policy,
+                    "requestedParentModel": args.parent_model,
+                    "parentModelEvidence": "caller-supplied" if args.parent_model else None,
                     "stageId": stage_id,
                     "model": profile["model"],
                     "requestedModel": profile["model"],
@@ -926,12 +944,15 @@ def main(argv: list[str] | None = None) -> int:
                             "producer": "run_codex_agent.py",
                             "role": args.role,
                             "suite": args.suite,
+                            "routingPolicy": args.policy,
+                            "requestedParentModel": args.parent_model,
+                            "parentModelEvidence": "caller-supplied" if args.parent_model else None,
                             "route": profile["model"],
                             "effort": profile["effort"],
                             "mode": execution_mode,
                             "profileSha256": profile_sha256,
-                    "instructionTemplateSha256": instruction_template_sha256,
-                    "routeSource": "explicit-selector" if generic else "bundled-preset",
+                            "instructionTemplateSha256": instruction_template_sha256,
+                            "routeSource": "explicit-selector" if generic else "bundled-preset",
                             "taskClass": args.task_class,
                             "acceptanceContractHash": args.acceptance_contract_hash,
                             "remainingRouteContext": route_context or None,
@@ -982,13 +1003,16 @@ def main(argv: list[str] | None = None) -> int:
                         "status": "running",
                         "role": args.role,
                         "suite": args.suite,
+                        "routingPolicy": args.policy,
+                        "requestedParentModel": args.parent_model,
+                        "parentModelEvidence": "caller-supplied" if args.parent_model else None,
                         "route": profile["model"],
                         "effort": profile["effort"],
                         "mode": execution_mode,
                         "serviceTier": profile.get("service_tier", "default"),
                         "profileSha256": profile_sha256,
-                    "instructionTemplateSha256": instruction_template_sha256,
-                    "routeSource": "explicit-selector" if generic else "bundled-preset",
+                        "instructionTemplateSha256": instruction_template_sha256,
+                        "routeSource": "explicit-selector" if generic else "bundled-preset",
                         "taskClass": args.task_class,
                         "acceptanceContractHash": args.acceptance_contract_hash,
                         "remainingRouteContext": route_context or None,
@@ -1221,6 +1245,9 @@ def main(argv: list[str] | None = None) -> int:
         "dispatchId": dispatch_id,
         "role": args.role,
         "suite": args.suite,
+        "routingPolicy": args.policy,
+        "requestedParentModel": args.parent_model,
+        "parentModelEvidence": "caller-supplied" if args.parent_model else None,
         "stageId": stage_id,
         "route": profile["model"],
         "effort": profile["effort"],
@@ -1233,8 +1260,8 @@ def main(argv: list[str] | None = None) -> int:
         "routeAttestation": "requested-only",
         "requestedReasoningEffort": profile["effort"],
         "profileSha256": profile_sha256,
-                    "instructionTemplateSha256": instruction_template_sha256,
-                    "routeSource": "explicit-selector" if generic else "bundled-preset",
+        "instructionTemplateSha256": instruction_template_sha256,
+        "routeSource": "explicit-selector" if generic else "bundled-preset",
         "codexVersion": codex_version_text,
         "status": "completed" if success else "failed",
         "exitCode": process.returncode if process is not None else None,

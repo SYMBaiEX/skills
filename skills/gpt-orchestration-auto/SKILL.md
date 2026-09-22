@@ -4,15 +4,16 @@ description: "Complete sustained engineering objectives through research, buildi
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "2.1.1"
+  version: "2.2.0"
 ---
 
 # GPT Orchestration Auto
 
 Use installed GPT Engineer as the shared contract. This wrapper adds durable progress, not another
-model policy. Preserve the selected `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, or
-`gpt-5.6-luna` parent; same-model children are explicit by default and mixed-model work is a
-deliberate policy. Native Claude execution remains provider-specific. No fleet is mandatory.
+model policy. Preserve the selected parent. GPT-6 Astra is parent/orchestrator-only and never a
+child; GPT-6 Sol and GPT-6 Luna are the only GPT Engineer child routes. Same-model is the default
+under Sol/Luna parents; an Astra or existing GPT-5.6 parent needs an explicit mixed-model Sol/Luna
+child. Native Claude execution remains provider-specific. No fleet is mandatory.
 
 Record objective, scope, acceptance, authority, requirements, evidence, current stage and blockers.
 Use native goal tools only when explicitly requested and available, following their exact lifecycle

@@ -97,11 +97,29 @@ print(json.dumps({"type": "turn.completed"}))
         self.environment.stop()
         self.temp.cleanup()
 
+    def run_agent(self, argv: list[str]) -> int:
+        """Supply an explicit same-model parent for pinned-route fixtures."""
+        from routes import ROLES
+
+        args = list(argv)
+        role = args[args.index("--role") + 1]
+        profile = ROLES.get(role)
+        if profile is not None:
+            child_model = profile["model"]
+        elif "--model" in args:
+            child_model = args[args.index("--model") + 1]
+        else:
+            child_model = None
+        if child_model and "--parent-model" not in args:
+            position = args.index("--cwd") if "--cwd" in args else len(args)
+            args[position:position] = ["--parent-model", child_model]
+        return run_codex_agent.main(args)
+
     def test_generic_role_dry_runs_all_supported_models_without_changing_parent(self) -> None:
-        from routes import SUPPORTED_MODELS
-        for model in SUPPORTED_MODELS:
+        from routes import CHILD_MODELS
+        for model in CHILD_MODELS:
             with mock.patch("sys.stdin", io.StringIO("Trace the API only")), mock.patch("sys.stdout", new_callable=io.StringIO) as output:
-                status = run_codex_agent.main([
+                status = self.run_agent([
                     "--role", "explorer", "--model", model, "--parent-model", model,
                     "--reasoning-effort", "medium", "--policy", "same-model",
                     "--cwd", str(self.root), "--output-dir", str(self.output),
@@ -111,7 +129,8 @@ print(json.dumps({"type": "turn.completed"}))
             result = json.loads(output.getvalue())
             self.assertEqual(result["requestedModel"], model)
             self.assertIsNone(result["effectiveModel"])
-            self.assertEqual(result["suite"], "same-model")
+            self.assertEqual(result["suite"], model.removeprefix("gpt-6-"))
+            self.assertEqual(result["routingPolicy"], "same-model")
             self.assertIsNone(result["profileSha256"])
             self.assertEqual(result["routeSource"], "explicit-selector")
             self.assertEqual(len(result["instructionTemplateSha256"]), 64)
@@ -119,8 +138,8 @@ print(json.dumps({"type": "turn.completed"}))
 
     def test_generic_same_model_rejects_mismatch_before_launch(self) -> None:
         with mock.patch("sys.stderr"), self.assertRaises(SystemExit):
-            run_codex_agent.main([
-                "--role", "explorer", "--model", "gpt-5.6-luna", "--parent-model", "gpt-6-astra",
+            self.run_agent([
+                "--role", "explorer", "--model", "gpt-6-luna", "--parent-model", "gpt-6-astra",
                 "--reasoning-effort", "medium", "--output-dir", str(self.output), "--dry-run",
             ])
         self.assertFalse(self.output.exists())
@@ -143,10 +162,10 @@ print(json.dumps({"type": "turn.completed"}))
             os.environ, {"GPT_ENGINEER_CLI_ADAPTER_REASON": ""}, clear=False
         ):
             with self.assertRaisesRegex(SystemExit, "2"):
-                run_codex_agent.main(
+                self.run_agent(
                     [
-                        "--suite", "economy", "--role",
-                        "terra-explorer",
+                        "--role",
+                        "gpt6-luna-explorer",
                         "--cwd",
                         str(self.root),
                         "--output-dir",
@@ -159,10 +178,10 @@ print(json.dumps({"type": "turn.completed"}))
 
     def test_local_schema_validation_rejects_provider_omission(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("INCOMPLETE_HANDOFF")):
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "terra-explorer",
+                    "--role",
+                    "gpt6-luna-explorer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -183,10 +202,10 @@ print(json.dumps({"type": "turn.completed"}))
     def test_dry_run_pins_luna_and_read_only_sandbox(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Verify the repository.")):
             with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
-                result = run_codex_agent.main(
+                result = self.run_agent(
                     [
-                        "--suite", "economy", "--role",
-                        "luna-verifier",
+                        "--role",
+                        "gpt6-luna-verifier",
                         "--cwd",
                         str(self.root),
                         "--output-dir",
@@ -198,33 +217,33 @@ print(json.dumps({"type": "turn.completed"}))
                 )
         self.assertEqual(result, 0)
         rendered = stdout.getvalue()
-        self.assertIn('"model": "gpt-5.6-luna"', rendered)
-        self.assertIn('"reasoningEffort": "medium"', rendered)
+        self.assertIn('"model": "gpt-6-luna"', rendered)
+        self.assertIn('"reasoningEffort": "high"', rendered)
         self.assertIn('"sandbox": "read-only"', rendered)
         self.assertNotIn("dangerously-bypass", rendered)
         self.assertIn("--output-schema", rendered)
 
-    def test_default_dry_run_pins_astra_read_only_verifier(self) -> None:
+    def test_default_dry_run_pins_sol_read_only_verifier(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Verify the repository without edits.")):
             with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
-                result = run_codex_agent.main([
-                    "--role", "astra-verifier", "--cwd", str(self.root),
+                result = self.run_agent([
+                    "--role", "gpt6-sol-verifier", "--cwd", str(self.root),
                     "--output-dir", str(self.output), "--codex", str(self.codex), "--dry-run",
                 ])
         self.assertEqual(result, 0)
         rendered = stdout.getvalue()
-        self.assertIn('"model": "gpt-6-astra"', rendered)
-        self.assertIn('"reasoningEffort": "medium"', rendered)
+        self.assertIn('"model": "gpt-6-sol"', rendered)
+        self.assertIn('"reasoningEffort": "high"', rendered)
         self.assertIn('"sandbox": "read-only"', rendered)
         self.assertNotIn('service_tier="fast"', rendered)
 
-    def test_terra_worker_requires_explicit_write_authority(self) -> None:
+    def test_luna_worker_requires_explicit_write_authority(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Implement the bounded fix.")):
             with self.assertRaisesRegex(SystemExit, "requires --allow-writes"):
-                run_codex_agent.main(
+                self.run_agent(
                     [
-                        "--suite", "economy", "--role",
-                        "terra-worker",
+                        "--role",
+                        "gpt6-luna-worker",
                         "--cwd",
                         str(self.root),
                         "--output-dir",
@@ -235,15 +254,15 @@ print(json.dumps({"type": "turn.completed"}))
                     ]
                 )
 
-    def test_luna_worker_is_low_effort_and_requires_write_authority(self) -> None:
+    def test_luna_worker_without_write_flag_fails_closed(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Implement the mechanical fix.")):
             with self.assertRaisesRegex(
-                SystemExit, "luna-worker requires --allow-writes"
+                SystemExit, "gpt6-luna-worker requires --allow-writes"
             ):
-                run_codex_agent.main(
+                self.run_agent(
                     [
-                        "--suite", "economy", "--role",
-                        "luna-worker",
+                        "--role",
+                        "gpt6-luna-worker",
                         "--cwd",
                         str(self.root),
                         "--output-dir",
@@ -254,15 +273,15 @@ print(json.dumps({"type": "turn.completed"}))
                     ]
                 )
 
-    def test_luna_max_worker_pins_fast_tier_and_requires_write_authority(self) -> None:
+    def test_luna_worker_uses_no_fast_tier(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Implement the dense bounded fix.")):
             with self.assertRaisesRegex(
-                SystemExit, "luna-max-worker requires --allow-writes"
+                SystemExit, "gpt6-luna-worker requires --allow-writes"
             ):
-                run_codex_agent.main(
+                self.run_agent(
                     [
-                        "--suite", "economy", "--role",
-                        "luna-max-worker",
+                        "--role",
+                        "gpt6-luna-worker",
                         "--cwd",
                         str(self.root),
                         "--output-dir",
@@ -274,10 +293,10 @@ print(json.dumps({"type": "turn.completed"}))
                 )
         with mock.patch("sys.stdin", io.StringIO("Implement the dense bounded fix.")):
             with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
-                result = run_codex_agent.main(
+                result = self.run_agent(
                     [
-                        "--suite", "economy", "--role",
-                        "luna-max-worker",
+                        "--role",
+                        "gpt6-luna-worker",
                         "--cwd",
                         str(self.root),
                         "--output-dir",
@@ -292,17 +311,17 @@ print(json.dumps({"type": "turn.completed"}))
                 )
         self.assertEqual(result, 0)
         rendered = stdout.getvalue()
-        self.assertIn('"reasoningEffort": "max"', rendered)
-        self.assertIn('"serviceTier": "fast"', rendered)
-        self.assertIn('service_tier=\\"fast\\"', rendered)
-        self.assertIn("features.fast_mode=true", rendered)
+        self.assertIn('"reasoningEffort": "high"', rendered)
+        self.assertNotIn('"serviceTier": "fast"', rendered)
+        self.assertNotIn("service_tier", rendered)
+        self.assertNotIn("features.fast_mode", rendered)
 
     def test_captures_delegate_outputs(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "terra-explorer",
+                    "--role",
+                    "gpt6-luna-explorer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -314,7 +333,7 @@ print(json.dumps({"type": "turn.completed"}))
         self.assertEqual(result, 0)
         self.assertIn("turn.completed", (self.output / "events.jsonl").read_text())
         command = json.loads((self.output / "args.json").read_text())
-        self.assertIn("gpt-5.6-terra", command)
+        self.assertIn("gpt-6-luna", command)
         self.assertIn("--ephemeral", command)
         self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
         result_json = json.loads((self.output / "result.json").read_text())
@@ -325,7 +344,7 @@ print(json.dumps({"type": "turn.completed"}))
             result_json["compatibilityReason"], "native-routing-unavailable"
         )
         self.assertEqual(result_json["status"], "completed")
-        self.assertEqual(result_json["handoff"]["stage_id"], "terra-explorer")
+        self.assertEqual(result_json["handoff"]["stage_id"], "gpt6-luna-explorer")
         self.assertEqual(result_json["requestedReasoningEffort"], "medium")
         self.assertIsNone(result_json["effectiveModel"])
         self.assertEqual(result_json["routeAttestation"], "requested-only")
@@ -387,10 +406,10 @@ print(json.dumps({"type": "turn.completed"}))
             objective_summary="Shared fleet",
         )
         with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "terra-explorer",
+                    "--role",
+                    "gpt6-luna-explorer",
                     "--stage-id",
                     "map-api",
                     "--cwd",
@@ -446,10 +465,10 @@ print(json.dumps({"type": "turn.completed"}))
             with self.assertRaisesRegex(
                 SystemExit, "already contains this stage attempt"
             ):
-                run_codex_agent.main(
+                self.run_agent(
                     [
-                        "--suite", "economy", "--role",
-                        "terra-explorer",
+                        "--role",
+                        "gpt6-luna-explorer",
                         "--stage-id",
                         "map-api",
                         "--cwd",
@@ -470,10 +489,10 @@ print(json.dumps({"type": "turn.completed"}))
         unsafe = Path(self.temp.name) / "unsafe-state"
         unsafe.symlink_to(target)
         with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "terra-explorer",
+                    "--role",
+                    "gpt6-luna-explorer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -493,10 +512,10 @@ print(json.dumps({"type": "turn.completed"}))
 
     def test_journal_can_be_disabled_explicitly(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "terra-explorer",
+                    "--role",
+                    "gpt6-luna-explorer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -514,10 +533,10 @@ print(json.dumps({"type": "turn.completed"}))
 
     def test_writer_accepts_only_explicit_path_scope(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("WRITE_ALLOWED")):
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "terra-worker",
+                    "--role",
+                    "gpt6-luna-worker",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -545,10 +564,10 @@ print(json.dumps({"type": "turn.completed"}))
 
     def test_writer_fails_closed_on_out_of_scope_change(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("WRITE_OUTSIDE")):
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "astra-engineer",
+                    "--role",
+                    "gpt6-sol-engineer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -568,10 +587,10 @@ print(json.dumps({"type": "turn.completed"}))
 
     def test_writer_commit_fails_closed_but_preserves_candidate_patch(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("WRITE_ALLOWED COMMIT_CHANGE")):
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "terra-worker",
+                    "--role",
+                    "gpt6-luna-worker",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -597,10 +616,10 @@ print(json.dumps({"type": "turn.completed"}))
         (self.root / ".gitignore").write_text("ignored.txt\n")
         (self.root / "ignored.txt").write_text("baseline\n")
         with mock.patch("sys.stdin", io.StringIO("WRITE_IGNORED")):
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "astra-engineer",
+                    "--role",
+                    "gpt6-sol-engineer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -623,10 +642,10 @@ print(json.dumps({"type": "turn.completed"}))
         (self.root / "external-link").symlink_to(outside)
         with mock.patch("sys.stdin", io.StringIO("Implement the bounded fix.")):
             with self.assertRaisesRegex(SystemExit, "symlinks that resolve outside"):
-                run_codex_agent.main(
+                self.run_agent(
                     [
-                        "--suite", "economy", "--role",
-                        "astra-engineer",
+                        "--role",
+                        "gpt6-sol-engineer",
                         "--cwd",
                         str(self.root),
                         "--output-dir",
@@ -642,10 +661,10 @@ print(json.dumps({"type": "turn.completed"}))
     def test_launch_failure_writes_result_envelope(self) -> None:
         missing = Path(self.temp.name) / "missing-codex"
         with mock.patch("sys.stdin", io.StringIO("Map the architecture.")):
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "terra-explorer",
+                    "--role",
+                    "gpt6-luna-explorer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -674,8 +693,8 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("Complete the read-only task.")), mock.patch.object(
             subprocess.Popen, "wait", autospec=True, side_effect=record_wait
         ):
-            result = run_codex_agent.main([
-                "--role", "astra-explorer", "--cwd", str(self.root),
+            result = self.run_agent([
+                "--role", "gpt6-sol-explorer", "--cwd", str(self.root),
                 "--output-dir", str(self.output), "--codex", str(self.codex),
             ])
         self.assertEqual(result, 0)
@@ -686,8 +705,8 @@ print(json.dumps({"type": "turn.completed"}))
             with self.subTest(timeout=timeout), mock.patch("sys.stderr", new_callable=io.StringIO) as stderr, mock.patch(
                 "run_codex_agent.subprocess.Popen"
             ) as launch, self.assertRaises(SystemExit) as raised:
-                run_codex_agent.main([
-                    "--role", "astra-explorer", "--cwd", str(self.root),
+                self.run_agent([
+                    "--role", "gpt6-sol-explorer", "--cwd", str(self.root),
                     "--output-dir", str(self.output), "--codex", str(self.codex),
                     "--timeout", timeout,
                 ])
@@ -711,8 +730,8 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("HANG")), mock.patch.object(
             subprocess.Popen, "wait", autospec=True, side_effect=interrupt_delegate
         ), mock.patch("run_codex_agent.os.killpg", wraps=os.killpg) as kill_group:
-            result = run_codex_agent.main([
-                "--role", "astra-explorer", "--cwd", str(self.root),
+            result = self.run_agent([
+                "--role", "gpt6-sol-explorer", "--cwd", str(self.root),
                 "--output-dir", str(self.output), "--codex", str(self.codex),
             ])
         self.assertEqual(result, 1)
@@ -727,10 +746,10 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("HANG")), mock.patch(
             "run_codex_agent.os.killpg", wraps=os.killpg
         ) as kill_group:
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "terra-explorer",
+                    "--role",
+                    "gpt6-luna-explorer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -827,8 +846,8 @@ else:
         with mock.patch("sys.stdin", io.StringIO("Complete normally.")), mock.patch(
             "run_codex_agent.stop_process_group", side_effect=report_unverified
         ):
-            result = run_codex_agent.main([
-                "--role", "astra-explorer", "--cwd", str(self.root),
+            result = self.run_agent([
+                "--role", "gpt6-sol-explorer", "--cwd", str(self.root),
                 "--output-dir", str(self.output), "--codex", str(self.codex),
             ])
         self.assertEqual(result, 1)
@@ -839,10 +858,10 @@ else:
     def test_rejects_oversized_prompt_before_launch(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("01234567890")):
             with self.assertRaisesRegex(SystemExit, "limit is 10"):
-                run_codex_agent.main(
+                self.run_agent(
                     [
-                        "--suite", "economy", "--role",
-                        "terra-explorer",
+                        "--role",
+                        "gpt6-luna-explorer",
                         "--cwd",
                         str(self.root),
                         "--output-dir",
@@ -856,10 +875,10 @@ else:
 
     def test_fails_closed_when_event_capture_is_truncated(self) -> None:
         with mock.patch("sys.stdin", io.StringIO("SPAM_STDOUT")):
-            result = run_codex_agent.main(
+            result = self.run_agent(
                 [
-                    "--suite", "economy", "--role",
-                    "terra-explorer",
+                    "--role",
+                    "gpt6-luna-explorer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",

@@ -36,7 +36,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(installed.returncode, 0, installed.stderr)
         checked = self.run_script("--check", str(self.root))
         self.assertEqual(checked.returncode, 0, checked.stderr)
-        self.assertEqual(len(list((self.root / ".codex" / "agents").glob("*.toml"))), 9)
+        self.assertEqual(len(list((self.root / ".codex" / "agents").glob("*.toml"))), 7)
         self.assertEqual(len(list((self.root / ".claude" / "agents").glob("*.md"))), 4)
         self.assertFalse((self.root / ".codex" / "hooks.json").exists())
 
@@ -48,7 +48,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(installed.returncode, 0, installed.stderr)
         checked = self.run_script("--check", "--global", env=env)
         self.assertEqual(checked.returncode, 0, checked.stderr)
-        self.assertEqual(len(list((Path(env["CODEX_HOME"]) / "agents").glob("*.toml"))), 9)
+        self.assertEqual(len(list((Path(env["CODEX_HOME"]) / "agents").glob("*.toml"))), 7)
         self.assertEqual(len(list((Path(env["CLAUDE_CONFIG_DIR"]) / "agents").glob("*.md"))), 4)
         self.assertFalse((Path(env["CODEX_HOME"]) / "hooks.json").exists())
 
@@ -66,7 +66,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual((folder / "settings.json").read_text(), '{"owner":true}')
 
     def test_refuses_conflicting_agent_file(self) -> None:
-        conflict = self.root / ".codex" / "agents" / "astra-engineer.toml"
+        conflict = self.root / ".codex" / "agents" / "gpt6-sol-engineer.toml"
         conflict.parent.mkdir(parents=True)
         conflict.write_text("user-owned\n")
         result = self.run_script("--provider", "codex", str(self.root))
@@ -75,7 +75,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(conflict.read_text(), "user-owned\n")
 
     def test_explicit_upgrade_preserves_unknown_profile(self) -> None:
-        conflict = self.root / ".codex" / "agents" / "astra-engineer.toml"
+        conflict = self.root / ".codex" / "agents" / "gpt6-sol-engineer.toml"
         conflict.parent.mkdir(parents=True)
         conflict.write_text('name = "astra_engineer"\nmodel = "gpt-5.6"\n')
         result = self.run_script("--provider", "codex", "--upgrade", str(self.root))
@@ -99,7 +99,7 @@ class BootstrapTests(unittest.TestCase):
             result = self.run_script("--provider", "codex", *arguments, str(self.root))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(retired.read_text(), customized)
-            self.assertTrue((retired.parent / "astra-engineer.toml").is_file())
+            self.assertTrue((retired.parent / "gpt6-sol-engineer.toml").is_file())
 
     def test_legacy_symlink_preserved_including_dangling_target(self) -> None:
         retired = self.root / ".codex" / "agents" / "sol-engineer.toml"
@@ -111,7 +111,7 @@ class BootstrapTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(retired.is_symlink())
             self.assertFalse(target.exists())
-            self.assertTrue((retired.parent / "astra-worker.toml").is_file())
+            self.assertTrue((retired.parent / "gpt6-sol-worker.toml").is_file())
 
 
 if __name__ == "__main__":

@@ -21,12 +21,15 @@ class AstraMigrationTests(unittest.TestCase):
         self.home = self.root / "home"
         bootstrap.install_codex(self.home, False, False, False)
 
-    def test_default_astra_and_explicit_economy(self):
+    def test_astra_parent_uses_only_explicit_sol_or_luna_children(self):
         self.assertEqual(audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL)["status"], "passed")
-        declaration = ["terra_worker=gpt-5.6-terra:medium"]
-        self.assertEqual(audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL, declaration)["status"], "failed")
-        self.assertEqual(audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL, declaration, suite="economy")["status"], "passed")
-        self.assertEqual(audit_routing.audit(self.root, self.home, "gpt-5.6-sol", suite="economy")["status"], "passed")
+        legacy = ["terra_worker=gpt-5.6-terra:medium"]
+        self.assertEqual(audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL, legacy)["status"], "failed")
+        astra_child = ["gpt6_sol_worker=gpt-6-astra:medium"]
+        self.assertEqual(audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL, astra_child)["status"], "failed")
+        current = ["gpt6_luna_worker=gpt-6-luna:high"]
+        self.assertEqual(audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL, current)["status"], "passed")
+        self.assertEqual(audit_routing.audit(self.root, self.home, "gpt-5.6-sol", suite="sol")["status"], "passed")
 
     def test_registry_and_assets_agree(self):
         for name, route in routes.ROLES.items():
@@ -34,26 +37,24 @@ class AstraMigrationTests(unittest.TestCase):
             self.assertEqual(profile["name"], name.replace("-", "_"))
             self.assertEqual(profile["model"], route["model"])
             self.assertEqual(profile["model_reasoning_effort"], route["effort"])
-        self.assertTrue(routes.ROLES["astra-verifier"]["write_capable"])
-        self.assertNotIn("sol-engineer", routes.ROLES)
+        self.assertFalse(routes.ROLES["gpt6-sol-verifier"]["write_capable"])
+        self.assertNotIn("astra-verifier", routes.ROLES)
 
     def test_verifier_artifact_authority_is_explicit_and_scoped(self):
-        instructions = run_codex_agent.role_instructions("astra-verifier")
-        self.assertIn("Never edit product source", instructions)
-        self.assertIn("Test-generated artifacts, caches, and build outputs", instructions)
-        self.assertIn("only within assigned paths", instructions)
-        self.assertIn("including prior authorization", instructions)
-        read_command = run_codex_agent.build_command("codex", "astra-verifier", self.root, self.root / "final.txt", False)
-        write_command = run_codex_agent.build_command("codex", "astra-verifier", self.root, self.root / "final.txt", True)
+        instructions = run_codex_agent.role_instructions("gpt6-sol-verifier")
+        self.assertIn("Do not edit source", instructions)
+        self.assertIn("Do not spawn children", instructions)
+        read_command = run_codex_agent.build_command("codex", "gpt6-sol-verifier", self.root, self.root / "final.txt", False)
+        write_command = run_codex_agent.build_command("codex", "gpt6-sol-verifier", self.root, self.root / "final.txt", True)
         self.assertEqual(read_command[read_command.index("--sandbox") + 1], "read-only")
-        self.assertEqual(write_command[write_command.index("--sandbox") + 1], "workspace-write")
+        self.assertEqual(write_command[write_command.index("--sandbox") + 1], "read-only")
 
-    def test_unused_retired_profile_warns_but_selected_role_fails(self):
+    def test_retired_profile_fails_even_when_unused_and_selected(self):
         path = self.home / "agents" / "custom-sol.toml"
         path.write_text('name = "sol_engineer"\nmodel = "gpt-5.6-sol"\nmodel_reasoning_effort = "high"\n')
         result = audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL)
-        self.assertEqual(result["status"], "passed")
-        self.assertTrue(any("explicit Astra profile audit" in item for item in result["warnings"]))
+        self.assertEqual(result["status"], "failed")
+        self.assertTrue(any("retired GPT Engineer child route" in item for item in result["violations"]))
         selected = audit_routing.audit(self.root, self.home, routes.ASTRA_MODEL, ["sol_engineer=gpt-5.6-sol:high"])
         self.assertEqual(selected["status"], "failed")
         self.assertEqual(path.read_text(), 'name = "sol_engineer"\nmodel = "gpt-5.6-sol"\nmodel_reasoning_effort = "high"\n')
@@ -81,7 +82,13 @@ class AstraMigrationTests(unittest.TestCase):
         content = b"known retired profile\n"
         digest = hashlib.sha256(content).hexdigest()
         path.write_bytes(content)
-        with mock.patch.dict(bootstrap.RETIRED, {path.name: digest}, clear=True):
+        with (
+            mock.patch.dict(bootstrap.RETIRED, {path.name: "test retirement"}, clear=True),
+            mock.patch.dict(
+                bootstrap.KNOWN_BUNDLED_HASHES,
+                {"agents/" + path.name: {digest}},
+            ),
+        ):
             with self.assertRaises(SystemExit):
                 bootstrap.retire_profiles(self.home, True, True)
             bootstrap.retire_profiles(self.home, False, True)
@@ -109,7 +116,7 @@ class AstraMigrationTests(unittest.TestCase):
         installed = json.loads(destination.read_text())["hooks"]["SubagentStart"]
         self.assertEqual(installed[0]["matcher"], "^sol_engineer$")
         self.assertEqual(installed[1], custom)
-        self.assertIn("astra_engineer", installed[2]["matcher"])
+        self.assertIn("gpt6_sol_engineer", installed[2]["matcher"])
         bootstrap.merge_codex_hooks(destination, True)
 
     def test_temporal_exact_model_policies(self):
@@ -134,16 +141,16 @@ class AstraMigrationTests(unittest.TestCase):
         self.assertEqual(groups[0]["matcher"], "^sol_engineer$")
         self.assertEqual(len(groups[0]["hooks"]), 2)
         self.assertIn({"type": "command", "command": "echo custom"}, groups[0]["hooks"])
-        self.assertIn("astra_engineer", groups[1]["matcher"])
+        self.assertIn("gpt6_sol_engineer", groups[1]["matcher"])
         bootstrap.merge_codex_hooks(destination, True)
 
-    def test_default_runner_refuses_economy_before_launch(self):
+    def test_astra_parent_requires_explicit_mixed_model_policy(self):
         with mock.patch("sys.stdin", io.StringIO("Read only")), mock.patch("sys.stderr", new_callable=io.StringIO) as err:
             with self.assertRaises(SystemExit):
-                run_codex_agent.main(["--role", "terra-explorer", "--compatibility-reason", "headless-isolation-required", "--cwd", str(self.root), "--output-dir", str(self.root / "result"), "--dry-run"])
-        # No subprocess/model execution is needed to prove suite membership.
-        self.assertIn("requires explicit --suite economy", err.getvalue())
-        self.assertNotIn("terra-explorer", routes.suite_routes())
+                run_codex_agent.main(["--role", "gpt6-luna-explorer", "--parent-model", "gpt-6-astra", "--compatibility-reason", "headless-isolation-required", "--cwd", str(self.root), "--output-dir", str(self.root / "result"), "--dry-run"])
+        # No subprocess/model execution is needed to prove the routing boundary.
+        self.assertIn("explicit mixed-model policy", err.getvalue())
+        self.assertNotIn("gpt6-luna-explorer", routes.suite_routes("sol"))
 
 
 if __name__ == "__main__":

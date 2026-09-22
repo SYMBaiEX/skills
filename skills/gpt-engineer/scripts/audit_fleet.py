@@ -12,11 +12,20 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-from routes import ROLES, LEGACY, LEGACY_RETIREMENT, historical_policy, ASTRA, ECONOMY, SUPPORTED_MODELS
-ALLOWED_MODELS = set(SUPPORTED_MODELS)
+from routes import (
+    ROLES,
+    LEGACY,
+    LEGACY_ASTRA_CHILD_NAMES,
+    LEGACY_RETIREMENT,
+    historical_policy,
+)
 CURRENT_ROLES = {name.replace("-", "_") for name in ROLES}
-HISTORICAL_ROLES = set(LEGACY) | {"sol_engineer"}
+HISTORICAL_ROLES = {name.replace("-", "_") for name in LEGACY} | {"sol_engineer"}
 CATALOG_ROLES = CURRENT_ROLES | HISTORICAL_ROLES
+LEGACY_ASTRA_ROLES = LEGACY_ASTRA_CHILD_NAMES
+LEGACY_ECONOMY_ROLES = {
+    name.replace("_", "-") for name in LEGACY
+} - LEGACY_ASTRA_ROLES
 # The native-first profile names shipped in this commit. Historical names stay
 # queryable for baselines but are not valid dispatch targets after this point.
 HISTORICAL_ROLE_RETIREMENT = LEGACY_RETIREMENT
@@ -188,7 +197,7 @@ def audit(
     root_thread: str | None = None,
     dispatch_suite: str | None = None,
 ) -> dict[str, object]:
-    if dispatch_suite not in (None, "astra", "economy", "same-model", "mixed-model"):
+    if dispatch_suite not in (None, "gpt6", "astra", "economy", "same-model", "mixed-model"):
         raise ValueError("Unknown dispatch suite")
     state_path = codex_home / "state_5.sqlite"
     history_path = codex_home / "thread_history_1.sqlite"
@@ -268,10 +277,11 @@ def audit(
             stale_profiles.append({"threadId": row["id"], "agentRole": row["agent_role"], "reason": "Sol profile after release cutover; installed workflow version and dispatch policy are unknown"})
         elif retired:
             reasons.append(retired)
-        if dispatch_suite in ("astra", "economy") and row["agent_role"] == "sol_engineer" and not retired:
-            reasons.append("Sol is outside the explicitly asserted v2 dispatch suite")
-        if dispatch_suite == "astra" and row["agent_role"] in {name.replace("-", "_") for name in ECONOMY}:
-            reasons.append("economy profile is outside the explicitly asserted Astra dispatch suite")
+        normalized_role = str(row["agent_role"] or "").replace("_", "-")
+        if dispatch_suite == "astra" and normalized_role in LEGACY_ECONOMY_ROLES:
+            reasons.append("legacy economy profile is outside the explicitly asserted v2.1 Astra suite")
+        if dispatch_suite == "economy" and normalized_role in LEGACY_ASTRA_ROLES:
+            reasons.append("legacy Astra child is outside the explicitly asserted economy suite")
         if reasons:
             route_violations.append(
                 {
@@ -338,10 +348,12 @@ def audit(
         "history": all_history,
         "historyByProfileCohort": history_by_cohort,
         "routeCohorts": {
-            "astra": sum(row["agent_role"].replace("_", "-") in ASTRA for row in rows if row["agent_role"]),
-            "economy": sum(row["agent_role"].replace("_", "-") in ECONOMY for row in rows if row["agent_role"]),
+            "gpt6Sol": sum(row["agent_role"].replace("_", "-").startswith("gpt6-sol-") for row in rows if row["agent_role"]),
+            "gpt6Luna": sum(row["agent_role"].replace("_", "-").startswith("gpt6-luna-") for row in rows if row["agent_role"]),
+            "astraLegacyChildren": sum(row["agent_role"].replace("_", "-") in LEGACY_ASTRA_ROLES for row in rows if row["agent_role"]),
+            "legacy56Children": sum(row["agent_role"].replace("_", "-") in LEGACY_ECONOMY_ROLES for row in rows if row["agent_role"]),
             "historical": len(historical_rows),
-            "economyAuthorization": "not observable from thread model metadata; requires dispatch evidence",
+            "modelPolicy": "Astra is parent-only; GPT-6 Sol and Luna are the current child routes",
         },
         "otelScope": {
             "rows": scoped_log_rows,
@@ -363,7 +375,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--since", help="ISO-8601 start time; defaults to seven days ago")
     parser.add_argument("--until", help="Exclusive ISO-8601 snapshot end; defaults to now")
     parser.add_argument("--root-thread", help="Limit the cohort to descendants of one root thread")
-    parser.add_argument("--dispatch-suite", choices=("astra", "economy", "same-model", "mixed-model"), help="Assert documented policy for the selected cohort, never infer it from timestamps. Does not attest same-model parent equality.")
+    parser.add_argument("--dispatch-suite", choices=("gpt6", "astra", "economy", "same-model", "mixed-model"), help="Assert the selected current or historical policy; gpt6 strictly rejects retired child routes. Does not attest same-model parent equality.")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:

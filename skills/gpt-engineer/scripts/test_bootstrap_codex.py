@@ -37,15 +37,13 @@ class BootstrapCodexTests(unittest.TestCase):
         self.assertEqual(
             agents,
             [
-                "astra-engineer.toml",
-                "astra-explorer.toml",
-                "astra-verifier.toml",
-                "astra-worker.toml",
-                "luna-max-worker.toml",
-                "luna-verifier.toml",
-                "luna-worker.toml",
-                "terra-explorer.toml",
-                "terra-worker.toml",
+                "gpt6-luna-explorer.toml",
+                "gpt6-luna-verifier.toml",
+                "gpt6-luna-worker.toml",
+                "gpt6-sol-engineer.toml",
+                "gpt6-sol-explorer.toml",
+                "gpt6-sol-verifier.toml",
+                "gpt6-sol-worker.toml",
             ],
         )
 

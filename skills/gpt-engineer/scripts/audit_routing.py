@@ -23,11 +23,18 @@ except ImportError:
 
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
-from routes import ASTRA_MODEL, SUPPORTED_MODELS, expected_profiles
-ALLOWED_PARENT_MODELS = set(SUPPORTED_MODELS)
+from routes import (
+    CHILD_MODELS,
+    PARENT_MODELS,
+    LEGACY,
+    LEGACY_ASTRA_CHILD_NAMES,
+    expected_profiles,
+)
+ALLOWED_PARENT_MODELS = set(PARENT_MODELS)
 EXPECTED = expected_profiles()
 APP_CODEX = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
 MANAGED_CATALOG = Path("model-catalogs/gpt-engineer-luna-v2.json")
+LEGACY_CHILD_NAMES = {name.replace("_", "-") for name in LEGACY}
 
 
 def sha256(path: Path) -> str:
@@ -287,7 +294,7 @@ def audit(
     observed_routes: list[str] | None = None,
     include_runtime: bool = False,
     explicit_codex: str | None = None,
-    suite: str = "astra",
+    suite: str = "all",
 ) -> dict[str, object]:
     EXPECTED = expected_profiles(suite)
     violations: list[str] = []
@@ -305,8 +312,17 @@ def audit(
             violations.append(f"{scope} profile: {exc}")
             continue
         name = str(profile.get("name", ""))
-        if name == "sol_engineer" and suite == "astra":
-            warnings.append(f"Sol profile is outside this explicit Astra profile audit; direct Sol routing remains supported: {path}")
+        normalized_name = name.replace("_", "-")
+        if normalized_name in LEGACY_CHILD_NAMES:
+            policy = (
+                "Astra is orchestrator-only"
+                if normalized_name in LEGACY_ASTRA_CHILD_NAMES
+                else "GPT Engineer child routing now uses only GPT-6 Sol or GPT-6 Luna"
+            )
+            violations.append(
+                f"{scope} profile {path} still exposes a retired GPT Engineer child route; {policy}"
+            )
+            continue
         if name not in EXPECTED:
             continue
         model = str(profile.get("model", ""))
@@ -348,6 +364,8 @@ def audit(
         valid = expected is not None and model == expected[0] and (
             not separator or effort == expected[1]
         )
+        if model not in CHILD_MODELS:
+            valid = False
         observed.append(
             {
                 "agentType": name,
@@ -358,6 +376,10 @@ def audit(
         )
         if expected is None:
             violations.append(f"observed unsupported agent type in pinned-suite mode: {name}")
+        elif model not in CHILD_MODELS:
+            violations.append(
+                f"observed child route for {name} used {model or '(missing)'}; children must use GPT-6 Sol or GPT-6 Luna"
+            )
         elif model != expected[0]:
             violations.append(
                 f"observed route for {name} used {model or '(missing)'}; expected {expected[0]}"
@@ -409,7 +431,7 @@ def main(argv: list[str] | None = None) -> int:
         metavar="AGENT_TYPE=MODEL[:EFFORT]",
         help="Validate effective child metadata exported by the runtime; repeat for each child",
     )
-    parser.add_argument("--suite", choices=("astra", "economy"), default="astra")
+    parser.add_argument("--suite", choices=("all", "sol", "luna"), default="all")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
     args = parser.parse_args(argv)
 

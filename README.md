@@ -11,8 +11,9 @@ servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and ap
 ## Skills
 
 - [`skills/gpt-engineer/`](skills/gpt-engineer/) — model-aware engineering from research through
-  verified delivery. Respect the selected Astra, Sol, Terra, or Luna parent; delegate when independent
-  work saves time or adds useful review. Includes proportionate tests, explicit same/mixed-model routes,
+  verified delivery. Astra is parent-only; GPT-6 Sol and Luna are its child routes. Preserve the
+  selected parent, including GPT-5.6 sessions during rollout, and delegate when independent work
+  saves time or adds useful review. Includes proportionate tests, explicit same/mixed-model routes,
   private durable run journals, outcome measurement, and task-owned cleanup. Native Codex is the
   interactive path; current SDK and managed Agents API guidance supports programmatic work. The
   Python CLI runner remains a guarded compatibility adapter. Productive multi-hour work is supported;
@@ -113,11 +114,13 @@ The unsupported Luna catalog-creation path has been removed. The recovery tool c
 disable the old managed setting, never create/refresh an override or enable Fast. Prefer stock
 native routing; retain the guarded CLI adapter for an evidenced compatibility/isolation gap.
 
-GPT Engineer 2.1 supports exact `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`
-parents. Same-model children are selected explicitly by default; mixed-model work is a deliberate
-policy. Optional pinned presets remain available, but do not dictate the parent. Unknown metadata
-is not guessed, and parent hook fields are not child attestation. The generic CLI adapter roles
-accept all four models with explicit model/effort and same/mixed policy.
+GPT Engineer 2.2 keeps GPT-6 Astra parent-only and routes children exclusively to GPT-6 Sol or
+GPT-6 Luna. Sol is the starting choice for demanding, ambiguous lanes; Luna for focused,
+repeatable work. Preserve the selected parent, including a GPT-5.6 parent still in use during the
+rollout; delegation from a 5.6 parent must explicitly route to GPT-6 Sol or Luna. Under an Astra
+parent, choose an explicit Sol/Luna child; under Sol or Luna, same-model is the default. Unknown
+metadata is not guessed, and parent hook fields are not child attestation. The generic CLI adapter
+accepts only GPT-6 Sol/Luna child routes and records the observed parent separately.
 See [model routing](skills/gpt-engineer/references/model-routing.md) and the
 [capability/install/evaluation matrix](skills/gpt-engineer/references/runtime-integrations.md).
 See [runtime choices and API compatibility](skills/gpt-engineer/references/dynamic-workflows.md)

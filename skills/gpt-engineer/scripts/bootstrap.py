@@ -22,10 +22,19 @@ except ImportError:  # pragma: no cover - Windows has no fcntl
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 ASSET_ROOT = SKILL_ROOT / "assets"
-# Historical profile retirement is intentionally empty: route selection now
-# handles legacy roles without requiring a legacy profile to be removed.
-RETIRED: dict[str, str] = {}
-BUNDLE_VERSION = "2.1.0"
+# Retire only exact managed profiles. Customized and unknown profiles stay put.
+RETIRED = {
+    "astra-engineer.toml": "Astra is now parent-only",
+    "astra-explorer.toml": "Astra is now parent-only",
+    "astra-verifier.toml": "Astra is now parent-only",
+    "astra-worker.toml": "Astra is now parent-only",
+    "terra-explorer.toml": "GPT-5.6 worker preset retired during the GPT-6 rollout",
+    "terra-worker.toml": "GPT-5.6 worker preset retired during the GPT-6 rollout",
+    "luna-worker.toml": "GPT-5.6 worker preset retired during the GPT-6 rollout",
+    "luna-verifier.toml": "GPT-5.6 worker preset retired during the GPT-6 rollout",
+    "luna-max-worker.toml": "Old Luna Max/Fast preset retired",
+}
+BUNDLE_VERSION = "2.2.0"
 RECEIPT_NAME = ".gpt-engineer-install.json"
 RECEIPT_VERSION = 1
 
@@ -34,10 +43,18 @@ RECEIPT_VERSION = 1
 # user files. A file that is neither in this table nor in a trusted receipt is
 # preserved on upgrade and uninstall.
 KNOWN_BUNDLED_HASHES = {
-    "agents/luna-max-worker.toml": {
-        "2f6ed7fda853cc5e7ea93f0112d51d61afd4ab39200c8ddec137e93b18d68bdd",
-        "c3dc7db4bcedfddebab68b92659161c1125262eef767e3e313017a70bfbbcfcf",
-        "f528eae1cb93eef4fe0d3132d28e149d793f238b54e579e75b72c956d0be5a12",
+    "agents/astra-engineer.toml": {
+        "a8e6a0c4a109543022f2badff542ecb567c8f6d4b1b3021085587d6416ed68a3",
+        "0ec2cca4a109543022f2badff542ecb567c8f6d4b1b3021085587d6416ed68a3",
+    },
+    "agents/astra-explorer.toml": {
+        "f838b1e89fbcfcd3941c75d5e16681c4aa10c9af5a1551afd3454b8b73cf268a",
+    },
+    "agents/astra-verifier.toml": {
+        "054e61f982c6c7559633688edd322e88344a5ac4dc4118f06c321954f1d8b908",
+    },
+    "agents/astra-worker.toml": {
+        "4f2b47e6e5242c541074db799142301ab9dee0624f7f9a55b09e42a68a1b4919",
     },
     "agents/luna-verifier.toml": {
         "2f4dedf82f957f256f8d372d182706dd9854953c5863d1e7a1d98d5948e054b3",
@@ -46,6 +63,12 @@ KNOWN_BUNDLED_HASHES = {
     "agents/luna-worker.toml": {
         "5daa5194184350d6f25b6e523b81f72866f57e5152cc0d5efb97415a6e09c271",
         "06b489562a28c5c8abefaa7afcc8731c32ca418227cb823cc4df3fe37d5b8105",
+    },
+    "agents/luna-max-worker.toml": {
+        "2f6ed7fda853cc5e7ea93f0112d51d61afd4ab39200c8ddec137e93b18d68bdd",
+        "c3dc7db4bcedfddebab68b92659161c1125262eef767e3e313017a70bfbbcfcf",
+        "f528eae1cb93eef4fe0d3132d28e149d793f238b54e579e75b72c956d0be5a12",
+        "a8929f75b09da8b84f4d20035d4beaa6e2191e62f346af13c93d766c3c3b8721",
     },
     "agents/terra-explorer.toml": {
         "8062ea8a602ae195e6f88df847c0a169ac450a7332767f77f699efd895cfcdaf",
@@ -67,6 +90,7 @@ KNOWN_BUNDLED_HASHES = {
 }
 KNOWN_MANAGED_HOOK_MATCHERS = {
     "SubagentStart": {
+        "^(astra_engineer|astra_explorer|astra_worker|astra_verifier|terra_explorer|terra_worker|luna_worker|luna_max_worker|luna_verifier)$",
         "^(sol_engineer|terra_explorer|terra_worker|luna_verifier)$",
         "^(sol_engineer|terra_explorer|terra_worker|luna_worker|luna_verifier)$",
     },
@@ -219,21 +243,29 @@ def trusted_hashes(relative: str, source: Path, receipt: dict) -> set[str]:
     return values
 
 
-def retire_profiles(destination: Path, check: bool, upgrade: bool) -> None:
-    for name, digest in RETIRED.items():
+def retire_profiles(destination: Path, check: bool, upgrade: bool, receipt: dict | None = None) -> None:
+    receipt = receipt or {}
+    for name, reason in RETIRED.items():
         path = destination / "agents" / name
         if not path.exists() and not path.is_symlink():
             continue
-        if path.is_symlink() or not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        relative = f"agents/{name}"
+        known_hashes = set(KNOWN_BUNDLED_HASHES.get(relative, set()))
+        recorded = receipt.get("files", {}).get(relative)
+        if isinstance(recorded, str):
+            known_hashes.add(recorded)
+        digest = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() and not path.is_symlink() else None
+        if digest not in known_hashes:
             print(
-                f"warning: Preserving customized or symlink retired profile: {path}; "
-                "it is not an allowed GPT Engineer dispatch target",
+                f"warning: Preserving customized or symlink retired profile: {path}; {reason}. "
+                "Review it manually; it is not an allowed GPT Engineer dispatch target",
                 file=sys.stderr,
             )
             continue
         if check or not upgrade:
             raise SystemExit(f"Retired profile remains installed; use --upgrade: {path}")
         backup = destination / "retired-agent-backups" / (name + "." + digest)
+        ensure_safe_destination(backup.parent)
         backup.parent.mkdir(parents=True, exist_ok=True)
         if backup.is_symlink() or (backup.exists() and backup.read_bytes() != path.read_bytes()):
             raise SystemExit(f"Retired profile backup conflicts: {backup}")
@@ -517,7 +549,7 @@ def install_codex(destination: Path, check: bool, project: bool, upgrade: bool) 
 
 def _install_codex(destination: Path, check: bool, project: bool, upgrade: bool) -> None:
     receipt = load_receipt(destination)
-    retire_profiles(destination, check, upgrade)
+    retire_profiles(destination, check, upgrade, receipt)
     install_agents(
         ASSET_ROOT / "codex" / "agents",
         destination / "agents",

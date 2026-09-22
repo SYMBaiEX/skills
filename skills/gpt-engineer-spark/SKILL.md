@@ -4,16 +4,18 @@ description: Lead end-to-end engineering work with a capable main agent and a pa
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "1.4.2"
+  version: "1.4.3"
 ---
 
 # GPT Engineer Spark
 
 Own the outcome as the main agent. Keep planning, architecture, conflict resolution, integration, security-sensitive judgment, and final acceptance in the main thread. Delegate small, explicit shards to `gpt-5.3-codex-spark` for speed.
 
-Spark is intentionally a separate speed-specialist model outside GPT Engineer's four-model contract. Activate
-this skill only when the user explicitly requests Spark or authorizes that tradeoff. Never enter it
-automatically from GPT Engineer's same-model or mixed-model policy. Preserve the selected main agent.
+Spark is intentionally a separate speed-specialist model outside GPT Engineer's GPT-6 Sol/Luna
+child routes. Activate this skill only when the user explicitly requests Spark or authorizes that
+tradeoff. Never enter it automatically from GPT Engineer's same-model or mixed-model policy. The
+selected main agent remains the orchestrator; Astra is never routed as a Spark or GPT Engineer
+child. Preserve the selected main agent.
 
 Read [references/codex-spark.md](references/codex-spark.md) before claiming availability, performance, or route proof.
 When Spark participates in a larger adaptive graph, also read the installed GPT Engineer
@@ -34,7 +36,7 @@ Use a project path instead of `--global` for repository-scoped profiles. Restart
 
 A profile file is configuration, not proof that a child used Spark. Prefer native custom-agent routing when the spawn surface exposes the selected agent. When it does not, use the guarded CLI fallback with an explicit `--model gpt-5.3-codex-spark` request. Never relabel an inherited or generic child as Spark.
 
-If Spark is unavailable, rejected, throttled beyond the task budget, or the user lacks the required entitlement, report that plainly. Do not silently substitute Terra, Luna, Sol, another model, or the parent.
+If Spark is unavailable, rejected, throttled beyond the task budget, or the user lacks the required entitlement, report that plainly. Do not silently substitute GPT-6 Sol, GPT-6 Luna, Astra, another model, or the parent.
 
 ## Shape the fleet
 

@@ -4,7 +4,7 @@ description: "Coordinate a requested coding-agent fleet with bounded ownership, 
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "2.1.0"
+  version: "2.2.0"
 ---
 
 # GPT Orchestration
@@ -14,9 +14,11 @@ nontrivial scheduling. This is an orchestration entry point, not another routing
 to load every engineer wrapper. A Skills CLI installation does not resolve dependencies or register
 agents and hooks.
 
-Preserve the selected parent (`gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, or
-`gpt-5.6-luna`). Same-model delegation is explicit by default; mixed-model lanes require a deliberate
-policy and exact child selection. Never infer execution from profiles or model self-description.
+Preserve the selected parent. GPT-6 Astra is parent/orchestrator-only and must never be a child.
+GPT-6 Sol and GPT-6 Luna are the only GPT Engineer child routes. Same-model delegation is the
+default under Sol/Luna parents; Astra parents require an explicit mixed-model Sol/Luna child. Keep
+an already-selected GPT-5.6 parent during rollout, but explicitly route children to GPT-6 Sol or
+Luna. Never infer execution from profiles or model self-description.
 If the core or native delegation is absent, explain the limitation and perform suitable work directly;
 do not switch models or install a framework automatically. Claude native routing stays provider-specific.
 

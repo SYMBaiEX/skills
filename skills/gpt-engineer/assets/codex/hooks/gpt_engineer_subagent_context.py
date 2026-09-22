@@ -5,15 +5,13 @@ import sys
 
 ALLOWED_ROLES = frozenset(
     {
-        "astra_engineer",
-        "astra_explorer",
-        "astra_worker",
-        "astra_verifier",
-        "terra_explorer",
-        "terra_worker",
-        "luna_worker",
-        "luna_max_worker",
-        "luna_verifier",
+        "gpt6_sol_engineer",
+        "gpt6_sol_explorer",
+        "gpt6_sol_worker",
+        "gpt6_sol_verifier",
+        "gpt6_luna_explorer",
+        "gpt6_luna_worker",
+        "gpt6_luna_verifier",
     }
 )
 MAX_CONTEXT_BYTES = 1200

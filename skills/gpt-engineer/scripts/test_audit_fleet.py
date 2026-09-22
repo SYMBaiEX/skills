@@ -28,9 +28,9 @@ class AuditFleetTests(unittest.TestCase):
         )
         rows = [
             ("root", None, "gpt-5.6-sol", "high", 90),
-            ("a", "terra_explorer", "gpt-5.6-terra", "medium", 110),
+            ("a", "gpt6_luna_explorer", "gpt-6-luna", "high", 110),
             ("b", "security-auditor", "gpt-5.4", "high", 120),
-            ("c", "luna_verifier", "gpt-5.6-luna", "medium", 130),
+            ("c", "gpt6_luna_verifier", "gpt-6-luna", "high", 130),
             ("d", "worker", "gpt-5.6-sol", "high", 140),
         ]
         state.executemany("INSERT INTO threads VALUES (?,?,?,?,?)", rows)
@@ -97,13 +97,13 @@ class AuditFleetTests(unittest.TestCase):
         self.assertTrue(any("not deduplicated" in item for item in result["limitations"]))
         self.assertTrue(any("unattributed" in item for item in result["warnings"]))
 
-    def test_wrong_model_within_economy_is_still_a_violation(self) -> None:
+    def test_wrong_model_for_current_luna_profile_is_a_violation(self) -> None:
         with sqlite3.connect(self.home / "state_5.sqlite") as state:
-            state.execute("UPDATE threads SET model='gpt-5.6-luna' WHERE id='a'")
+            state.execute("UPDATE threads SET model='gpt-6-sol' WHERE id='a'")
         result = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(100, timezone.utc), root_thread="root")
         violations = result["fleet"]["routeViolations"]
         self.assertEqual(len(violations), 1)
-        self.assertIn("expected gpt-5.6-terra", violations[0]["reasons"][0])
+        self.assertIn("expected gpt-6-luna", violations[0]["reasons"][0])
         self.assertEqual(result["fleet"]["latestOnlyChildren"], 1)
 
     def test_missing_child_role_is_unattributed_not_a_crash(self) -> None:
@@ -125,7 +125,7 @@ class AuditFleetTests(unittest.TestCase):
         self.assertEqual(violations, [])
         self.assertEqual(result["fleet"]["staleProfileDiagnostics"][0]["threadId"], "c")
         self.assertEqual(result["fleet"]["historicalProfileChildren"], 2)
-        strict = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(cutoff, timezone.utc), until=datetime.fromtimestamp(cutoff + 100, timezone.utc), root_thread="root", dispatch_suite="astra")
+        strict = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(cutoff, timezone.utc), until=datetime.fromtimestamp(cutoff + 100, timezone.utc), root_thread="root", dispatch_suite="gpt6")
         self.assertEqual(len(strict["fleet"]["routeViolations"]), 1)
         for policy in ("same-model", "mixed-model"):
             current = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(cutoff, timezone.utc), until=datetime.fromtimestamp(cutoff + 100, timezone.utc), root_thread="root", dispatch_suite=policy)
@@ -175,7 +175,7 @@ class AuditFleetTests(unittest.TestCase):
         )
         self.assertEqual(result["fleet"]["spawnedChildren"], 2)
         self.assertEqual(
-            result["fleet"]["modelCounts"], {"gpt-5.6-luna": 1, "gpt-5.6-sol": 1}
+            result["fleet"]["modelCounts"], {"gpt-6-luna": 1, "gpt-5.6-sol": 1}
         )
 
     def test_since_requires_timezone(self) -> None:

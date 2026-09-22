@@ -4,14 +4,19 @@ description: "Complete substantial software builds, remediation, and engineering
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "2.1.2"
+  version: "2.2.0"
 ---
 
 # GPT Engineer
 
-Own the requested outcome. Respect the selected parent: `gpt-6-astra`, `gpt-5.6-sol`,
-`gpt-5.6-terra`, or `gpt-5.6-luna`. Neither Astra nor a fleet is required. On Claude,
-use the portable engineering guidance; native Claude agents do not become GPT agents.
+Own the requested outcome. Preserve the selected parent model. GPT-6 Astra is orchestrator-only:
+use it only when it is the active parent/chat model, never as a child, worker, verifier, fallback,
+or spawned profile. GPT-6 Sol and GPT-6 Luna are the only GPT Engineer child routes. Use Sol for
+ambiguous, demanding, multi-step lanes and Luna for focused, repeatable lanes; same-model children
+are the default under Sol/Luna parents, while an Astra parent must explicitly choose a Sol/Luna
+mixed-model child. Older GPT-5.6 parent sessions may continue during rollout, but do not create new
+GPT-5.6 child routes or silently change the selected parent. Neither Astra nor a fleet is required.
+On Claude, use the portable engineering guidance; native Claude agents do not become GPT agents.
 
 ## Establish the contract
 

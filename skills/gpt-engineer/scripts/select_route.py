@@ -10,7 +10,7 @@ import argparse
 import json
 import sys
 
-from routes import SUPPORTED_MODELS
+from routes import ASTRA_MODEL, CHILD_MODELS, PARENT_MODELS, SUPPORTED_MODELS
 
 MAX_INPUT = 32768
 PARENT_EVENTS = frozenset({"SessionStart", "SessionEnd", "PreToolUse", "PostToolUse",
@@ -52,14 +52,32 @@ def plan(document: dict) -> dict:
     if parent.get("source") == "codex-hook":
         trusted = parent.get("hookEventName") in PARENT_EVENTS
     parent_model = parent.get("model") if trusted else None
-    for label, value in (("parent", parent_model), ("child", child.get("model"))):
-        if value is not None and value not in SUPPORTED_MODELS:
-            raise ValueError(label + " model outside supported contract")
-    model = child.get("model") or (parent_model if policy == "same-model" else None)
-    if policy == "same-model" and parent_model and model != parent_model:
-        raise ValueError("same-model child differs from observed parent")
+    if parent_model is not None and parent_model not in PARENT_MODELS:
+        raise ValueError("parent model outside supported contract")
+    explicit_child = child.get("model")
+    if explicit_child is not None and explicit_child not in CHILD_MODELS:
+        raise ValueError("Astra is orchestrator-only; children must use GPT-6 Sol or Luna")
+    model = explicit_child
+    if policy == "same-model":
+        if parent_model is None:
+            result = {"schema": "gpt-engineer-route/v1", "policy": policy,
+                      "parent": {"effectiveModel": None, "source": parent.get("source", "unavailable")},
+                      "requested": {"model": explicit_child, "effort": child.get("effort"), "serviceTier": child.get("serviceTier")},
+                      "effectiveChild": {"model": None, "effort": None, "serviceTier": None},
+                      "action": "parent-only", "spawn": None,
+                      "reason": "active parent model unavailable; do not infer a same-model route"}
+            return result
+        if parent_model == ASTRA_MODEL:
+            raise ValueError("Astra is orchestrator-only; choose a Sol or Luna child with mixed-model policy")
+        if parent_model not in CHILD_MODELS:
+            raise ValueError("a legacy parent requires an explicit GPT-6 Sol or Luna mixed-model child")
+        model = explicit_child or parent_model
+        if model != parent_model:
+            raise ValueError("same-model child differs from observed parent")
     if policy == "mixed-model" and not child.get("model"):
         raise ValueError("mixed-model requires an explicit child model")
+    if model is not None and model not in CHILD_MODELS:
+        raise ValueError("Astra is orchestrator-only; children must use GPT-6 Sol or Luna")
     result = {"schema": "gpt-engineer-route/v1", "policy": policy,
               "parent": {"effectiveModel": parent_model, "source": parent.get("source", "unavailable")},
               "requested": {"model": model, "effort": child.get("effort"),
@@ -84,8 +102,6 @@ def plan(document: dict) -> dict:
     if not capabilities.get("effortSelector") or not isinstance(effort, str) or effort not in efforts.get(model, []):
         result["reason"] = "choose an explicit supported effort; do not inherit an unintended default"
         return result
-    if model == "gpt-6-astra" and effort in ("none", "minimal"):
-        raise ValueError("Astra does not support none/minimal")
     tier = child.get("serviceTier")
     if tier is not None and (not capabilities.get("tierSelector") or tier not in tiers):
         result["reason"] = "explicit service tier unavailable; do not silently drop it"

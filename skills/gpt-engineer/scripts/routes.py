@@ -1,51 +1,111 @@
-"""Single source of truth for current requested routes and historical policies."""
+"""Single source of truth for parent-only Astra and GPT-6 Sol/Luna child routes."""
+
 from datetime import datetime, timezone
 
 ASTRA_MODEL = "gpt-6-astra"
-SUPPORTED_MODELS = (ASTRA_MODEL, "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna")
-# Policy cutover is an explicit instant, not the beginning of the release day.
+SOL_MODEL = "gpt-6-sol"
+LUNA_MODEL = "gpt-6-luna"
+
+# GPT-5.6 parents can remain active during the GPT-6 rollout. The skill never
+# changes the selected parent and never selects Astra for a spawned child.
+PARENT_MODELS = (
+    ASTRA_MODEL,
+    SOL_MODEL,
+    LUNA_MODEL,
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+)
+CHILD_MODELS = (SOL_MODEL, LUNA_MODEL)
+# Parent-event metadata may contain any supported selected parent. Child model
+# validation always uses CHILD_MODELS, never this parent allowlist.
+SUPPORTED_MODELS = PARENT_MODELS
+
+# Historical cutovers remain for classifying stored OTel cohorts. They do not
+# infer what an old running task loaded from timestamps alone.
 MIGRATION = datetime(2026, 9, 10, 23, 23, 48, tzinfo=timezone.utc)
 LEGACY_RETIREMENT = datetime(2026, 8, 31, 7, 15, 45, tzinfo=timezone.utc)
-
 def route(model, effort, writable, tier=None):
     value = {"model": model, "effort": effort, "write_capable": writable}
     if tier:
         value["service_tier"] = tier
     return value
 
-ASTRA = {
-    "astra-engineer": route(ASTRA_MODEL, "high", True),
-    "astra-explorer": route(ASTRA_MODEL, "medium", False),
-    "astra-worker": route(ASTRA_MODEL, "medium", True),
-    "astra-verifier": route(ASTRA_MODEL, "medium", True),
-}
-ECONOMY = {
-    "terra-explorer": route("gpt-5.6-terra", "medium", False),
-    "terra-worker": route("gpt-5.6-terra", "medium", True),
-    "luna-worker": route("gpt-5.6-luna", "low", True),
-    "luna-max-worker": route("gpt-5.6-luna", "max", True, "fast"),
-    "luna-verifier": route("gpt-5.6-luna", "medium", True),
-}
-ROLES = {name: {**value, "profile": name + ".toml"} for name, value in {**ASTRA, **ECONOMY}.items()}
-LEGACY = {"gpt-engineer-lead": "gpt-5.6-sol", "gpt-engineer-explorer": "gpt-5.6-terra", "gpt-engineer-worker": "gpt-5.6-terra", "gpt-engineer-verifier": "gpt-5.6-luna"}
 
-def suite_routes(suite="astra"):
-    if suite not in ("astra", "economy"):
-        raise ValueError("Unknown routing suite: " + suite)
-    return {name: value for name, value in ROLES.items() if suite == "economy" or name in ASTRA}
+SOL = {
+    "gpt6-sol-engineer": route(SOL_MODEL, "medium", True),
+    "gpt6-sol-explorer": route(SOL_MODEL, "medium", False),
+    "gpt6-sol-worker": route(SOL_MODEL, "medium", True),
+    "gpt6-sol-verifier": route(SOL_MODEL, "high", False),
+}
+LUNA = {
+    "gpt6-luna-explorer": route(LUNA_MODEL, "high", False),
+    "gpt6-luna-worker": route(LUNA_MODEL, "high", True),
+    "gpt6-luna-verifier": route(LUNA_MODEL, "high", False),
+}
+CURRENT = {**SOL, **LUNA}
+ROLES = {name: {**value, "profile": name + ".toml"} for name, value in CURRENT.items()}
 
-def expected_profiles(suite="astra"):
-    return {name.replace("-", "_"): (value["model"], value["effort"], value.get("service_tier")) for name, value in suite_routes(suite).items()}
+# Read-only history map. These names and models must never become new routes.
+LEGACY = {
+    "astra-engineer": ASTRA_MODEL,
+    "astra-explorer": ASTRA_MODEL,
+    "astra-worker": ASTRA_MODEL,
+    "astra-verifier": ASTRA_MODEL,
+    "terra-explorer": "gpt-5.6-terra",
+    "terra-worker": "gpt-5.6-terra",
+    "luna-worker": "gpt-5.6-luna",
+    "luna-verifier": "gpt-5.6-luna",
+    "luna-max-worker": "gpt-5.6-luna",
+    "gpt-engineer-lead": "gpt-5.6-sol",
+    "gpt-engineer-explorer": "gpt-5.6-terra",
+    "gpt-engineer-worker": "gpt-5.6-terra",
+    "gpt-engineer-verifier": "gpt-5.6-luna",
+    "sol_engineer": "gpt-5.6-sol",
+}
+LEGACY_ASTRA_CHILD_NAMES = frozenset(
+    {"astra-engineer", "astra-explorer", "astra-worker", "astra-verifier"}
+)
+
+
+def suite_routes(suite="all"):
+    if suite == "all":
+        return dict(ROLES)
+    if suite == "sol":
+        return {name: ROLES[name] for name in SOL}
+    if suite == "luna":
+        return {name: ROLES[name] for name in LUNA}
+    if suite == "astra":
+        raise ValueError("Astra is orchestrator-only; no Astra child suite exists")
+    raise ValueError("Unknown routing suite: " + str(suite))
+
+
+def expected_profiles(suite="all"):
+    return {
+        name.replace("-", "_"): (value["model"], value["effort"], value.get("service_tier"))
+        for name, value in suite_routes(suite).items()
+    }
+
 
 def historical_policy(role, created_at, dispatch_policy=None):
-    """Return exact model and retirement reason; never infer economy authorization."""
+    """Return recorded policy for an old route without inventing loaded-version evidence."""
     if not isinstance(role, str):
         return None, None
-    if role in LEGACY:
-        return LEGACY[role], "retired GPT Engineer profile used after native-first migration" if created_at >= LEGACY_RETIREMENT.timestamp() else None
-    if role == "sol_engineer":
+    normalized = role.replace("_", "-")
+    if normalized in LEGACY:
+        retired = dispatch_policy == "gpt6"
+        if normalized.startswith("gpt-engineer-") and created_at >= LEGACY_RETIREMENT.timestamp():
+            retired = True
+        reason = "retired child profile under the asserted GPT-6 routing policy" if retired else None
+        return LEGACY[normalized], reason
+    if normalized == "sol-engineer":
         if dispatch_policy in ("same-model", "mixed-model"):
             return "gpt-5.6-sol", None
-        return "gpt-5.6-sol", "retired Sol profile used after Astra migration" if created_at >= MIGRATION.timestamp() else None
-    current = ROLES.get(role.replace("_", "-"))
-    return (current["model"], None) if current else (None, None)
+        retired = dispatch_policy == "gpt6" or (
+            isinstance(created_at, (int, float)) and created_at >= MIGRATION.timestamp()
+        )
+        return "gpt-5.6-sol", "retired legacy Sol profile; use a GPT-6 Sol/Luna role" if retired else None
+    current = ROLES.get(normalized)
+    if current:
+        return current["model"], None
+    return None, None
