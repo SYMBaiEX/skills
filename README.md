@@ -38,6 +38,8 @@ servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and ap
   research, implementation, verification, and gap-closing loop until the outcome is complete.
 - [`skills/symbaiex-agent-enrollment/`](skills/symbaiex-agent-enrollment/) — enroll and operate a
   user-directed SYMBaiEX agent with locally held Ed25519 credentials.
+- [`skills/symbaiex-docs-mcp/`](skills/symbaiex-docs-mcp/) — search and read public, read-only
+  SYMBaiEX developer documentation over MCP, separate from authenticated product operations.
 - [`skills/symbaiex-evidence-search/`](skills/symbaiex-evidence-search/) — search bounded public
   evidence and editorial records through the published REST or MCP contracts.
 - [`skills/symbaiex-claim-verification/`](skills/symbaiex-claim-verification/) — verify stored claims
@@ -69,11 +71,14 @@ Install the SYMBaiEX platform skills with Bun:
 
 ```bash
 bunx skills add SYMBaiEX/skills --skill symbaiex-agent-enrollment -y
+bunx skills add SYMBaiEX/skills --skill symbaiex-docs-mcp -y
 bunx skills add SYMBaiEX/skills --skill symbaiex-evidence-search -y
 bunx skills add SYMBaiEX/skills --skill symbaiex-claim-verification -y
 bunx skills add SYMBaiEX/skills --skill symbaiex-research-jobs -y
 bunx skills add SYMBaiEX/skills --skill symbaiex-webhooks -y
 ```
+
+Installing `symbaiex-docs-mcp` with the Skills CLI installs its instructions; it does not configure an MCP connection. To use `docs_search`, `docs_list`, and `docs_get`, configure a Streamable HTTP server named `symbaiex-docs` in your selected agent with the public endpoint `https://www.symbaiex.com/api/docs/mcp`. The exact entry is in [`mcp.json`](mcp.json); copy it into your agent's MCP settings if your host does not load Agent Plugins manifests. The docs server is read-only and requires no credential. Do not configure the separate `symbaiex-evidence` server unless you intend to use its authenticated product tools.
 
 Install the portable GPT Engineer core for Codex and Claude Code. Native model selectors do not
 require Python or custom profile registration:
