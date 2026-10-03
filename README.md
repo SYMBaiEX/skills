@@ -1,5 +1,7 @@
 # skills
 
+[![Skills.sh installs](https://skills.sh/b/symbaiex/skills)](https://skills.sh/symbaiex/skills)
+
 Public [Agent Skills](https://agentskills.io/home) — portable `SKILL.md` capability packages that
 work across Claude Code, Codex, Cursor, and other Skills-compatible agents.
 
