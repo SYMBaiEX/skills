@@ -12,6 +12,11 @@ servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and ap
 
 ## Skills
 
+- [skills/image-prompting/](skills/image-prompting/) — write and refine image prompts, with
+  GPT Image 2.5 guidance for composition, text, references, and controlled edits.
+- [skills/video-prompting/](skills/video-prompting/) — write model-specific video prompts for
+  Alibaba Wan 3.0 and ByteDance Seedance 2.0/2.5, including shot timing, motion, references, and
+  audio direction.
 - [`skills/gpt-engineer/`](skills/gpt-engineer/) — model-aware engineering from research through
   verified delivery. Astra is parent-only; GPT-6 Sol and Luna are its child routes. Preserve the
   selected parent, including GPT-5.6 sessions during rollout, and delegate when independent work
@@ -66,6 +71,14 @@ npx skills add SYMBaiEX/skills --skill gpt-orchestration -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration-build -y
 npx skills add SYMBaiEX/skills --skill gpt-orchestration-auto -y
 ```
+
+Install the visual-prompting skills for Codex and Claude Code:
+
+~~~bash
+npx skills add SYMBaiEX/skills \
+  --skill video-prompting image-prompting \
+  --agent codex claude-code --global --yes
+~~~
 
 Install the SYMBaiEX platform skills with Bun:
 
