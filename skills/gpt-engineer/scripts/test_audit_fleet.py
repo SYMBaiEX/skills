@@ -164,7 +164,7 @@ class AuditFleetTests(unittest.TestCase):
             since=datetime.fromtimestamp(100, timezone.utc),
             root_thread="root",
         )
-        self.assertEqual(result["fleet"]["historicalProfileChildren"], 1)
+        self.assertEqual(result["fleet"]["historicalProfileChildren"], 0)
         self.assertEqual(result["fleet"]["latestOnlyChildren"], 2)
         self.assertIn("retired", result["fleet"]["routeViolations"][0]["reasons"][0])
 

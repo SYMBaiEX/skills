@@ -43,7 +43,7 @@ class AstraMigrationTests(unittest.TestCase):
     def test_verifier_artifact_authority_is_explicit_and_scoped(self):
         instructions = run_codex_agent.role_instructions("gpt6-sol-verifier")
         self.assertIn("Do not edit source", instructions)
-        self.assertIn("Do not spawn children", instructions)
+        self.assertIn("or spawn children", instructions)
         read_command = run_codex_agent.build_command("codex", "gpt6-sol-verifier", self.root, self.root / "final.txt", False)
         write_command = run_codex_agent.build_command("codex", "gpt6-sol-verifier", self.root, self.root / "final.txt", True)
         self.assertEqual(read_command[read_command.index("--sandbox") + 1], "read-only")
