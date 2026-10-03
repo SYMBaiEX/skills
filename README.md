@@ -38,6 +38,8 @@ servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and ap
   research, implementation, verification, and gap-closing loop until the outcome is complete.
 - [`skills/symbaiex-agent-enrollment/`](skills/symbaiex-agent-enrollment/) — enroll and operate a
   user-directed SYMBaiEX agent with locally held Ed25519 credentials.
+- [`skills/symbaiex-docs-mcp/`](skills/symbaiex-docs-mcp/) — search and read public, read-only
+  SYMBaiEX developer documentation over MCP, separate from authenticated product operations.
 - [`skills/symbaiex-evidence-search/`](skills/symbaiex-evidence-search/) — search bounded public
   evidence and editorial records through the published REST or MCP contracts.
 - [`skills/symbaiex-claim-verification/`](skills/symbaiex-claim-verification/) — verify stored claims
@@ -69,6 +71,7 @@ Install the SYMBaiEX platform skills with Bun:
 
 ```bash
 bunx skills add SYMBaiEX/skills --skill symbaiex-agent-enrollment -y
+bunx skills add SYMBaiEX/skills --skill symbaiex-docs-mcp -y
 bunx skills add SYMBaiEX/skills --skill symbaiex-evidence-search -y
 bunx skills add SYMBaiEX/skills --skill symbaiex-claim-verification -y
 bunx skills add SYMBaiEX/skills --skill symbaiex-research-jobs -y

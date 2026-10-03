@@ -1,0 +1,4 @@
+interface:
+  display_name: "SYMBaiEX Docs MCP"
+  short_description: "Search read-only SYMBaiEX developer docs"
+  default_prompt: "Use $symbaiex-docs-mcp to find current SYMBaiEX API or MCP integration guidance."
