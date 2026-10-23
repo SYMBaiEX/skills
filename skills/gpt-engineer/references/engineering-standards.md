@@ -141,7 +141,7 @@ as a new baseline until comparable outcome evidence establishes its effects.
 
 ## Official sources
 
-- Astra model and prompt guidance: https://developers.openai.com/api/docs/guides/latest-model
+- GPT-6 model and prompt guidance: https://developers.openai.com/api/docs/guides/latest-model
 - Codex subagents and custom agents: https://learn.chatgpt.com/docs/agent-configuration/subagents
 - Codex instruction layering: https://learn.chatgpt.com/docs/agent-configuration/agents-md
 - Codex code review: https://learn.chatgpt.com/docs/code-review

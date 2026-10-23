@@ -18,7 +18,7 @@ servers. Read [`AGENTS.md`](AGENTS.md) for the repository-wide credential and ap
   Alibaba Wan 3.0 and ByteDance Seedance 2.0/2.5, including shot timing, motion, references, and
   audio direction.
 - [`skills/gpt-engineer/`](skills/gpt-engineer/) — model-aware engineering from research through
-  verified delivery. Astra is parent-only; GPT-6 Sol and Luna are its child routes. Preserve the
+  verified delivery. Astra is parent-only; GPT-6.1 Sol and GPT-6 Luna are its child routes. Preserve the
   selected parent, including GPT-5.6 sessions during rollout, and delegate when independent work
   saves time or adds useful review. Includes proportionate tests, explicit same/mixed-model routes,
   private durable run journals, outcome measurement, and task-owned cleanup. Native Codex is the
@@ -134,13 +134,13 @@ The unsupported Luna catalog-creation path has been removed. The recovery tool c
 disable the old managed setting, never create/refresh an override or enable Fast. Prefer stock
 native routing; retain the guarded CLI adapter for an evidenced compatibility/isolation gap.
 
-GPT Engineer 2.2 keeps GPT-6 Astra parent-only and routes children exclusively to GPT-6 Sol or
-GPT-6 Luna. Sol is the starting choice for demanding, ambiguous lanes; Luna for focused,
-repeatable work. Preserve the selected parent, including a GPT-5.6 parent still in use during the
-rollout; delegation from a 5.6 parent must explicitly route to GPT-6 Sol or Luna. Under an Astra
-parent, choose an explicit Sol/Luna child; under Sol or Luna, same-model is the default. Unknown
-metadata is not guessed, and parent hook fields are not child attestation. The generic CLI adapter
-accepts only GPT-6 Sol/Luna child routes and records the observed parent separately.
+GPT Engineer 2.3 uses GPT-6.1 Sol for demanding children and GPT-6 Luna for focused work.
+GPT-6 Sol child presets are retired; upgrade removes only exact managed copies and preserves
+customized files for review. Preserve the selected parent; 6.1 Sol/Luna parents use same-model
+children by default, while Astra and older parents require explicit mixed-model selection.
+Named custom-agent model/effort settings take precedence over spawn settings. Codex Ultra and API
+reasoning levels are distinct controls. The skill does not enable paid speed tiers. Historical
+trace identities remain interpretable without keeping retired active routes.
 See [model routing](skills/gpt-engineer/references/model-routing.md) and the
 [capability/install/evaluation matrix](skills/gpt-engineer/references/runtime-integrations.md).
 See [runtime choices and API compatibility](skills/gpt-engineer/references/dynamic-workflows.md)
@@ -155,10 +155,13 @@ explicit init. Command evidence and fleet outcome analysis are separate, fail-cl
 python3 ~/.agents/skills/gpt-engineer/scripts/run_journal.py --help
 python3 ~/.agents/skills/gpt-engineer/scripts/cache_gates.py --help
 python3 ~/.agents/skills/gpt-engineer/scripts/join_fleet_outcomes.py --help
+python3 ~/.agents/skills/gpt-engineer/scripts/audit_traces.py --help
 ```
 
-These tools store normalized lifecycle, requirement, gate, and outcome evidence—not raw prompts,
-responses, reasoning, child transcripts, stderr, or telemetry logs.
+The journal and outcome tools store normalized lifecycle, requirement, gate, and outcome evidence.
+The read-only trace audit streams local records and emits aggregate diagnostics, with explicit
+retention and attribution limits. Raw transcripts and private trace reports do not belong in public
+release evidence. See the [2.3 migration notes](skills/gpt-engineer/references/release-2.3.0.md).
 
 Install and register the Codex-only Spark fleet separately:
 

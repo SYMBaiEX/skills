@@ -40,12 +40,27 @@ class BootstrapCodexTests(unittest.TestCase):
                 "gpt6-luna-explorer.toml",
                 "gpt6-luna-verifier.toml",
                 "gpt6-luna-worker.toml",
-                "gpt6-sol-engineer.toml",
-                "gpt6-sol-explorer.toml",
-                "gpt6-sol-verifier.toml",
-                "gpt6-sol-worker.toml",
+                "gpt61-sol-engineer.toml",
+                "gpt61-sol-explorer.toml",
+                "gpt61-sol-verifier.toml",
+                "gpt61-sol-worker.toml",
             ],
         )
+
+    def test_sol61_hooks_cover_every_registered_profile(self) -> None:
+        import re
+        import routes
+        self.assertEqual(self.run_bootstrap().returncode, 0)
+        hooks = json.loads((self.root / ".codex" / "hooks.json").read_text())
+        matcher = hooks["hooks"]["SubagentStart"][0]["matcher"]
+        script = self.root / ".codex" / "hooks" / "gpt_engineer_subagent_context.py"
+        for role in routes.ROLES:
+            name = role.replace("-", "_")
+            self.assertIsNotNone(re.fullmatch(matcher, name))
+            result = subprocess.run(["python3", str(script)],
+                                    input=json.dumps({"hook_event_name": "SubagentStart", "agent_type": name}),
+                                    capture_output=True, text=True, check=True)
+            self.assertIn(name, json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"])
 
     def test_merges_existing_hooks_without_losing_them(self) -> None:
         hooks_path = self.root / ".codex" / "hooks.json"

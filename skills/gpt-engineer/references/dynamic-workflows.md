@@ -1,5 +1,7 @@
 # Dynamic engineering workflows
 
+Documentation reviewed October 23, 2026.
+
 Start with direct execution in the selected parent model. Add independent children only when their work shortens the
 critical path or adds useful review. A large task or a strong model alone does not decide topology.
 
@@ -56,35 +58,45 @@ work or capacity, and writers. Re-plan in Broad when it is not justified. Defaul
 requirements remain as described in the main skill; Team is the stricter experiment. More model
 capacity does not justify more agents, and no mode requires filling all slots.
 
-## Astra features for API controllers
+## Current capabilities for API controllers
 
 These are implementation choices for an actual API application. Feature-detect them; do not add API
 fields to Codex tools or claim a local skill enabled server features.
 
-- **Async tools:** `async: true` applies to application-run function/custom tools. Start each job
+- **Async tools:** documented for GPT-6 Astra and later supported models; verify compatibility
+  for the selected endpoint/model. `async: true` applies to application-run function/custom tools. Start each job
   once, retain its original `call_id` and unique task handle, and return results to those calls.
   The app owns pending work, cancellation and recovery. Async does not apply to hosted tools or
   Programmatic Tool Calling; in Responses Multi-agent, do not combine it with parallel tool calls.
-- **Steering:** Astra WebSocket steering queues additional input into a continuation. Acceptance
+- **Steering:** GPT-6 WebSocket steering queues additional input into a continuation. Acceptance
   does not undo started actions. Reconcile accepted input and pending tools on reconnect; do not
   resend accepted steering or launch duplicate work. Preserve the continuing user goal.
 - **Reasoning changes:** `configuration_update` preserves cache while changing effort only in
-  Astra standard single-agent Responses. Keep request-level effort unchanged, avoid adjacent
+  GPT-6-family standard single-agent Responses. Keep request-level effort unchanged, avoid adjacent
   updates, and do not combine with automatic compaction/truncation or `/responses/compact`.
   Explicit `compaction_trigger` is supported; reapply effort afterward. The response's reported
   request-level effort does not attest the active update.
-- **Responses migration:** tool calling requires Responses. Remove temperature, top_p and
-  top_logprobs; also Chat Completions logprobs and Responses output-logprobs include. Replace
-  none/minimal with low. EU data residency excludes Astra Fast/priority processing.
+- **Responses migration:** Astra and 6.1 Sol tool calling requires Responses; replace their
+  unsupported none/minimal efforts with low. With reasoning enabled, remove temperature, top_p,
+  top_logprobs, Chat Completions logprobs, and Responses output-logprobs include. Luna supports
+  none, including Chat Completions function calling at none; do not apply Sol's effort prohibition
+  to Luna. 6.1 Sol Fast/Ultrafast support US/EU residency; Astra's do not support EU residency.
 - **Caching:** preserve stable message/tool prefixes and append deltas; avoid gratuitous schema,
-  tool ordering or prompt rewrites. GPT-5.6+ supports `prompt_cache_options.ttl: "30m"` and explicit
-  cache boundaries. Cache writes and reads have distinct billing; a high hit rate alone is not
-  task efficiency. Use current diagnostics when API cache misses are a measured bottleneck.
+  tool ordering or prompt rewrites. Supported models expose `prompt_cache_options.ttl: "30m"` (default) or `"12h"`
+  and explicit cache boundaries. Cache writes cost 1.25x input for 30m or 2.5x for 12h;
+  these are total write rates, not additive surcharges. Adopt longer retention only for measured
+  reuse, not as a default optimization. 6.1 Sol cache reads are 5% of uncached input; a high hit rate alone is not
+  task efficiency. Preserve useful stable prefixes: shortening a cacheable prefix below the cache
+  minimum can increase cost. Use current diagnostics when API cache misses are a measured bottleneck.
 - **Safeguards:** surface actual safety/approval interruptions as their own outcomes, preserve
   completed evidence, and follow the runtime's review path. Do not retry a denied action as a
   different model or classify a review stop as an ordinary transient error.
 
-Responses Multi-agent defaults to three concurrent descendants across the tree, excluding the root;
+Responses Multi-agent beta explicitly supports 6.1 Sol and documented GPT-5.6 models; native
+Codex model availability does not establish Responses Multi-agent support. Its children share
+the request model/tools, so it cannot implement mixed-model native routing. It uses automatic
+per-agent compaction and does not support `reasoning.summary`, `max_tool_calls`, or
+`/responses/compact`. It defaults to three concurrent descendants across the tree, excluding the root;
 Agents API's separate default is six. Do not transfer one runtime's limits to another. Responses
 hosted collaboration actions are server-managed, while application function calls remain yours.
 WebSocket result injection needs accepted/failed/completed-race handling. API mode does not isolate
@@ -110,7 +122,7 @@ to compare accepted results, time, rework and usage with the historical baseline
 
 ## Official sources
 
-- [Astra guidance](https://developers.openai.com/api/docs/guides/latest-model)
+- [GPT-6 guidance](https://developers.openai.com/api/docs/guides/latest-model)
 - [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk)
 - [Runtime comparison](https://developers.openai.com/api/docs/guides/agents#compare-agent-runtimes)
 - [Agents API](https://developers.openai.com/api/docs/guides/agents-api/overview)

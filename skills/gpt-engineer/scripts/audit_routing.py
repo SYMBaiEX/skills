@@ -317,7 +317,7 @@ def audit(
             policy = (
                 "Astra is orchestrator-only"
                 if normalized_name in LEGACY_ASTRA_CHILD_NAMES
-                else "GPT Engineer child routing now uses only GPT-6 Sol or GPT-6 Luna"
+                else "GPT Engineer child routing now uses GPT-6.1 Sol or GPT-6 Luna"
             )
             violations.append(
                 f"{scope} profile {path} still exposes a retired GPT Engineer child route; {policy}"
@@ -378,7 +378,7 @@ def audit(
             violations.append(f"observed unsupported agent type in pinned-suite mode: {name}")
         elif model not in CHILD_MODELS:
             violations.append(
-                f"observed child route for {name} used {model or '(missing)'}; children must use GPT-6 Sol or GPT-6 Luna"
+                f"observed child route for {name} used {model or '(missing)'}; children must use GPT-6.1 Sol or GPT-6 Luna"
             )
         elif model != expected[0]:
             violations.append(
@@ -431,7 +431,7 @@ def main(argv: list[str] | None = None) -> int:
         metavar="AGENT_TYPE=MODEL[:EFFORT]",
         help="Validate effective child metadata exported by the runtime; repeat for each child",
     )
-    parser.add_argument("--suite", choices=("all", "sol", "luna"), default="all")
+    parser.add_argument("--suite", choices=("all", "sol61", "luna"), default="all")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
     args = parser.parse_args(argv)
 

@@ -1,8 +1,8 @@
 # Fleet observability
 
-For the current contract, `audit_fleet.py --dispatch-suite gpt6` asserts that active GPT Engineer
-children use GPT-6 Sol or GPT-6 Luna and never Astra. It does not attest parent-child equality.
-Preserve `astra`/`economy` only for explicitly identified historical cohorts. A timestamp or
+For the current contract, `audit_fleet.py --dispatch-suite gpt61` asserts that active GPT Engineer
+children use GPT-6.1 Sol or GPT-6 Luna and never Astra. It does not attest parent-child equality.
+Preserve `gpt6` (2.2 Sol/Luna), `astra`, and `economy` only for explicitly identified historical cohorts. A timestamp or
 currently installed skill version cannot establish which policy an old run loaded; an old Astra
 child route without dispatch evidence is historical, not automatically a confirmed violation.
 
@@ -46,8 +46,8 @@ command retries, compactions, or finding acceptance from the three SQLite summar
 its output with runner `result.json` lifecycle envelopes and targeted rollout analysis when those
 metrics matter.
 
-Use `--dispatch-suite gpt6` only when the selected audit window is known to have loaded the current
-policy. Use `astra` or `economy` solely for known v2.1 historical routing, not as current choices.
+Use `--dispatch-suite gpt61` only when the selected audit window is known to have loaded the current
+policy. Use `gpt6` solely for known 2.2 routing, or `astra`/`economy` for known v2.1 routing, not as current choices.
 Omission preserves historical interpretation; pre-existing Sol/Astra records are not reclassified
 by release date alone.
 
@@ -65,6 +65,31 @@ The joiner hashes identifiers by default, diagnoses ambiguous IDs and retention 
 dispatch, route, result-envelope, projected, OTel-covered, and accepted-outcome denominators
 separate. It never treats a spawn edge or OTel row as an accepted engineering outcome. Read
 [`run-journal.md`](run-journal.md) for the journal, cache, resume, privacy, and retention contract.
+
+## Audit retained tool and context activity
+
+For a broad maintenance review, stream all locally retained sessions and state-referenced rollouts:
+
+```bash
+python3 scripts/audit_traces.py \
+  --since 2026-09-22T16:54:37-05:00 \
+  --until 2026-10-23T13:24:06-05:00 \
+  --exclude-thread <current-audit-root-id> \
+  --output /private/path/trace-review.json
+```
+
+Timestamps need explicit timezones. The window is inclusive/exclusive. Exclusion follows registered
+spawn descendants, so the maintenance run does not inflate its own baseline. The command reads
+stores in read-only mode, includes resumed older files, and emits aggregate counts rather than raw
+transcripts or IDs. Keep reports private. Missing registry paths across all history are a separate
+denominator from window-active threads; diagnostic retention can cover much less than the window.
+
+Stable event deduplication handles copied history; projected ownership is required for the partial
+cumulative token deltas. Initial baselines are omitted and missing evidence stays unavailable.
+Static `tools.*` references inside orchestration code are candidates, not executed-call counts.
+Likewise repetition, error/truncation markers, and skill-read matches require targeted corroboration.
+A read command is not proof of successful skill loading or its version. Do not attribute every
+observed session to GPT Engineer or report token aggregates as account billing.
 
 ## Keep denominators separate
 
@@ -84,7 +109,7 @@ projection gaps, not that a dispatch did no work. A spawn edge with status `open
 not proof that an operating-system process is still alive.
 
 Keep current GPT Engineer profiles, retired GPT Engineer profiles, and unattributed specialist
-children separate. Current cohorts are GPT-6 Sol and GPT-6 Luna; Astra is an allowed parent but
+children separate. Current cohorts are GPT-6.1 Sol and GPT-6 Luna; Astra is an allowed parent but
 never a child. Keep historic Astra-child and GPT-5.6 cohorts for longitudinal comparison; the
 public release date does not prove when a running task loaded the new skill. Validate the exact
 model assigned to each known role. A child outside the GPT Engineer profile catalog may come from
@@ -161,7 +186,7 @@ fleet size. Use the same task and acceptance contract, record coordination/synth
 duplicated findings and rework. Correctness tests for the migration do not establish a latency or cost
 win. Keep original model, effort, runtime, and loaded skill policy/version evidence. Existing
 GPT-5.6 Sol/Terra/Luna parent sessions may continue during rollout, but those models are not current
-GPT Engineer child routes; the child allowlist is GPT-6 Sol/Luna only.
+GPT Engineer child routes; the child allowlist is GPT-6.1 Sol/Luna only.
 
 Use a Broad read ceiling of six as the default experiment, not a permanent conclusion. A qualified
 Team read wave may compare seven or eight lanes against Broad, but it must measure accepted findings,

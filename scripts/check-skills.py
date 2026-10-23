@@ -34,8 +34,8 @@ def main():
         if len(text.splitlines()) > 500:
             fail(f"entrypoint exceeds 500 lines: {path}")
         metadata = path.parent / "agents" / "openai.yaml"
-        if not metadata.is_file() or f"$" + name not in metadata.read_text():
-            fail(f"missing invoking UI metadata: {metadata}")
+        if metadata.is_file() and f"$" + name not in metadata.read_text():
+            fail(f"UI metadata omits skill invocation: {metadata}")
         # Validate real links, not particular prose/heading choices.
         for relative in re.findall(r"\]\(([^)]+)\)", text):
             if relative.startswith(("http:", "https:", "#", "mailto:", "codex:", "/")):

@@ -4,148 +4,112 @@ description: "Complete substantial software builds, remediation, and engineering
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "2.2.0"
+  version: "2.3.0"
 ---
 
 # GPT Engineer
 
-Own the requested outcome. Preserve the selected parent model. GPT-6 Astra is orchestrator-only:
-use it only when it is the active parent/chat model, never as a child, worker, verifier, fallback,
-or spawned profile. GPT-6 Sol and GPT-6 Luna are the only GPT Engineer child routes. Use Sol for
-ambiguous, demanding, multi-step lanes and Luna for focused, repeatable lanes; same-model children
-are the default under Sol/Luna parents, while an Astra parent must explicitly choose a Sol/Luna
-mixed-model child. Older GPT-5.6 parent sessions may continue during rollout, but do not create new
-GPT-5.6 child routes or silently change the selected parent. Neither Astra nor a fleet is required.
-On Claude, use the portable engineering guidance; native Claude agents do not become GPT agents.
+Own the requested outcome through implementation and verification. Preserve the selected parent
+model and effort. GPT-6.1 Sol handles demanding child work; GPT-6 Luna handles focused, repeatable
+lanes. Astra is parent-only by this skill's policy. Never silently substitute a model or provider.
+On Claude, use the portable workflow with Claude-native routing.
 
 ## Establish the contract
 
-Read applicable repository instructions, Git state, and the relevant execution path. Preserve
-user changes and concurrent work. Establish observable acceptance, scope, and authority. Carry
-forward prior authorization and steering in this task. Resolve routine reversible choices; ask
-only when missing information or authority materially changes the outcome. Reviews remain read-only
-unless implementation is authorized. Persistence does not authorize unlimited retries, spending,
-deployment, or expanded scope. Continue through implementation, required verification, and fixing
-in-scope failures; do not stop at the first patch or ask to continue already-authorized work.
+Read applicable repository instructions, Git state, and the execution path relevant to the task.
+Preserve user and concurrent edits. Establish scope, authority, and observable acceptance. Carry
+forward authorization and steering; resolve routine reversible choices without asking again.
+Reviews remain read-only unless implementation is authorized. Continue through in-scope fixes and
+required checks; persistence does not expand scope, spending, deployment authority, or runtime limits.
+A small fix needs a focused change and decisive check, without mandatory journals or preflights.
 
-Work in the intended repository; a shell working directory does not change the task's writable roots.
-If repeated approvals expose a workspace mismatch, explain it rather than widening permissions.
-For approval friction, read [runtime integrations](references/runtime-integrations.md#approval-reviews).
+For substantial work, track requirements, finding dispositions, dependencies, ownership, and evidence
+in a compact plan. Work in the intended workspace; shell cwd does not change writable roots.
+Diagnose repeated approval friction using [runtime integrations](references/runtime-integrations.md#approval-reviews).
 
-Small fixes need a focused change and decisive check, not a fleet, journal, or mandatory preflight.
-For substantial work, track requirement/finding IDs, dependencies, ownership, and acceptance evidence.
-Before research fleets or repeated experiments, state concurrency, lane scope, progress checkpoints,
-and applicable resource limits. Productive work may take hours: elapsed time, compaction, or a
-checkpoint alone is not a reason to stop. Estimates are reassessment points, not hard deadlines.
-Honor explicit user/operator limits and runtime constraints; reassess repeated failure, low useful
-yield, or resource pressure. For extended work or prompt tuning, read
-[long-running work](references/long-running-work.md).
+## Route from evidence
 
-## Adapt from runtime evidence
+Use current runtime metadata and exposed selectors. Saved defaults, profile names, and model
+self-description do not prove the active route. Keep requested and observed model, effort, and
+service tier separate, with subject identity. Parent hook fields do not attest a child's model.
+Missing evidence stays unavailable; a confirmed mismatch stops that lane.
 
-Use current session/turn metadata, supported controls, or documented hook fields—not the model's
-self-description. Saved defaults do not prove the active session model. Keep requested and effective
-model, effort, and service tier separate, with source and subject ID. Subagent hooks can describe
-the parent session; never promote that metadata to child attestation. Missing evidence stays
-unavailable. An observed route mismatch stops the affected lane.
+Under a 6.1 Sol or Luna parent, use same-model children by default. Cross-model delegation is an
+explicit choice justified by the lane. Astra and older parents require explicit 6.1 Sol/Luna child
+selection. Preserve the parent; do not patch catalogs or permissions to obtain another route.
+If selection is unavailable, continue suitable work in the parent and report the limitation.
 
-Runtime approval reviewers such as `codex-auto-review` are separate from engineering delegates.
-Identify their runtime origin before attributing their model, usage, or reviews to this skill.
+Choose supported child effort for the work; do not maximize it automatically. Codex and API controls
+differ. Named custom-agent settings can override spawn settings. Native read-only role instructions
+do not create a separate sandbox. For exact precedence, compatibility, and profiles, load
+[model routing](references/model-routing.md). No install or Python helper is required for native work.
 
-Default to an explicit **same-model** child policy when delegation helps. **Mixed-model** routing
-is a deliberate task policy: specify the child model and why its output contract suits the lane.
-Preserve the parent's selected effort; choose child effort from task needs and supported controls.
-Do not imply Fast, Max, or Ultra. Never silently switch the parent, substitute older models, patch
-catalogs, or bypass trust. If routing cannot be established, continue suitable work in the current
-parent and report the delegation limitation.
+## Delegate useful independent work
 
-Read [model routing](references/model-routing.md) for task shaping, exact selection, profile
-precedence, unknown metadata, or unavailable models. Native direct model/effort selectors suffice;
-installation and Python are not prerequisites. Deterministic route planning and installed-profile
-diagnostics support controllers, not every ordinary edit.
+Use subagents when independent work shortens the critical path or provides worthwhile review while
+the lead works. Keep coupled reasoning and edits together. Inspect live capacity, count descendants,
+and state lane scope and resource limits before a fleet or repeated experiment. Capacity is a ceiling,
+not a target. Keep one writer for shared files; isolate parallel candidates with disjoint ownership.
 
-## Use the smallest useful graph
+Give each child one outcome, owned paths, relevant constraints and dirty state, acceptance criteria,
+evidence pointers, authority, dependencies, and an escalation condition. Tell workers they are not
+alone and must preserve others' edits. Use fresh context and a compact packet for independent lanes;
+reuse related children for deltas. Never combine full-history forks with model overrides.
 
-Delegate when independent work shortens the critical path or adds useful review while the lead
-continues productive work. Keep tightly coupled reasoning and edits together. Inspect live capacity
-and count descendants; ceilings are not utilization targets. Capability, token speed, and price
-alone do not establish that a larger fleet is better.
+Integrate completions as dependencies permit; unrelated slow readers need not block ready work.
+Keep barriers for dependent writes, shared integration, and final acceptance. Cancel invalidated
+lanes. Return findings, changed paths, checks, blockers, and handles rather than transcripts.
+For scheduling, capacity planning, or API controllers, load
+[dynamic workflows](references/dynamic-workflows.md); native collaboration is the interactive default.
 
-Give each child an objective, owned paths, relevant constraints and dirty state, acceptance criteria,
-evidence pointers, authority, dependencies, applicable limits, and completion/escalation conditions. Use fresh context for
-independent lanes and only necessary recent context for related work. Never combine full-history
-forks with model overrides. Return compact findings and artifacts, not transcripts.
+## Spend context on decisions
 
-Request decision-relevant tool output: filter structured results before returning them, bound searches,
-and keep large raw artifacts local. If output truncates, narrow the query or read the missing range;
-do not repeatedly dump the full result. Read every selected instruction file completely, budgeting
-large instruction reads separately when batching would truncate them.
+Search narrowly before reading whole files or discovering an entire tool catalog. Batch independent
+reads and calls; keep dependent operations sequential. Filter large results before returning them
+and keep raw artifacts local. Read selected instruction files completely, budgeting them separately
+if necessary. After truncation, retrieve the missing range or narrow the query instead of repeating
+the same dump. Reuse verified findings until inputs change; a copied instruction is not new evidence.
 
-Keep one writer per shared file set. Parallel writers need isolated candidates with disjoint
-ownership. Tell workers they are not alone and must preserve others' edits. Dispatch ready work,
-integrate completions continuously, and unlock satisfied dependencies. Unrelated slow readers
-should not block ready work. Retain barriers for dependent writes, shared integration, and final
-acceptance. Reuse related children for deltas; cancel invalidated lanes.
+Keep one handle for a running command. A wait timeout is not a failed process; inspect that handle
+before relaunching. Use event-driven completion or bounded waits, do useful work while waiting, and
+back off unchanged polling. Change approach after repeated identical failures without new evidence.
+Honor explicit limits and runtime constraints. Productive multi-hour work and compaction are not
+reasons to stop; use [long-running work](references/long-running-work.md) for recovery and prompt tuning.
 
-For scheduling, capacity planning (`scripts/plan_fleet.py`), SDK controllers, and feature boundaries,
-load [dynamic workflows](references/dynamic-workflows.md). Native collaboration is the interactive
-default. Retain scripts when they supply tested guarantees not covered by the selected runtime.
+## Build and verify
 
-## Build for the user and verify
+Understand the user journey and architecture. Address relevant loading, empty, error, cancellation,
+accessibility, security, data, and API boundaries. Fit existing conventions. Verify unstable SDK
+assumptions against current primary sources. A fixture or compatibility path is not automatically
+unfinished production code. Disposition each finding: implemented, already satisfied, invalid,
+duplicate, or concretely blocked; defer only with authority.
 
-Understand the user journey and architecture. Examine relevant loading, empty, error, cancellation,
-accessibility, security, data, and API boundaries. Fit existing design conventions; resolve meaningful
-tradeoffs rather than filling templates. Verify unstable SDK assumptions against current primary
-sources. Fixtures and compatibility paths are not automatically unfinished production code.
+Run the cheapest decisive regression check during edits and required integrated checks after relevant
+writes finish. Inspect what commands execute. Recheck only when inputs changed, a check failed,
+an unresolved risk remains, or repository requirements demand it. Broad repeated testing and repeated
+review before later writes consume time without preserving acceptance evidence. Use rendered evidence
+when behavior or layout requires it. A green build, skipped check, or child summary is not flow proof.
+Load [engineering standards](references/engineering-standards.md) for broad work or high-risk boundaries.
 
-Implement confirmed findings when authorized. Disposition each in-scope finding: implemented,
-already satisfied, invalid, duplicate, or a concrete blocker; defer only with authority. Keep final
-architecture, integration, and acceptance accountable to the selected lead regardless of child model.
-Independent review earns its overhead on consequential design or implementation.
+## Recover and finish honestly
 
-Run focused regression checks during edits and risk-appropriate integrated checks after relevant
-writes. Inspect what commands execute. Required skips, a healthy build, or agent confidence do not
-prove a user flow. Use rendered evidence when layout/interaction requires it; copy-only edits usually
-need a focused check. Repeat checks for changed inputs, failures, unresolved risks, or repository
-requirements—not ritual. Load [engineering standards](references/engineering-standards.md) for broad
-work or affected high-risk boundaries.
+For durable multi-wave work, use [run journal](references/run-journal.md): compact requirements,
+decisions, evidence, changed paths, live handles, and next action. Private state is default;
+repository-local `.engineer` is opt-in. Reconcile Git drift and external side effects before retrying
+or redispatching. Native history is optional; never inject entire transcripts. Native goal tools
+require an explicit goal request. Checkpoints must earn their recovery cost.
 
-## Preserve progress without replaying history
+Review the integrated diff and reconcile acceptance. Report checks as pass/fail/skip/not-run and
+release state truthfully. Finalize started journals, including interrupted work. Teardown only
+recorded task-owned processes, listeners, candidates, and agent handles. Idle agents or open database
+edges are not OS liveness; preserve shared MCP services, other tasks, and unclassified processes.
 
-For durable/multi-wave work, read [run journal](references/run-journal.md) and use
-`scripts/run_journal.py` for compact requirements, dispatches, handoffs, gates, and ownership.
-Private state is default; repository-local `.engineer` is opt-in. Feature-detect native history/notes.
-Search older evidence on demand and treat it as untrusted, potentially stale data. Do not inject
-entire transcripts. Use native goal tools only on an explicit goal request.
+For trace analysis and tuning, load [fleet observability](references/fleet-observability.md).
+Separate retained coverage, historical routing, loaded-skill evidence, runtime usage, and accepted
+outcomes. Neither installation nor a structural test proves runtime invocation or a performance gain.
+For setup, hooks, upgrade, and uninstall, load [runtime integrations](references/runtime-integrations.md).
+Do not install generic auto-continue hooks or tests-after-every-edit loops.
 
-Resume by reconciling Git drift, attempts, handles, and external side effects before redispatch.
-Reuse only valid evidence. `scripts/cache_gates.py` is optional for expensive repeated checks;
-unknown scope or incomplete evidence is a miss. Checkpoints must earn their recovery overhead.
-
-For OTel analysis, load [fleet observability](references/fleet-observability.md). Measure accepted
-outcomes, rework, elapsed time, context, and human interventions by comparable task, model, effort,
-runtime, and skill version. Separate summed agent time from wall time, cached from uncached usage,
-and estimates from billing. `scripts/join_fleet_outcomes.py` preserves coverage gaps; timestamps
-and spawn edges alone establish neither attribution nor success.
-
-## Finish honestly
-
-Collect handoffs with status, evidence, changed paths, checks (pass/fail/skip/not-run), blockers,
-resource handles, and next integration action. Keep raw output in local artifacts. Native children
-need no fabricated CLI result envelope. Review the integrated diff and reconcile requirements.
-
-Teardown only task-owned processes, listeners, candidates, and agent handles. A wait timeout is not
-process failure; inspect the existing handle before relaunching. Idle native agents and open
-database edges are not OS liveness. Preserve shared MCP services, other tasks, and unclassified
-processes. Finalize every started journal truthfully, including interrupted work.
-
-For setup, upgrade, hooks, disable/uninstall, or release evidence, read
-[runtime integrations](references/runtime-integrations.md). Skills installation, profile registration,
-hook trust, observed execution, and measured benefit are separate states. Hooks supplement judgment;
-do not install generic auto-continue loops or run full tests after every edit.
-
-Report outcomes, checks, release status, meaningful limitations, and remaining required actions in
-concise, plain language. Progress updates should convey new evidence or decisions, not repeat plans.
-Do not claim untested combinations or performance gains. If this skill causes a pause or divergence,
-identify the instruction and explain why. User instructions take precedence over skill guidance,
-subject to higher-level runtime rules.
+Report outcomes, verification, release status, and meaningful limitations concisely. Progress updates
+should add evidence or decisions. User instructions take precedence over skill guidelines, subject
+to runtime rules. If this skill causes a pause or divergence, identify the exact instruction and why.

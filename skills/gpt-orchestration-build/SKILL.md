@@ -4,7 +4,7 @@ description: "Implement an existing audit, issue set, review, or failing-test re
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "2.2.0"
+  version: "2.3.0"
 ---
 
 # GPT Orchestration Build
@@ -14,8 +14,8 @@ execution, not a separate model policy. Installation does not resolve a core dep
 profiles/hooks. If the core is unavailable, preserve the current parent and apply the bounded
 workflow below directly.
 
-Preserve the selected parent. GPT-6 Astra is parent/orchestrator-only and never a child. GPT-6 Sol
-and GPT-6 Luna are the only GPT Engineer child routes. Under Sol/Luna parents, same-model children
+Preserve the selected parent. GPT-6 Astra is parent/orchestrator-only and never a child. GPT-6.1 Sol
+and GPT-6 Luna are the only GPT Engineer child routes. Under 6.1 Sol/Luna parents, same-model children
 are the default; an Astra or existing GPT-5.6 parent requires an explicit mixed-model Sol/Luna
 route. A fleet is optional. Never silently substitute models or change provider.
 

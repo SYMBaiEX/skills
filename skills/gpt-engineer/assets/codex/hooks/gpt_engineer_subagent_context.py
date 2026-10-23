@@ -5,10 +5,10 @@ import sys
 
 ALLOWED_ROLES = frozenset(
     {
-        "gpt6_sol_engineer",
-        "gpt6_sol_explorer",
-        "gpt6_sol_worker",
-        "gpt6_sol_verifier",
+        "gpt61_sol_engineer",
+        "gpt61_sol_explorer",
+        "gpt61_sol_worker",
+        "gpt61_sol_verifier",
         "gpt6_luna_explorer",
         "gpt6_luna_worker",
         "gpt6_luna_verifier",

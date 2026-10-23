@@ -24,7 +24,7 @@ HISTORICAL_ROLES = {name.replace("-", "_") for name in LEGACY} | {"sol_engineer"
 CATALOG_ROLES = CURRENT_ROLES | HISTORICAL_ROLES
 LEGACY_ASTRA_ROLES = LEGACY_ASTRA_CHILD_NAMES
 LEGACY_ECONOMY_ROLES = {
-    name.replace("_", "-") for name in LEGACY
+    name.replace("_", "-") for name, model in LEGACY.items() if model.startswith("gpt-5.6-")
 } - LEGACY_ASTRA_ROLES
 # The native-first profile names shipped in this commit. Historical names stay
 # queryable for baselines but are not valid dispatch targets after this point.
@@ -197,7 +197,7 @@ def audit(
     root_thread: str | None = None,
     dispatch_suite: str | None = None,
 ) -> dict[str, object]:
-    if dispatch_suite not in (None, "gpt6", "astra", "economy", "same-model", "mixed-model"):
+    if dispatch_suite not in (None, "gpt61", "gpt6", "astra", "economy", "same-model", "mixed-model"):
         raise ValueError("Unknown dispatch suite")
     state_path = codex_home / "state_5.sqlite"
     history_path = codex_home / "thread_history_1.sqlite"
@@ -348,12 +348,13 @@ def audit(
         "history": all_history,
         "historyByProfileCohort": history_by_cohort,
         "routeCohorts": {
+            "gpt61Sol": sum(row["agent_role"].replace("_", "-").startswith("gpt61-sol-") for row in rows if row["agent_role"]),
             "gpt6Sol": sum(row["agent_role"].replace("_", "-").startswith("gpt6-sol-") for row in rows if row["agent_role"]),
             "gpt6Luna": sum(row["agent_role"].replace("_", "-").startswith("gpt6-luna-") for row in rows if row["agent_role"]),
             "astraLegacyChildren": sum(row["agent_role"].replace("_", "-") in LEGACY_ASTRA_ROLES for row in rows if row["agent_role"]),
             "legacy56Children": sum(row["agent_role"].replace("_", "-") in LEGACY_ECONOMY_ROLES for row in rows if row["agent_role"]),
             "historical": len(historical_rows),
-            "modelPolicy": "Astra is parent-only; GPT-6 Sol and Luna are the current child routes",
+            "modelPolicy": "Astra is parent-only; GPT-6.1 Sol and Luna are the current child routes",
         },
         "otelScope": {
             "rows": scoped_log_rows,
@@ -375,7 +376,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--since", help="ISO-8601 start time; defaults to seven days ago")
     parser.add_argument("--until", help="Exclusive ISO-8601 snapshot end; defaults to now")
     parser.add_argument("--root-thread", help="Limit the cohort to descendants of one root thread")
-    parser.add_argument("--dispatch-suite", choices=("gpt6", "astra", "economy", "same-model", "mixed-model"), help="Assert the selected current or historical policy; gpt6 strictly rejects retired child routes. Does not attest same-model parent equality.")
+    parser.add_argument("--dispatch-suite", choices=("gpt61", "gpt6", "astra", "economy", "same-model", "mixed-model"), help="Assert the selected current or historical policy; gpt61 allows current Sol 6.1/Luna profiles; gpt6 asserts historical v2.2 Sol 6/Luna profiles. Does not attest same-model parent equality.")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:
