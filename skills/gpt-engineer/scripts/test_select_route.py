@@ -18,6 +18,31 @@ class RouteTests(unittest.TestCase):
             self.assertEqual(result["spawn"], {"model": model, "reasoning_effort": "high", "fork_turns": "none"})
             self.assertEqual(result["effectiveChild"], {"model": None, "effort": None, "serviceTier": None})
 
+    def test_sol61_mixed_routes_and_runtime_effort_capabilities(self):
+        for parent, child in (("gpt-6-astra", "gpt-6.1-sol"),
+                              ("gpt-6.1-sol", "gpt-6-luna"),
+                              ("gpt-6-sol", "gpt-6.1-sol")):
+            value = request(parent)
+            value.update(policy="mixed-model", child={"model": child, "effort": "medium"})
+            result = plan(value)
+            self.assertEqual(result["parent"]["effectiveModel"], parent)
+            self.assertEqual(result["spawn"]["model"], child)
+        value = request("gpt-6.1-sol")
+        value["child"] = {"effort": "ultra"}
+        self.assertEqual(plan(value)["action"], "parent-only")
+        value["capabilities"]["efforts"]["gpt-6.1-sol"].append("ultra")
+        self.assertEqual(plan(value)["spawn"]["reasoning_effort"], "ultra")
+
+    def test_retired_sol_parent_requires_explicit_mixed_route(self):
+        with self.assertRaises(ValueError):
+            plan(request("gpt-6-sol"))
+        value = request("gpt-6-sol")
+        value.update(policy="mixed-model", child={"model": "gpt-6.1-sol", "effort": "medium"})
+        self.assertEqual(plan(value)["parent"]["effectiveModel"], "gpt-6-sol")
+        value["child"]["model"] = "gpt-6-sol"
+        with self.assertRaises(ValueError):
+            plan(value)
+
     def test_unknown_or_saved_parent_does_not_guess(self):
         for source in ("configuration", "self-description", "unavailable"):
             value = request()
@@ -26,10 +51,10 @@ class RouteTests(unittest.TestCase):
 
     def test_explicit_mixed_policy_preserves_parent(self):
         value = request("gpt-6-astra")
-        value.update(policy="mixed-model", child={"model": "gpt-6-sol", "effort": "medium"})
+        value.update(policy="mixed-model", child={"model": "gpt-6.1-sol", "effort": "medium"})
         result = plan(value)
         self.assertEqual(result["parent"]["effectiveModel"], "gpt-6-astra")
-        self.assertEqual(result["spawn"]["model"], "gpt-6-sol")
+        self.assertEqual(result["spawn"]["model"], "gpt-6.1-sol")
 
     def test_mismatch_and_legacy_fail(self):
         for model in ("gpt-6-astra", "gpt-5.6-terra", "gpt-5.4"):
@@ -63,7 +88,7 @@ class RouteTests(unittest.TestCase):
             result = hook_identity({"hook_event_name": event, "model": "gpt-6-astra", "prompt": "SECRET"})
             self.assertIsNone(result["model"])
             self.assertNotIn("SECRET", str(result))
-        self.assertEqual(hook_identity({"hook_event_name": "Stop", "model": "gpt-6-sol"})["model"], "gpt-6-sol")
+        self.assertEqual(hook_identity({"hook_event_name": "Stop", "model": "gpt-6.1-sol"})["model"], "gpt-6.1-sol")
 
     def test_invalid_input(self):
         for value in ([], {"policy": "cheap"}, {"policy": "mixed-model"}, {"parent": []}):
@@ -71,12 +96,12 @@ class RouteTests(unittest.TestCase):
                 plan(value)
 
     def test_parent_hook_normalizer_round_trips_into_planner(self):
-        value = request("gpt-6-sol")
-        value["parent"] = hook_identity({"hook_event_name": "Stop", "model": "gpt-6-sol"})
+        value = request("gpt-6.1-sol")
+        value["parent"] = hook_identity({"hook_event_name": "Stop", "model": "gpt-6.1-sol"})
         value["child"] = {"effort": "medium"}
         result = plan(value)
-        self.assertEqual(result["spawn"]["model"], "gpt-6-sol")
-        self.assertEqual(result["parent"]["effectiveModel"], "gpt-6-sol")
+        self.assertEqual(result["spawn"]["model"], "gpt-6.1-sol")
+        self.assertEqual(result["parent"]["effectiveModel"], "gpt-6.1-sol")
 
 
 if __name__ == "__main__":

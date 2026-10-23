@@ -116,7 +116,7 @@ print(json.dumps({"type": "turn.completed"}))
         return run_codex_agent.main(args)
 
     def test_generic_role_dry_runs_all_supported_models_without_changing_parent(self) -> None:
-        from routes import CHILD_MODELS
+        from routes import CHILD_MODELS, MODEL_FAMILIES
         for model in CHILD_MODELS:
             with mock.patch("sys.stdin", io.StringIO("Trace the API only")), mock.patch("sys.stdout", new_callable=io.StringIO) as output:
                 status = self.run_agent([
@@ -129,12 +129,30 @@ print(json.dumps({"type": "turn.completed"}))
             result = json.loads(output.getvalue())
             self.assertEqual(result["requestedModel"], model)
             self.assertIsNone(result["effectiveModel"])
-            self.assertEqual(result["suite"], model.removeprefix("gpt-6-"))
+            self.assertEqual(result["suite"], MODEL_FAMILIES[model])
             self.assertEqual(result["routingPolicy"], "same-model")
             self.assertIsNone(result["profileSha256"])
             self.assertEqual(result["routeSource"], "explicit-selector")
             self.assertEqual(len(result["instructionTemplateSha256"]), 64)
             self.assertFalse(self.output.exists())
+
+    def test_sol61_explicit_mixed_route_keeps_retired_parent_and_family(self) -> None:
+        with mock.patch("sys.stdin", io.StringIO("Read the API")), mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(self.run_agent([
+                "--role", "explorer", "--model", "gpt-6.1-sol", "--parent-model", "gpt-6-sol",
+                "--reasoning-effort", "medium", "--policy", "mixed-model", "--suite", "sol61",
+                "--cwd", str(self.root), "--output-dir", str(self.output),
+                "--codex", str(self.codex), "--dry-run",
+            ]), 0)
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["requestedModel"], "gpt-6.1-sol")
+        self.assertEqual(result["suite"], "sol61")
+        for effort in ("none", "minimal", "ultra"):
+            with mock.patch("sys.stderr"), self.assertRaises(SystemExit):
+                self.run_agent([
+                    "--role", "explorer", "--model", "gpt-6.1-sol", "--reasoning-effort", effort,
+                    "--cwd", str(self.root), "--output-dir", str(self.output), "--dry-run",
+                ])
 
     def test_generic_same_model_rejects_mismatch_before_launch(self) -> None:
         with mock.patch("sys.stderr"), self.assertRaises(SystemExit):
@@ -227,12 +245,12 @@ print(json.dumps({"type": "turn.completed"}))
         with mock.patch("sys.stdin", io.StringIO("Verify the repository without edits.")):
             with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
                 result = self.run_agent([
-                    "--role", "gpt6-sol-verifier", "--cwd", str(self.root),
+                    "--role", "gpt61-sol-verifier", "--cwd", str(self.root),
                     "--output-dir", str(self.output), "--codex", str(self.codex), "--dry-run",
                 ])
         self.assertEqual(result, 0)
         rendered = stdout.getvalue()
-        self.assertIn('"model": "gpt-6-sol"', rendered)
+        self.assertIn('"model": "gpt-6.1-sol"', rendered)
         self.assertIn('"reasoningEffort": "high"', rendered)
         self.assertIn('"sandbox": "read-only"', rendered)
         self.assertNotIn('service_tier="fast"', rendered)
@@ -567,7 +585,7 @@ print(json.dumps({"type": "turn.completed"}))
             result = self.run_agent(
                 [
                     "--role",
-                    "gpt6-sol-engineer",
+                    "gpt61-sol-engineer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -619,7 +637,7 @@ print(json.dumps({"type": "turn.completed"}))
             result = self.run_agent(
                 [
                     "--role",
-                    "gpt6-sol-engineer",
+                    "gpt61-sol-engineer",
                     "--cwd",
                     str(self.root),
                     "--output-dir",
@@ -645,7 +663,7 @@ print(json.dumps({"type": "turn.completed"}))
                 self.run_agent(
                     [
                         "--role",
-                        "gpt6-sol-engineer",
+                        "gpt61-sol-engineer",
                         "--cwd",
                         str(self.root),
                         "--output-dir",
@@ -694,7 +712,7 @@ print(json.dumps({"type": "turn.completed"}))
             subprocess.Popen, "wait", autospec=True, side_effect=record_wait
         ):
             result = self.run_agent([
-                "--role", "gpt6-sol-explorer", "--cwd", str(self.root),
+                "--role", "gpt61-sol-explorer", "--cwd", str(self.root),
                 "--output-dir", str(self.output), "--codex", str(self.codex),
             ])
         self.assertEqual(result, 0)
@@ -706,7 +724,7 @@ print(json.dumps({"type": "turn.completed"}))
                 "run_codex_agent.subprocess.Popen"
             ) as launch, self.assertRaises(SystemExit) as raised:
                 self.run_agent([
-                    "--role", "gpt6-sol-explorer", "--cwd", str(self.root),
+                    "--role", "gpt61-sol-explorer", "--cwd", str(self.root),
                     "--output-dir", str(self.output), "--codex", str(self.codex),
                     "--timeout", timeout,
                 ])
@@ -731,7 +749,7 @@ print(json.dumps({"type": "turn.completed"}))
             subprocess.Popen, "wait", autospec=True, side_effect=interrupt_delegate
         ), mock.patch("run_codex_agent.os.killpg", wraps=os.killpg) as kill_group:
             result = self.run_agent([
-                "--role", "gpt6-sol-explorer", "--cwd", str(self.root),
+                "--role", "gpt61-sol-explorer", "--cwd", str(self.root),
                 "--output-dir", str(self.output), "--codex", str(self.codex),
             ])
         self.assertEqual(result, 1)
@@ -847,7 +865,7 @@ else:
             "run_codex_agent.stop_process_group", side_effect=report_unverified
         ):
             result = self.run_agent([
-                "--role", "gpt6-sol-explorer", "--cwd", str(self.root),
+                "--role", "gpt61-sol-explorer", "--cwd", str(self.root),
                 "--output-dir", str(self.output), "--codex", str(self.codex),
             ])
         self.assertEqual(result, 1)

@@ -1,7 +1,7 @@
 # Long-running work and prompt tuning
 
 Use for multi-hour work, interruption recovery, or changes to the engineer's prompts. Guidance
-reviewed September 13, 2026. These are workflow choices, not provider runtime guarantees.
+reviewed October 23, 2026. These are workflow choices, not provider runtime guarantees.
 
 ## Continue from evidence
 
@@ -50,6 +50,10 @@ At compaction or handoff, preserve decisions, open criteria, changed paths, curr
 handles, and the next action. Retrieve older details when needed. In native Codex, use its context
 management; do not recreate API compaction in the skill. An application-owned Responses controller
 must follow the documented conversation-state and compaction protocol for its selected model.
+
+Measure retained trace coverage before tuning; use the aggregate-only audit described in
+[fleet observability](fleet-observability.md). A repeat-call marker is a candidate, not proof of
+waste; changed files, compaction, pagination, and fresh state can justify another read.
 
 Tune only a demonstrated failure: premature handoff, redundant testing, wrong routing, stale context,
 or duplicated work. Compare previous/revised/no-skill behavior on the same acceptance contracts;

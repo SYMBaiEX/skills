@@ -3,7 +3,7 @@
 GPT-5.6 Sol, Terra, and Luna are retained here as historical and rollout-parent compatibility
 references. If a user has already selected a GPT-5.6 parent, preserve it; this skill does not
 switch the active chat model. GPT-5.6 is not a current GPT Engineer child route. Any delegation
-from a GPT-5.6 parent must be an explicit mixed-model route to GPT-6 Sol or GPT-6 Luna. Astra
+from a GPT-5.6 parent must be an explicit mixed-model route to GPT-6.1 Sol or GPT-6 Luna. Astra
 remains parent-only under every route.
 
 Use only runtime-supported selectors and the upstream model catalog. The old unsupported Luna

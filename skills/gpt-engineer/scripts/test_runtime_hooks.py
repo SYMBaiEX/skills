@@ -91,6 +91,35 @@ class RuntimeHookTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(path.read_bytes(), GUARD_HOOK.read_bytes())
 
+    def test_receiptless_v220_upgrade_replaces_context_hook_and_matcher_once(self) -> None:
+        import re
+
+        self.install()
+        codex = self.root / ".codex"
+        (codex / ".gpt-engineer-install.json").unlink()
+        path = codex / "hooks" / CONTEXT_HOOK.name
+        original = CONTEXT_HOOK.read_text().replace("gpt61_sol_", "gpt6_sol_")
+        path.write_text(original)
+        hooks_path = codex / "hooks.json"
+        config = json.loads(hooks_path.read_text())
+        old_matcher = "^(gpt6_sol_engineer|gpt6_sol_explorer|gpt6_sol_worker|gpt6_sol_verifier|gpt6_luna_explorer|gpt6_luna_worker|gpt6_luna_verifier)$"
+        config["hooks"]["SubagentStart"][0]["matcher"] = old_matcher
+        hooks_path.write_text(json.dumps(config))
+        for _ in range(2):
+            result = self.run_bootstrap("--provider", "codex", "--upgrade", "--with-hooks")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(path.read_bytes(), CONTEXT_HOOK.read_bytes())
+            groups = json.loads(hooks_path.read_text())["hooks"]["SubagentStart"]
+            self.assertEqual(len(groups), 1)
+            for role in ("gpt6_luna_explorer", "gpt6_luna_worker", "gpt6_luna_verifier", "gpt61_sol_worker"):
+                handlers = [handler for group in groups if re.fullmatch(group["matcher"], role)
+                            for handler in group["hooks"]]
+                self.assertEqual(len(handlers), 1)
+        observed = subprocess.run([sys.executable, str(path)],
+                                  input=json.dumps({"hook_event_name": "SubagentStart", "agent_type": "gpt61_sol_worker"}),
+                                  capture_output=True, text=True, check=True)
+        self.assertIn("gpt61_sol_worker", json.loads(observed.stdout)["hookSpecificOutput"]["additionalContext"])
+
     def test_symlink_and_dangling_symlink_are_preserved(self) -> None:
         self.install()
         codex = self.root / ".codex"
@@ -118,7 +147,7 @@ class RuntimeHookTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("symlink path", result.stderr)
         self.assertTrue((codex / "agents").is_symlink())
-        self.assertFalse((owner / "gpt6-sol-engineer.toml").exists())
+        self.assertFalse((owner / "gpt61-sol-engineer.toml").exists())
 
     def test_disable_removes_only_exact_managed_handlers(self) -> None:
         self.install()
@@ -163,12 +192,12 @@ class RuntimeHookTests(unittest.TestCase):
     def test_uninstall_removes_managed_files_and_keeps_custom_file(self) -> None:
         self.install()
         codex = self.root / ".codex"
-        custom = codex / "agents" / "gpt6-sol-engineer.toml"
+        custom = codex / "agents" / "gpt61-sol-engineer.toml"
         custom.write_text("name = 'owner-owned'\n")
         result = self.run_bootstrap("--provider", "codex", "--uninstall")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(custom.read_text(), "name = 'owner-owned'\n")
-        self.assertFalse((codex / "agents" / "gpt6-sol-explorer.toml").exists())
+        self.assertFalse((codex / "agents" / "gpt61-sol-explorer.toml").exists())
         self.assertFalse((codex / ".gpt-engineer-install.json").exists())
 
     def test_uninstall_keeps_script_referenced_by_preserved_custom_handler(self) -> None:
@@ -215,7 +244,7 @@ class RuntimeHookTests(unittest.TestCase):
             result = self.run_bootstrap("--provider", "codex", "--uninstall")
             self.assertNotEqual(result.returncode, 0)
             self.assertTrue((codex / "hooks" / GUARD_HOOK.name).exists())
-            self.assertTrue((codex / "agents" / "gpt6-sol-engineer.toml").exists())
+            self.assertTrue((codex / "agents" / "gpt61-sol-engineer.toml").exists())
 
     def test_current_and_historical_managed_registration_collapse(self) -> None:
         self.install()

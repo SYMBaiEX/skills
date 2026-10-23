@@ -24,6 +24,10 @@ SKILL_ROOT = Path(__file__).resolve().parent.parent
 ASSET_ROOT = SKILL_ROOT / "assets"
 # Retire only exact managed profiles. Customized and unknown profiles stay put.
 RETIRED = {
+    "gpt6-sol-worker.toml": "GPT-6 Sol child replaced by GPT-6.1 Sol",
+    "gpt6-sol-engineer.toml": "GPT-6 Sol child replaced by GPT-6.1 Sol",
+    "gpt6-sol-explorer.toml": "GPT-6 Sol child replaced by GPT-6.1 Sol",
+    "gpt6-sol-verifier.toml": "GPT-6 Sol child replaced by GPT-6.1 Sol",
     "astra-engineer.toml": "Astra is now parent-only",
     "astra-explorer.toml": "Astra is now parent-only",
     "astra-verifier.toml": "Astra is now parent-only",
@@ -34,7 +38,7 @@ RETIRED = {
     "luna-verifier.toml": "GPT-5.6 worker preset retired during the GPT-6 rollout",
     "luna-max-worker.toml": "Old Luna Max/Fast preset retired",
 }
-BUNDLE_VERSION = "2.2.0"
+BUNDLE_VERSION = "2.3.0"
 RECEIPT_NAME = ".gpt-engineer-install.json"
 RECEIPT_VERSION = 1
 
@@ -43,6 +47,13 @@ RECEIPT_VERSION = 1
 # user files. A file that is neither in this table nor in a trusted receipt is
 # preserved on upgrade and uninstall.
 KNOWN_BUNDLED_HASHES = {
+    "agents/gpt6-luna-explorer.toml": {"2219a78fed37320eabb7932c56475aee7880c745c1b7073656a6669924d32ace"},
+    "agents/gpt6-luna-verifier.toml": {"70061c6aab27111e1c2120c1da615c27b95f524eec78bc549dea040173d676ed"},
+    "agents/gpt6-luna-worker.toml": {"d24b8ad256358de57026746653cc1825415f3c439f4da9881a2859b0c77a01a7"},
+    "agents/gpt6-sol-verifier.toml": {"c8b4c0e83f442201571cc20866f1ba3e50c4435ae2447713bbf284d54ae53d45"},
+    "agents/gpt6-sol-explorer.toml": {"7f1052137988778ef6886a5d533d1d1b802741428ad043d983f66159c4cde9f3"},
+    "agents/gpt6-sol-engineer.toml": {"7344e5c3501c670cba26bdecf9d1a37add1fd08353acd689c300dd4ebd94d728"},
+    "agents/gpt6-sol-worker.toml": {"32a3811b49c3dd6545e1cc2ad7b7afea6b1de01acce795d14c6a2243d624a156"},
     "agents/astra-engineer.toml": {
         "a8e6a0c4a109543022f2badff542ecb567c8f6d4b1b3021085587d6416ed68a3",
         "0ec2cca4a109543022f2badff542ecb567c8f6d4b1b3021085587d6416ed68a3",
@@ -79,6 +90,7 @@ KNOWN_BUNDLED_HASHES = {
         "e97f6c5cd4dfc387a9595a9ed5f213fee51842ca85f8c1bb7cb2eafdea5ded80",
     },
     "hooks/gpt_engineer_subagent_context.py": {
+        "dcf18d071e018682f600c2ba9afd97c7b8bda9d108b199b7aa1be60ae2216383",
         "547091486167a8ca9760392fa2a8210897f2112c6db8cdaf6b9ddcbbf951c0e1",
         "d3b9c75bc7374a07c9f265ceb5a4f8ff21c4e4e6069f6cd4ae16f7012514fc7e",
         "7f574bb78a145a14bb699ca74b608f6f6363a535af166b647214859ce049779c",
@@ -90,6 +102,7 @@ KNOWN_BUNDLED_HASHES = {
 }
 KNOWN_MANAGED_HOOK_MATCHERS = {
     "SubagentStart": {
+        "^(gpt6_sol_engineer|gpt6_sol_explorer|gpt6_sol_worker|gpt6_sol_verifier|gpt6_luna_explorer|gpt6_luna_worker|gpt6_luna_verifier)$",
         "^(astra_engineer|astra_explorer|astra_worker|astra_verifier|terra_explorer|terra_worker|luna_worker|luna_max_worker|luna_verifier)$",
         "^(sol_engineer|terra_explorer|terra_worker|luna_verifier)$",
         "^(sol_engineer|terra_explorer|terra_worker|luna_worker|luna_verifier)$",

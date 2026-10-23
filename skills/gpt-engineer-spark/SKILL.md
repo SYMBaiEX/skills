@@ -11,7 +11,7 @@ metadata:
 
 Own the outcome as the main agent. Keep planning, architecture, conflict resolution, integration, security-sensitive judgment, and final acceptance in the main thread. Delegate small, explicit shards to `gpt-5.3-codex-spark` for speed.
 
-Spark is intentionally a separate speed-specialist model outside GPT Engineer's GPT-6 Sol/Luna
+Spark is intentionally a separate speed-specialist model outside GPT Engineer's GPT-6.1 Sol/Luna
 child routes. Activate this skill only when the user explicitly requests Spark or authorizes that
 tradeoff. Never enter it automatically from GPT Engineer's same-model or mixed-model policy. The
 selected main agent remains the orchestrator; Astra is never routed as a Spark or GPT Engineer

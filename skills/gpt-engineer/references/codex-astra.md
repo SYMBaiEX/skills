@@ -2,7 +2,7 @@
 
 This historical filename is retained for existing links. GPT-6 Astra is parent-only: it may be
 the active orchestrator/chat model, but it is never a GPT Engineer worker, verifier, fallback, or
-spawned profile. GPT-6 Sol and GPT-6 Luna are the only bundled child models. See
+spawned profile. GPT-6.1 Sol and GPT-6 Luna are the bundled child models. See
 [model routing](model-routing.md) for the complete policy and official source links.
 
 The optional Codex profile bundle includes Sol engineer/explorer/worker/verifier and Luna
@@ -11,8 +11,8 @@ verification); Luna profiles begin at high effort. These are starting defaults, 
 the native model. The runtime's available efforts and profile precedence remain authoritative.
 
 Use [runtime integrations](runtime-integrations.md) for installation, trust, upgrade, and removal.
-The upgrade backs up and retires only exact skill-managed Astra child profiles. Customized or
-unknown old Astra profiles are preserved and should be reviewed; the route audit flags them as
+The upgrade backs up and retires only exact skill-managed Astra and retired GPT-6 Sol child profiles. Customized or
+unknown retired profiles are preserved for review and must not be selected; the route audit flags them as
 unsafe GPT Engineer targets. Profile registration is not evidence that a run used the profile.
 
 ## Guarded CLI adapter
@@ -23,14 +23,14 @@ cross-provider gap: candidate copies, path scope, repository locks, process grou
 structured handoffs, and private lifecycle evidence. It disables recursive delegation and network
 access. It does not automatically integrate candidates.
 
-For a generic role, select an exact GPT-6 Sol or Luna model and effort. An Astra parent must use an
-explicit mixed-model policy; same-model is available only when the selected Sol/Luna parent matches
+For a generic role, select an exact GPT-6.1 Sol or Luna model and effort. An Astra parent must use an
+explicit mixed-model policy; same-model is available only when the selected 6.1 Sol/Luna parent matches
 the child. The CLI caller supplies the observed parent identity; the adapter cannot attest the
 parent's session.
 
 ```bash
 python3 scripts/run_codex_agent.py \
-  --role explorer --model gpt-6-sol --reasoning-effort medium \
+  --role explorer --model gpt-6.1-sol --reasoning-effort medium \
   --parent-model gpt-6-astra --policy mixed-model \
   --compatibility-reason headless-isolation-required \
   --stage-id architecture-map --cwd /path/to/repo \

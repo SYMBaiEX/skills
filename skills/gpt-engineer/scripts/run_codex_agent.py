@@ -23,7 +23,7 @@ import run_journal
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 HANDOFF_SCHEMA = SKILL_ROOT / "assets" / "codex" / "handoff.schema.json"
-from routes import CHILD_MODELS, PARENT_MODELS, ROLES
+from routes import CHILD_MODELS, MODEL_FAMILIES, PARENT_MODELS, PROFILE_PREFIXES, ROLES
 
 COMPATIBILITY_REASONS = (
     "native-routing-unavailable",
@@ -602,8 +602,8 @@ def bounded_error(error: BaseException, cwd: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--role", choices=tuple(ROLES) + ("engineer", "explorer", "worker", "verifier"), required=True)
-    parser.add_argument("--suite", choices=("sol", "luna"), help="Optional child-model family check")
-    parser.add_argument("--model", choices=CHILD_MODELS, help="Exact GPT-6 Sol or Luna child model; Astra is parent-only")
+    parser.add_argument("--suite", choices=("sol61", "luna"), help="Optional child-model family check")
+    parser.add_argument("--model", choices=CHILD_MODELS, help="Exact GPT-6.1 Sol or Luna child model; Astra is parent-only")
     parser.add_argument("--parent-model", choices=PARENT_MODELS, help="Observed active chat/orchestrator model")
     parser.add_argument("--policy", choices=("same-model", "mixed-model"), default="same-model")
     parser.add_argument("--reasoning-effort", choices=("low", "medium", "high", "xhigh", "max"))
@@ -688,17 +688,17 @@ def main(argv: list[str] | None = None) -> int:
     generic = args.role in ("engineer", "explorer", "worker", "verifier")
     if generic:
         if not args.model or not args.reasoning_effort:
-            parser.error("Generic roles require explicit GPT-6 Sol/Luna --model and --reasoning-effort")
+            parser.error("Generic roles require explicit GPT-6.1 Sol/Luna --model and --reasoning-effort")
         if not args.parent_model:
             parser.error("Specify the observed active --parent-model before routing a child")
-        if args.suite and not args.model.endswith(args.suite):
+        if args.suite and MODEL_FAMILIES[args.model] != args.suite:
             parser.error("--suite must match the explicitly selected child model")
         if args.policy == "same-model" and args.parent_model != args.model:
             parser.error("Same-model requires a Sol/Luna parent matching the child; Astra or another model requires --policy mixed-model")
-        base_role = "gpt6-" + args.model.removeprefix("gpt-6-") + "-" + args.role
+        base_role = PROFILE_PREFIXES[args.model] + "-" + args.role
         if base_role not in ROLES:
             parser.error("This model does not provide the requested child role")
-        args.suite = args.model.removeprefix("gpt-6-")
+        args.suite = MODEL_FAMILIES[args.model]
         profile = {**ROLES[base_role], "model": args.model, "effort": args.reasoning_effort}
         # Do not inherit a preset service tier or parent model.
         profile.pop("service_tier", None)
@@ -711,7 +711,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("Specify the observed active --parent-model before routing a child")
         base_role = args.role
         profile = dict(ROLES[args.role])
-        family = "sol" if profile["model"] == "gpt-6-sol" else "luna"
+        family = MODEL_FAMILIES[profile["model"]]
         if args.suite and args.suite != family:
             parser.error("--suite conflicts with the pinned child profile")
         if args.policy == "same-model" and args.parent_model != profile["model"]:

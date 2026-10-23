@@ -1,6 +1,7 @@
 # Runtime integrations and release checks
 
-Capability review: September 13, 2026. Tested versions belong in release evidence, not a permanent
+Capability documentation reviewed October 23, 2026. Older inspected version numbers below are
+historical local evidence, not fresh compatibility verification. Tested versions belong in release evidence, not a permanent
 minimum-version promise. Read only rows relevant to the selected surface. A portable skill cannot
 enable a runtime feature by describing it.
 
@@ -10,15 +11,15 @@ enable a runtime feature by describing it.
 | --- | --- | --- | --- | --- | --- | --- |
 | SKILL.md and progressive disclosure | Agent Skills current specification | Core and optional references | Cheap discovery; task-specific context | Description always discoverable; body on activation | Does not register agents/hooks or resolve dependencies | Adopt; compact core |
 | Targeted install/update, temporary use | Vercel Skills CLI 1.5.26 validated | Portable distribution | Avoid blanket reinstalls; disposable canary | CLI/network and isolated setup | Installation telemetry is not usage/outcome telemetry | Adopt named skills and versioned evaluation |
-| Native model/effort selection | Codex live schema; local CLI 0.153.4 inspected | Primary engineering route | No extra controller/process loop | Child context and synthesis | Profiles/defaults may override; account availability varies | Adopt explicit same/mixed route |
-| Optional pinned agent profiles | Codex .toml; 0.153.4 inspection | Bundled/installed presets | Convenient roles | Catalog entries; maintenance | Installed is not necessarily loaded or effective | Retain optional; direct selectors suffice |
+| Native model/effort selection | Codex live schema; local CLI 0.153.4 inspected | Primary engineering route | No extra controller/process loop | Child context and synthesis | Named custom-agent model/effort override spawn values; account availability varies | Adopt explicit same/mixed route |
+| Optional pinned agent profiles | Codex .toml; 0.153.4 inspection | 6.1 Sol/Luna bundled presets | Convenient roles | Catalog entries; maintenance | Installed is not necessarily loaded or effective | Retain optional; direct selectors suffice |
 | SubagentStart context | Codex released hooks docs | Project opt-in handler | Compact role/ownership reminder | One short process per matching start | Parent session/model is not child attestation; trust required | Retain bounded, narrow, synchronous |
 | Destructive command guard | Codex PreToolUse | Project opt-in handler | Extra accidental-command warning | Matching shell call latency | Not a complete security boundary; cannot grant authority | Retain synchronous; permissions remain authoritative |
 | Model signal normalization | Codex hook extension | Optional pure helper, not a new global hook | Prevent parent/child misattribution | Small JSON parse | Caller must obtain authentic event; fields can be unavailable | Adopt whitelist, no persistence |
 | Startup/compaction restoration | Codex SessionStart/PostCompact; runtime-specific | Manual journal resume/native context | Recover open requirements | Potential context injection and stale state | Needs explicit run binding and trust | Defer automatic hook; use bounded explicit resume |
 | Tool outcomes/resource recorder | Codex PostToolUse/Interrupt | Native telemetry plus explicit owned handles | Better causal timing/cleanup | Per-tool hook load and sensitive outputs | Hosted tools differ; async completion may arrive later | Defer generic hook until missing evidence justifies it |
 | Stop/reconciliation hooks | Codex/Claude distinct payloads | Explicit journal close | Honest completion | Continuation can consume usage | Hook cannot determine all acceptance/authority | Reject generic auto-continue; keep explicit gates |
-| Native context notes/history | Eligible Astra Codex session; experiment off by default | Feature-detected only | Search prior context rather than replay | State/tool calls | Account/client/sign-in restrictions; not arbitrary cross-project memory | Prefer when available; never auto-enable |
+| Native context notes/history | Eligible Codex session; feature-detect current client/account | Feature-detected only | Search prior context rather than replay | State/tool calls | Account/client/sign-in restrictions; not arbitrary cross-project memory | Prefer when available; never auto-enable |
 | Claude skills and agent profiles | Claude Code 2.1.247 inspected; current docs may describe newer releases | Shared skill folder, separate native profiles | Portable engineering in Claude | Provider-specific maintenance | GPT model IDs do not select Claude models; precedence differs | Retain, test separately |
 | Claude forced subagent model | Docs require 2.1.257+ for FORCE | Not enabled by this skill | Uniform routing when explicitly required | Removes role flexibility | Local 2.1.247 below documented FORCE version | Defer; do not claim env default is a force guarantee |
 | Companion plugin | Codex/Claude packaging extensions | Not added | Could ship hooks/agents as a versioned bundle | Another catalog, activation and trust boundary | Skills CLI does not install plugin components; duplicate hooks can all run | Defer: optional bootstrap covers current need |

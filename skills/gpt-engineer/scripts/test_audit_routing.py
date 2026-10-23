@@ -52,23 +52,32 @@ class AuditRoutingTests(unittest.TestCase):
         self.assertEqual(result["status"], "passed")
         self.assertEqual(result["violations"], [])
 
+    def test_sol61_suite_preserves_model_identity(self) -> None:
+        result = audit_routing.audit(self.root, self.home, "gpt-6.1-sol",
+                                    ["gpt61_sol_worker=gpt-6.1-sol:medium"], suite="sol61")
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(len(result["profiles"]), 4)
+        wrong = audit_routing.audit(self.root, self.home, "gpt-6.1-sol",
+                                   ["gpt61_sol_worker=gpt-6-sol:medium"], suite="sol61")
+        self.assertEqual(wrong["status"], "failed")
+
     def test_single_quoted_commented_shadow_cannot_bypass_audit(self) -> None:
         shadow = self.root / ".codex" / "agents" / "shadow.toml"
-        shadow.write_text("name = 'gpt6_sol_worker' # valid TOML\nmodel = 'gpt-5.4' # wrong route\nmodel_reasoning_effort = 'medium'\n")
+        shadow.write_text("name = 'gpt61_sol_worker' # valid TOML\nmodel = 'gpt-5.4' # wrong route\nmodel_reasoning_effort = 'medium'\n")
         result = audit_routing.audit(self.root, self.home, "gpt-6-astra")
         self.assertEqual(result["status"], "failed")
-        self.assertTrue(any(str(shadow) in item and "expected gpt-6-sol" in item for item in result["violations"]))
+        self.assertTrue(any(str(shadow) in item and "expected gpt-6.1-sol" in item for item in result["violations"]))
 
     def test_multiline_toml_string_and_nested_fields(self) -> None:
         path = self.root / ".codex" / "agents" / "multiline.toml"
-        path.write_text('name = """gpt6_sol_worker"""\nmodel = """gpt-6-sol"""\nmodel_reasoning_effort = "medium" # comment\n[metadata]\nname = "gpt6_sol_worker"\nmodel = "gpt-5.4"\n')
-        self.assertEqual(audit_routing.read_profile(path)["model"], "gpt-6-sol")
+        path.write_text('name = """gpt61_sol_worker"""\nmodel = """gpt-6.1-sol"""\nmodel_reasoning_effort = "medium" # comment\n[metadata]\nname = "gpt61_sol_worker"\nmodel = "gpt-5.4"\n')
+        self.assertEqual(audit_routing.read_profile(path)["model"], "gpt-6.1-sol")
         self.assertEqual(audit_routing.audit(self.root, self.home, "gpt-6-astra")["status"], "passed")
-        path.write_text('[metadata]\nname = "gpt6_sol_worker"\nmodel = "gpt-5.4"\n')
+        path.write_text('[metadata]\nname = "gpt61_sol_worker"\nmodel = "gpt-5.4"\n')
         self.assertEqual(audit_routing.read_profile(path), {})
-        (self.home / "agents" / "gpt6-sol-worker.toml").unlink()
+        (self.home / "agents" / "gpt61-sol-worker.toml").unlink()
         result = audit_routing.audit(self.root, self.home, "gpt-6-astra")
-        self.assertIn("missing installed custom agent profile: gpt6_sol_worker", result["violations"])
+        self.assertIn("missing installed custom agent profile: gpt61_sol_worker", result["violations"])
 
     def test_malformed_and_duplicate_keys_fail_with_source(self) -> None:
         path = self.root / ".codex" / "agents" / "malformed.toml"
@@ -97,7 +106,7 @@ class AuditRoutingTests(unittest.TestCase):
     def test_project_shadow_with_old_model_fails(self) -> None:
         shadow = self.root / ".codex" / "agents" / "shadow.toml"
         shadow.write_text(
-            'name = "gpt6_sol_explorer"\n'
+            'name = "gpt61_sol_explorer"\n'
             'description = "bad shadow"\n'
             'model = "gpt-5.4"\n'
             'model_reasoning_effort = "high"\n'
@@ -106,7 +115,7 @@ class AuditRoutingTests(unittest.TestCase):
         result = audit_routing.audit(self.root, self.home, "gpt-6-astra")
         self.assertEqual(result["status"], "failed")
         self.assertTrue(
-            any("expected gpt-6-sol/medium" in item for item in result["violations"])
+            any("expected gpt-6.1-sol/medium" in item for item in result["violations"])
         )
 
     def test_old_parent_model_fails(self) -> None:
@@ -118,11 +127,11 @@ class AuditRoutingTests(unittest.TestCase):
         )
 
     def test_missing_profile_fails(self) -> None:
-        (self.home / "agents" / "gpt6-sol-worker.toml").unlink()
+        (self.home / "agents" / "gpt61-sol-worker.toml").unlink()
         result = audit_routing.audit(self.root, self.home, None)
         self.assertEqual(result["status"], "failed")
         self.assertIn(
-            "missing installed custom agent profile: gpt6_sol_worker",
+            "missing installed custom agent profile: gpt61_sol_worker",
             result["violations"],
         )
 
@@ -131,7 +140,7 @@ class AuditRoutingTests(unittest.TestCase):
             self.root,
             self.home,
             "gpt-6-astra",
-            ["gpt6_sol_explorer=gpt-6-sol:medium"],
+            ["gpt61_sol_explorer=gpt-6.1-sol:medium"],
         )
         self.assertEqual(result["status"], "passed")
         self.assertTrue(result["observedRoutes"][0]["valid"])
@@ -143,7 +152,7 @@ class AuditRoutingTests(unittest.TestCase):
             "gpt-6-astra",
             [
                 "security-auditor=gpt-5.4:high",
-                "gpt6_sol_worker=gpt-6-astra:high",
+                "gpt61_sol_worker=gpt-6-astra:high",
             ],
         )
         self.assertEqual(result["status"], "failed")
@@ -151,12 +160,12 @@ class AuditRoutingTests(unittest.TestCase):
             any("unsupported agent type" in item for item in result["violations"])
         )
         self.assertTrue(
-            any("children must use GPT-6 Sol or GPT-6 Luna" in item for item in result["violations"])
+            any("children must use GPT-6.1 Sol or GPT-6 Luna" in item for item in result["violations"])
         )
 
     def test_malformed_observed_route_fails(self) -> None:
         result = audit_routing.audit(
-            self.root, self.home, "gpt-6-astra", ["gpt6_sol_explorer"]
+            self.root, self.home, "gpt-6-astra", ["gpt61_sol_explorer"]
         )
         self.assertEqual(result["status"], "failed")
         self.assertTrue(any("invalid observed route" in item for item in result["violations"]))

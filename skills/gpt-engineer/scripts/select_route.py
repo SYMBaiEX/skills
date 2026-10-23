@@ -56,7 +56,7 @@ def plan(document: dict) -> dict:
         raise ValueError("parent model outside supported contract")
     explicit_child = child.get("model")
     if explicit_child is not None and explicit_child not in CHILD_MODELS:
-        raise ValueError("Astra is orchestrator-only; children must use GPT-6 Sol or Luna")
+        raise ValueError("Astra is orchestrator-only; children must use GPT-6.1 Sol or Luna")
     model = explicit_child
     if policy == "same-model":
         if parent_model is None:
@@ -70,14 +70,14 @@ def plan(document: dict) -> dict:
         if parent_model == ASTRA_MODEL:
             raise ValueError("Astra is orchestrator-only; choose a Sol or Luna child with mixed-model policy")
         if parent_model not in CHILD_MODELS:
-            raise ValueError("a legacy parent requires an explicit GPT-6 Sol or Luna mixed-model child")
+            raise ValueError("a legacy parent requires an explicit Sol or Luna mixed-model child")
         model = explicit_child or parent_model
         if model != parent_model:
             raise ValueError("same-model child differs from observed parent")
     if policy == "mixed-model" and not child.get("model"):
         raise ValueError("mixed-model requires an explicit child model")
     if model is not None and model not in CHILD_MODELS:
-        raise ValueError("Astra is orchestrator-only; children must use GPT-6 Sol or Luna")
+        raise ValueError("Astra is orchestrator-only; children must use GPT-6.1 Sol or Luna")
     result = {"schema": "gpt-engineer-route/v1", "policy": policy,
               "parent": {"effectiveModel": parent_model, "source": parent.get("source", "unavailable")},
               "requested": {"model": model, "effort": child.get("effort"),

@@ -71,6 +71,32 @@ class AuditFleetTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
+    def test_sol_generations_remain_separate_historical_cohorts(self) -> None:
+        with sqlite3.connect(self.home / "state_5.sqlite") as state:
+            state.execute("UPDATE threads SET agent_role='gpt61_sol_worker', model='gpt-6.1-sol' WHERE id='a'")
+            state.execute("UPDATE threads SET agent_role='gpt6_sol_worker', model='gpt-6-sol' WHERE id='c'")
+        result = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(100, timezone.utc), root_thread="root")
+        self.assertEqual(result["routeCohorts"]["gpt61Sol"], 1)
+        self.assertEqual(result["routeCohorts"]["gpt6Sol"], 1)
+        self.assertEqual(result["routeCohorts"]["legacy56Children"], 0)
+        self.assertEqual(result["fleet"]["currentProfileChildren"], 1)
+        self.assertEqual(result["fleet"]["historicalProfileChildren"], 1)
+        self.assertEqual(result["fleet"]["routeViolations"], [])
+
+    def test_gpt6_assertion_remains_historical_and_gpt61_is_current(self) -> None:
+        with sqlite3.connect(self.home / "state_5.sqlite") as state:
+            state.execute("UPDATE threads SET agent_role='gpt6_sol_worker', model='gpt-6-sol' WHERE id='a'")
+        historical = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(100, timezone.utc), root_thread="root", dispatch_suite="gpt6")
+        self.assertEqual(historical["fleet"]["routeViolations"], [])
+        current = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(100, timezone.utc), root_thread="root", dispatch_suite="gpt61")
+        self.assertEqual([item["threadId"] for item in current["fleet"]["routeViolations"]], ["a"])
+        with sqlite3.connect(self.home / "state_5.sqlite") as state:
+            state.execute("UPDATE threads SET agent_role='gpt61_sol_worker', model='gpt-6.1-sol' WHERE id='a'")
+        current = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(100, timezone.utc), root_thread="root", dispatch_suite="gpt61")
+        self.assertEqual(current["fleet"]["routeViolations"], [])
+        historical = audit_fleet.audit(codex_home=self.home, since=datetime.fromtimestamp(100, timezone.utc), root_thread="root", dispatch_suite="gpt6")
+        self.assertEqual([item["threadId"] for item in historical["fleet"]["routeViolations"]], ["a"])
+
     def test_audits_recursive_root_and_route_leakage(self) -> None:
         result = audit_fleet.audit(
             codex_home=self.home,
