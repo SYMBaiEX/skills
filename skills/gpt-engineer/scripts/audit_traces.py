@@ -113,6 +113,17 @@ def audit(home, since, until, excluded=()):
                 except (ValueError,UnicodeError): counts['invalid_json_lines'] += 1; continue
                 if not isinstance(record,dict) or not isinstance(record.get('payload'),dict): counts['malformed_records'] += 1; continue
                 payload=record['payload']; kind=record.get('type')
+                session_record = kind == 'session_meta'
+                turn_record = kind == 'turn_context' or (
+                    kind == 'event_msg' and payload.get('type') == 'task_started')
+                identity_field = 'id' if session_record else 'turn_id' if turn_record else None
+                if identity_field is not None and identity_field in payload and not isinstance(payload[identity_field], str):
+                    counts['malformed_records'] += 1
+                    # Invalid boundaries must not lend the preceding owner's identity to later records.
+                    if session_record:
+                        owner = None
+                    turn = None
+                    continue
                 if kind == 'session_meta': owner=payload.get('id'); turn=None
                 if kind == 'turn_context': turn=payload.get('turn_id',turn)
                 if kind == 'event_msg' and payload.get('type') == 'task_started': turn=payload.get('turn_id',turn)

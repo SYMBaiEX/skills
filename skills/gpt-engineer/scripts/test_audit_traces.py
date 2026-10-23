@@ -40,6 +40,32 @@ class AuditTests(unittest.TestCase):
             self.assertEqual(result['tool_calls'], {'other': 4})
             self.assertNotIn('private-', json.dumps(result))
 
+    def test_malformed_rollout_identifiers_do_not_abort_or_inherit_ownership(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            folder = home / 'sessions'
+            folder.mkdir()
+            with sqlite3.connect(home / 'thread_history_1.sqlite') as db:
+                db.execute('create table thread_turns(thread_id,turn_id,status,started_at,duration_ms)')
+                db.execute("insert into thread_turns values('owner','turn','completed',1790812800,1200)")
+            events = [{'type': 'session_meta', 'payload': {'id': 'owner'}},
+                      {'type': 'turn_context', 'payload': {'turn_id': 'turn'}}]
+            for value in ([], {}, None, 123, True):
+                events.extend([
+                    {'type': 'session_meta', 'payload': {'id': value}},
+                    {'type': 'turn_context', 'payload': {'turn_id': value}},
+                    {'type': 'event_msg', 'payload': {'type': 'task_started', 'turn_id': value}}])
+            for value in (100, 130):
+                events.append({'type': 'event_msg', 'payload': {'type': 'token_count',
+                               'info': {'total_token_usage': {'input_tokens': value}}}})
+            for index, event in enumerate(events):
+                event['timestamp'] = '2026-10-01T00:00:%02dZ' % index
+            (folder / 'invalid-identities.jsonl').write_text(''.join(json.dumps(e) + '\n' for e in events))
+            result = audit(home, 1790812800, 1790899200)
+            self.assertEqual(result['counts']['malformed_records'], 15)
+            self.assertEqual(result['runtime_usage']['token_deltas'], {})
+            self.assertEqual(result['event_types'], {'token_count': 2})
+
     def test_usage_rejects_unknown_and_invalid_fields(self):
         self.assertEqual(usage_delta({'input_tokens':'bad'}, {'input_tokens':7,'output_tokens':-1,'total_tokens':True,'private-token-label':123}), {'input_tokens':7})
 
