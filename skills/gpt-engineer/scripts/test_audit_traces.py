@@ -14,6 +14,32 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(process.returncode,2)
         self.assertIn('--since must precede --until',process.stderr)
 
+    def test_wrong_typed_rollout_fields_do_not_abort(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            folder = home / 'sessions'
+            folder.mkdir()
+            events = []
+            for timestamp in (None, 123, [], {}):
+                events.append({'timestamp': timestamp, 'type': 'event_msg',
+                               'payload': {'type': 'valid_type'}})
+            for subtype in (None, 123, [], {}):
+                events.append({'timestamp': '2026-10-01T00:00:00Z', 'type': 'event_msg',
+                               'payload': {'type': subtype}})
+            for index, name in enumerate((None, 123, [], {'private-label': 'private-value'})):
+                events.append({'timestamp': '2026-10-01T00:00:01Z', 'type': 'response_item',
+                               'payload': {'type': 'function_call', 'call_id': str(index),
+                                           'name': name, 'arguments': 'private-arguments'}})
+            events.append({'timestamp': '2026-10-01T00:00:02Z', 'type': 'event_msg',
+                           'payload': {'type': 'valid_type'}})
+            (folder / 'malformed.jsonl').write_text(''.join(json.dumps(e) + '\n' for e in events))
+            result = audit(home, 1790812800, 1790899200)
+            self.assertEqual(result['counts']['invalid_timestamps'], 4)
+            self.assertEqual(result['counts']['malformed_records'], 4)
+            self.assertEqual(result['event_types'], {'valid_type': 1})
+            self.assertEqual(result['tool_calls'], {'other': 4})
+            self.assertNotIn('private-', json.dumps(result))
+
     def test_usage_rejects_unknown_and_invalid_fields(self):
         self.assertEqual(usage_delta({'input_tokens':'bad'}, {'input_tokens':7,'output_tokens':-1,'total_tokens':True,'private-token-label':123}), {'input_tokens':7})
 

@@ -16,9 +16,9 @@ agents and hooks.
 
 Preserve the selected parent. GPT-6 Astra is parent/orchestrator-only and must never be a child.
 GPT-6.1 Sol and GPT-6 Luna are the only GPT Engineer child routes. Same-model delegation is the
-default under 6.1 Sol/Luna parents; Astra parents require an explicit mixed-model Sol/Luna child. Keep
-an already-selected GPT-5.6 parent during rollout, but explicitly route children to GPT-6.1 Sol or
-Luna. Never infer execution from profiles or model self-description.
+default under 6.1 Sol/Luna parents. An Astra, retired GPT-6 Sol, or existing GPT-5.6 parent
+requires an explicit mixed-model GPT-6.1 Sol or GPT-6 Luna child. Preserve the selected parent.
+Never infer execution from profiles or model self-description.
 If the core or native delegation is absent, explain the limitation and perform suitable work directly;
 do not switch models or install a framework automatically. Claude native routing stays provider-specific.
 

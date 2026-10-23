@@ -12,8 +12,8 @@ metadata:
 Use installed GPT Engineer as the shared contract. This wrapper adds durable progress, not another
 model policy. Preserve the selected parent. GPT-6 Astra is parent/orchestrator-only and never a
 child; GPT-6.1 Sol and GPT-6 Luna are the only GPT Engineer child routes. Same-model is the default
-under 6.1 Sol/Luna parents; an Astra or existing GPT-5.6 parent needs an explicit mixed-model Sol/Luna
-child. Native Claude execution remains provider-specific. No fleet is mandatory.
+under 6.1 Sol/Luna parents; an Astra, retired GPT-6 Sol, or existing GPT-5.6 parent needs an explicit
+mixed-model GPT-6.1 Sol or GPT-6 Luna child. Native Claude execution remains provider-specific. No fleet is mandatory.
 
 Record objective, scope, acceptance, authority, requirements, evidence, current stage and blockers.
 Use native goal tools only when explicitly requested and available, following their exact lifecycle

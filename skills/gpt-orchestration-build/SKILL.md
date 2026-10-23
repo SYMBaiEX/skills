@@ -16,8 +16,9 @@ workflow below directly.
 
 Preserve the selected parent. GPT-6 Astra is parent/orchestrator-only and never a child. GPT-6.1 Sol
 and GPT-6 Luna are the only GPT Engineer child routes. Under 6.1 Sol/Luna parents, same-model children
-are the default; an Astra or existing GPT-5.6 parent requires an explicit mixed-model Sol/Luna
-route. A fleet is optional. Never silently substitute models or change provider.
+are the default; an Astra, retired GPT-6 Sol, or existing GPT-5.6 parent requires an explicit
+mixed-model GPT-6.1 Sol or GPT-6 Luna child route. A fleet is optional. Never silently substitute
+models or change provider.
 
 Read repository instructions and current Git state; preserve user/concurrent edits. Carry prior
 authorization within this task. Validate supplied findings against current source, tests and relevant

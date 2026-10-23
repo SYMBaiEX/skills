@@ -16,6 +16,8 @@ import sqlite3
 
 
 def epoch(value):
+    if not isinstance(value, str):
+        raise ValueError('timestamps must be strings with an explicit timezone')
     parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
     if parsed.tzinfo is None:
         raise ValueError('timestamps require an explicit timezone')
@@ -139,11 +141,14 @@ def audit(home, since, until, excluded=()):
                 if kind == 'compacted': counts['compaction_records'] += 1
                 if kind == 'event_msg':
                     subtype=payload.get('type','unknown')
-                    if re.fullmatch(r'[a-z_]{1,80}',subtype): event_types[subtype] += 1
+                    if isinstance(subtype,str) and re.fullmatch(r'[a-z_]{1,80}',subtype):
+                        event_types[subtype] += 1
+                    else:
+                        counts['malformed_records'] += 1
                 if kind != 'response_item': continue
                 if payload.get('type') in ('function_call','custom_tool_call'):
                     name=payload.get('name','unknown')
-                    if not re.fullmatch(r'[a-zA-Z0-9_.:-]{1,160}',name): name='other'
+                    if not isinstance(name,str) or not re.fullmatch(r'[a-zA-Z0-9_.:-]{1,160}',name): name='other'
                     tools[name] += 1
                     args=payload.get('arguments',payload.get('input',''))
                     repeat=digest([turn,name,args])

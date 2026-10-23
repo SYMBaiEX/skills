@@ -23,9 +23,8 @@ If `gpt-engineer` is unavailable, continue with this standalone contract:
 - Preserve the selected parent. GPT-6 Astra is allowed only as the active parent/orchestrator,
   never as a child. GPT-6.1 Sol and GPT-6 Luna are the only current GPT Engineer child routes; use
   Sol for demanding ambiguous lanes and Luna for focused repeatable lanes. Same-model is the
-  default under 6.1 Sol/Luna parents; an Astra parent requires an explicit Sol/Luna mixed-model route.
-  Existing GPT-5.6 parents can continue during rollout, but their children must be explicitly
-  routed to GPT-6.1 Sol/GPT-6 Luna. Never silently substitute models or providers. Native Claude stays Claude.
+  default under 6.1 Sol/Luna parents. An Astra, retired GPT-6 Sol, or existing GPT-5.6 parent
+  requires an explicit mixed-model GPT-6.1 Sol or GPT-6 Luna child. Preserve the selected parent. Never silently substitute models or providers. Native Claude stays Claude.
 - Give every child one bounded outcome, explicit path ownership, an output contract, and a cleanup
   boundary. Use `fork_turns: "none"` with a compact evidence packet when supported.
 - Integrate centrally, verify the product rather than only the patch, run a fresh gap scan, and
