@@ -4,7 +4,7 @@ description: "Complete substantial software builds, remediation, and engineering
 license: MIT
 metadata:
   author: SYMBaiEX
-  version: "2.3.0"
+  version: "2.3.1"
 ---
 
 # GPT Engineer
@@ -46,8 +46,10 @@ do not create a separate sandbox. For exact precedence, compatibility, and profi
 
 ## Delegate useful independent work
 
-Use subagents when independent work shortens the critical path or provides worthwhile review while
-the lead works. Keep coupled reasoning and edits together. Inspect live capacity, count descendants,
+Work directly by default for focused tasks and tightly coupled changes. Delegate only a bounded,
+independent lane whose parallel progress or independent judgment justifies startup, duplicated context,
+and integration cost. Do not add a planner, explorer, or reviewer merely to fill a workflow role.
+Keep coupled reasoning and edits together. Inspect live capacity, count descendants,
 and state lane scope and resource limits before a fleet or repeated experiment. Capacity is a ceiling,
 not a target. Keep one writer for shared files; isolate parallel candidates with disjoint ownership.
 
@@ -64,10 +66,14 @@ For scheduling, capacity planning, or API controllers, load
 
 ## Spend context on decisions
 
+Use instructions already supplied in context; do not reread the same entrypoint from disk unless
+its content is missing, changed, or uncertain. Discover task source separately from skill packages
+and generated trees; list supporting files only when they answer a concrete question.
 Search narrowly before reading whole files or discovering an entire tool catalog. Batch independent
 reads and calls; keep dependent operations sequential. Filter large results before returning them
-and keep raw artifacts local. Read selected instruction files completely, budgeting them separately
-if necessary. After truncation, retrieve the missing range or narrow the query instead of repeating
+and keep raw artifacts local. Read applicable repository instructions completely. Supporting references are conditional:
+select the relevant section from its headings rather than dumping the whole manual. Load more only
+when a decision needs it. After truncation, retrieve the missing range or narrow the query instead of repeating
 the same dump. Reuse verified findings until inputs change; a copied instruction is not new evidence.
 
 Keep one handle for a running command. A wait timeout is not a failed process; inspect that handle
@@ -89,7 +95,10 @@ writes finish. Inspect what commands execute. Recheck only when inputs changed, 
 an unresolved risk remains, or repository requirements demand it. Broad repeated testing and repeated
 review before later writes consume time without preserving acceptance evidence. Use rendered evidence
 when behavior or layout requires it. A green build, skipped check, or child summary is not flow proof.
-Load [engineering standards](references/engineering-standards.md) for broad work or high-risk boundaries.
+For release-readiness or cross-boundary work, consult only the applicable gates in
+[engineering standards](references/engineering-standards.md). A focused change or review can use
+the task contract and relevant regression evidence directly; touching a security or data symbol
+does not require unrelated gates. Preserve required security, compatibility, and correctness checks.
 
 ## Recover and finish honestly
 
@@ -99,7 +108,9 @@ repository-local `.engineer` is opt-in. Reconcile Git drift and external side ef
 or redispatching. Native history is optional; never inject entire transcripts. Native goal tools
 require an explicit goal request. Checkpoints must earn their recovery cost.
 
-Review the integrated diff and reconcile acceptance. Report checks as pass/fail/skip/not-run and
+Review the integrated diff and reconcile acceptance. Read changed source once with enough context
+to assess correctness; avoid replaying complete diffs or passing test output already inspected.
+Use concise success summaries and retain full failure evidence when investigation needs it. Report checks as pass/fail/skip/not-run and
 release state truthfully. Finalize started journals, including interrupted work. Teardown only
 recorded task-owned processes, listeners, candidates, and agent handles. Idle agents or open database
 edges are not OS liveness; preserve shared MCP services, other tasks, and unclassified processes.

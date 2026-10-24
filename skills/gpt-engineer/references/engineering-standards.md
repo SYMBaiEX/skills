@@ -1,7 +1,8 @@
 # Engineering standards
 
-Read this reference for Broad or Team work, release-readiness claims, or a change that touches a
-high-consequence boundary. The goal is a consistent definition of done without forcing every
+Consult the applicable sections for cross-boundary work or release-readiness claims. For a focused
+change or review, use its explicit contract and relevant checks directly. Search the headings and gate
+table first; load only sections needed to resolve the actual impact, including high-consequence risks. The goal is a consistent definition of done without forcing every
 repository into one stack or loading a universal checklist into every child.
 
 ## Build the standard in three layers
